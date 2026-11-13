@@ -18,7 +18,18 @@ const STORE = {
   status: 'whataka.status',
   relay: 'whataka.relay',
   avatar: 'whataka.avatar',
+  wallet: 'whataka.wallet',
 };
+
+// Pesos de minería: idénticos a los del contrato WhaTakaMiningRewards.
+const WEIGHTS = { relay: 5n, store: 8n, uptime: 1n, call: 10n, reputation: 3n };
+
+// ABI mínima del contrato para reclamar la recompensa.
+const MINING_ABI = [
+  'function claimMiningReward(bytes32 reportHash, uint256 relayUnits, uint256 storeUnits, uint256 uptimeUnits, uint256 callUnits, uint256 reputationUnits, uint256 deadline, bytes signature)',
+  'function rewardFor(uint256 relayUnits, uint256 storeUnits, uint256 uptimeUnits, uint256 callUnits, uint256 reputationUnits) view returns (uint256)',
+  'function rewardPool() view returns (uint256)',
+];
 
 const params = new URLSearchParams(location.search);
 
@@ -285,7 +296,79 @@ const state = {
   relayUnits: 0,
   storeUnits: 0,
   pendingKeys: new Map(),
+  // Web3
+  wallet: null,
+  miningConfig: null,
 };
+
+// ─────────────────────────────────────────────────────────────
+// Web3 (MetaMask)
+// ─────────────────────────────────────────────────────────────
+
+// Carga la config de minería del relé (contrato + cadena) una sola vez.
+async function loadMiningConfig() {
+  if (state.miningConfig) return state.miningConfig;
+  try {
+    const res = await fetch(`${RELAY_HTTP}/api/mining/config`);
+    const cfg = await res.json();
+    state.miningConfig = cfg && cfg.configured ? cfg : null;
+  } catch {
+    state.miningConfig = null;
+  }
+  return state.miningConfig;
+}
+
+function updateWalletUI() {
+  const status = $('#wallet-status-text');
+  const sub = $('#wallet-address-sub');
+  if (!status || !sub) return;
+  if (state.wallet) {
+    status.textContent = 'Wallet conectada 🟢';
+    sub.textContent = shortPeer(state.wallet, 6, 4);
+  } else {
+    status.textContent = '🦊 Conectar MetaMask';
+    sub.textContent = 'Vincular wallet para cobrar TTC on-chain';
+  }
+}
+
+// Conecta MetaMask y devuelve la dirección. Cambia a la red del contrato si hace falta.
+async function connectWallet() {
+  if (typeof window.ethereum === 'undefined') {
+    toast('Abre WhaTaka dentro de MetaMask o un navegador con wallet Web3');
+    return null;
+  }
+  try {
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const accounts = await provider.send('eth_requestAccounts', []);
+    const address = accounts && accounts[0];
+    if (!address) throw new Error('sin cuentas');
+
+    const cfg = await loadMiningConfig();
+    if (cfg) {
+      const current = Number(await provider.send('eth_chainId', []));
+      if (current !== Number(cfg.chainId)) {
+        try {
+          await window.ethereum.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: '0x' + Number(cfg.chainId).toString(16) }],
+          });
+        } catch {
+          toast(`Cambia tu wallet a la red ${cfg.chainId}`);
+        }
+      }
+    }
+
+    state.wallet = address;
+    writeStore(STORE.wallet, address);
+    updateWalletUI();
+    toast('Wallet conectada');
+    return address;
+  } catch (err) {
+    console.warn('MetaMask', err);
+    toast('No se pudo conectar la wallet');
+    return null;
+  }
+}
 
 // ─────────────────────────────────────────────────────────────
 // Interfaz
@@ -435,15 +518,36 @@ function renderStatus() {
     </div>`).join('');
 }
 
+// Unidades actuales del nodo (mismas que espera el contrato).
+function miningUnits() {
+  const uptime = BigInt(Math.floor((Date.now() - state.startedAt) / 60000));
+  const store = BigInt(Object.values(state.messages).reduce((n, arr) => n + arr.length, 0));
+  return {
+    relay: BigInt(state.relayUnits),
+    store,
+    uptime,
+    call: 0n,
+    reputation: 0n,
+  };
+}
+
+function miningScore(units) {
+  return units.relay * WEIGHTS.relay
+    + units.store * WEIGHTS.store
+    + units.uptime * WEIGHTS.uptime
+    + units.call * WEIGHTS.call
+    + units.reputation * WEIGHTS.reputation;
+}
+
 function renderMining() {
-  const minutes = Math.floor((Date.now() - state.startedAt) / 60000);
-  state.storeUnits = Object.values(state.messages).reduce((n, arr) => n + arr.length, 0);
-  const score = state.relayUnits * 0.5 + state.storeUnits * 0.3 + minutes * 0.2;
+  const units = miningUnits();
+  state.storeUnits = Number(units.store);
+  const score = miningScore(units);
 
   $('#m-relay').textContent = String(state.relayUnits);
-  $('#m-uptime').textContent = String(minutes);
-  $('#m-store').textContent = String(state.storeUnits);
-  $('#m-score').textContent = score.toFixed(2);
+  $('#m-uptime').textContent = String(units.uptime);
+  $('#m-store').textContent = String(units.store);
+  $('#m-score').textContent = score.toString();
 
   const badge = $('#node-status');
   if (state.connected) {
@@ -856,34 +960,96 @@ async function sendMiningReport() {
   const btn = $('#btn-send-report');
   const log = $('#report-log');
   btn.disabled = true;
-  log.textContent = 'Firmando reporte…';
-
-  const minutes = Math.floor((Date.now() - state.startedAt) / 60000);
-  state.storeUnits = Object.values(state.messages).reduce((n, arr) => n + arr.length, 0);
-  const payload = {
-    peerId: state.identity.peerId,
-    signPub: state.identity.signPub,
-    relayUnits: state.relayUnits,
-    storeUnits: state.storeUnits,
-    uptimeMinutes: minutes,
-    issuedAt: new Date().toISOString(),
-    nonce: randomHex(8),
-  };
 
   try {
-    payload.signature = await signPayload(state.signKey, payload);
-    const res = await fetch(`${RELAY_HTTP}/api/mining/report`, {
+    // 1. Aseguramos wallet conectada.
+    if (!state.wallet) {
+      log.textContent = 'Conecta tu MetaMask para reclamar TTC…';
+      const addr = await connectWallet();
+      if (!addr) return;
+    }
+
+    // 2. El relé tiene que estar configurado con contrato y firmante.
+    const cfg = await loadMiningConfig();
+    if (!cfg) {
+      log.textContent = 'La minería on-chain aún no está configurada en el relé.';
+      toast('Minería on-chain no disponible');
+      return;
+    }
+
+    const units = miningUnits();
+    const score = miningScore(units);
+    if (score === 0n) {
+      log.textContent = 'Aún no acumulaste unidades de minería.';
+      return;
+    }
+
+    // 3. Pedimos al relé un vale firmado para nuestras unidades.
+    log.textContent = 'Solicitando vale firmado al relé…';
+    const reportHash = ethers.keccak256(
+      ethers.toUtf8Bytes(`${state.identity.peerId}:${randomHex(8)}`),
+    );
+    const voucherRes = await fetch(`${RELAY_HTTP}/api/mining/voucher`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        user: state.wallet,
+        peerId: state.identity.peerId,
+        reportHash,
+        relayUnits: units.relay.toString(),
+        storeUnits: units.store.toString(),
+        uptimeUnits: units.uptime.toString(),
+        callUnits: units.call.toString(),
+        reputationUnits: units.reputation.toString(),
+      }),
     });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-    log.textContent = `Reporte aceptado · score ${data.score ?? '—'} · TTC ${data.reward ?? '—'}`;
-    toast('MINING_REPORT firmado y enviado');
+    const voucherData = await voucherRes.json().catch(() => ({}));
+    if (!voucherRes.ok) throw new Error(voucherData.error || `HTTP ${voucherRes.status}`);
+
+    // 4. Enviamos la transacción; MetaMask firma y el contrato verifica el vale.
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const signer = await provider.getSigner();
+    const contract = new ethers.Contract(voucherData.contract, MINING_ABI, signer);
+
+    const u = voucherData.units;
+    // El importe lo decide el contrato (aplica el halving). Si podemos leerlo,
+    // mostramos el número exacto en vez del factor fijo del backend.
+    let rewardLabel = voucherData.rewardFormatted;
+    try {
+      rewardLabel = ethers.formatUnits(
+        await contract.rewardFor(u.relay, u.store, u.uptime, u.call, u.reputation),
+        18,
+      );
+    } catch {
+      /* el contrato podría no exponer rewardFor; usamos el del backend */
+    }
+
+    log.textContent = `Reclamando ${rewardLabel} TTC… confirma en tu wallet`;
+    const tx = await contract.claimMiningReward(
+      voucherData.reportHash,
+      u.relay,
+      u.store,
+      u.uptime,
+      u.call,
+      u.reputation,
+      voucherData.deadline,
+      voucherData.signature,
+    );
+    log.textContent = `Tx enviada ${tx.hash.slice(0, 12)}… esperando confirmación`;
+    await tx.wait();
+
+    log.textContent = `¡Recompensa de ${rewardLabel} TTC enviada a tu wallet! 🪙`;
+    toast('TTC reclamados on-chain');
+
+    // 5. Reiniciamos los contadores locales ya cobrados.
+    state.relayUnits = 0;
+    state.startedAt = Date.now();
+    renderMining();
   } catch (err) {
-    log.textContent = `No se pudo enviar: ${err.message}. Se guardó localmente.`;
-    toast('Reporte guardado localmente');
+    console.warn('Minería on-chain', err);
+    const msg = err.shortMessage || err.reason || err.message || 'error desconocido';
+    log.textContent = `No se pudo reclamar: ${msg}`;
+    toast('No se pudo reclamar la recompensa');
   } finally {
     btn.disabled = false;
   }
@@ -933,6 +1099,7 @@ function bindEvents() {
     }
   });
   $('#btn-send-report').addEventListener('click', sendMiningReport);
+  $('#connect-wallet-box').addEventListener('click', connectWallet);
 }
 
 async function boot() {
@@ -944,11 +1111,13 @@ async function boot() {
   state.identity = identity;
   state.signKey = await importSignPrivate(identity.signPriv);
   state.agreeKey = await importAgreePrivate(identity.agreePriv);
+  state.wallet = readStore(STORE.wallet, null);
 
   renderProfile();
   renderChats();
   renderStatus();
   renderMining();
+  updateWalletUI();
   bindEvents();
 
   if (params.get('relay')) {

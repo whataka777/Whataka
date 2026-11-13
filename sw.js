@@ -1,8 +1,9 @@
-const CACHE = 'whataka-v3';
+const CACHE = 'whataka-v5';
 const ASSETS = [
   './',
   './index.html',
   './app.js',
+  './vendor/ethers.umd.min.js',
   './manifest.webmanifest',
   './icons/icon-192.png',
   './icons/icon-512.png',

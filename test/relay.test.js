@@ -11,6 +11,11 @@ const PORT = 19876;
 const BASE = `http://127.0.0.1:${PORT}`;
 const WS_URL = `ws://127.0.0.1:${PORT}/relay`;
 
+// Clave de firmante y contrato ficticios para probar los vales de minería.
+const TEST_SIGNER_KEY = '0x' + '11'.repeat(32);
+const TEST_CHAIN_ID = 80002;
+const TEST_CONTRACT = '0x' + 'ab'.repeat(20);
+
 let child;
 
 function wait(ms) {
@@ -68,7 +73,13 @@ function makePeerId(seed) {
 
 test.before(async () => {
   child = spawn(process.execPath, [path.join(__dirname, '..', 'server.js')], {
-    env: { ...process.env, PORT: String(PORT) },
+    env: {
+      ...process.env,
+      PORT: String(PORT),
+      CHAIN_ID: String(TEST_CHAIN_ID),
+      MINING_CONTRACT: TEST_CONTRACT,
+      REPORT_SIGNER_KEY: TEST_SIGNER_KEY,
+    },
     stdio: 'ignore',
   });
   await waitForHealth();
@@ -247,4 +258,79 @@ test('la foto de perfil se difunde solo si es una miniatura JPEG válida', async
 
   a.close();
   b.close();
+});
+
+test('GET /api/mining/config publica contrato y cadena', async () => {
+  const res = await fetch(`${BASE}/api/mining/config`);
+  assert.equal(res.status, 200);
+  const cfg = await res.json();
+  assert.equal(cfg.configured, true);
+  assert.equal(cfg.chainId, TEST_CHAIN_ID);
+  assert.equal(cfg.contract, TEST_CONTRACT);
+  assert.equal(cfg.weights.relay, 5);
+  assert.equal(cfg.weights.call, 10);
+});
+
+test('el vale firmado recupera al firmante del relé y calcula la recompensa', async () => {
+  const voucher = require('../lib/voucher');
+  const { ethers } = require('ethers');
+  const user = '0x' + 'cd'.repeat(20);
+  const body = {
+    user,
+    peerId: 'wt1testpeer',
+    relayUnits: '10',
+    storeUnits: '2',
+    uptimeUnits: '30',
+    callUnits: '1',
+    reputationUnits: '5',
+  };
+
+  const res = await fetch(`${BASE}/api/mining/voucher`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  assert.equal(res.status, 200);
+  const data = await res.json();
+
+  // Score 10*5 + 2*8 + 30*1 + 1*10 + 5*3 = 121 -> 0.121 TTC
+  assert.equal(data.score, '121');
+  assert.equal(data.rewardFormatted, '0.121');
+  assert.equal(data.contract, TEST_CONTRACT);
+  assert.match(data.reportHash, /^0x[0-9a-f]{64}$/);
+
+  // La firma debe recuperar la dirección del firmante configurado.
+  const expectedSigner = voucher.signerAddress(TEST_SIGNER_KEY);
+  const recovered = ethers.verifyMessage(
+    ethers.getBytes(
+      voucher.voucherDigest({
+        chainId: TEST_CHAIN_ID,
+        contract: TEST_CONTRACT,
+        user,
+        reportHash: data.reportHash,
+        units: { relay: 10n, store: 2n, uptime: 30n, call: 1n, reputation: 5n },
+        deadline: data.deadline,
+      }),
+    ),
+    data.signature,
+  );
+  assert.equal(recovered, expectedSigner);
+});
+
+test('el vale rechaza una dirección de wallet inválida', async () => {
+  const res = await fetch(`${BASE}/api/mining/voucher`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user: 'no-es-direccion', relayUnits: '1' }),
+  });
+  assert.equal(res.status, 400);
+});
+
+test('el vale rechaza un score cero', async () => {
+  const res = await fetch(`${BASE}/api/mining/voucher`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user: '0x' + 'cd'.repeat(20) }),
+  });
+  assert.equal(res.status, 400);
 });

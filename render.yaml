@@ -13,3 +13,11 @@ services:
         value: production
       - key: CORS_ORIGIN
         value: "*"
+      # Minería on-chain: cadena, contrato desplegado y clave del firmante.
+      # REPORT_SIGNER_KEY es un secreto: configúralo en el panel de Render, no aquí.
+      - key: CHAIN_ID
+        value: "80002"
+      - key: MINING_CONTRACT
+        sync: false
+      - key: REPORT_SIGNER_KEY
+        sync: false

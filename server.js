@@ -11,9 +11,18 @@ const http = require('http');
 const crypto = require('crypto');
 const express = require('express');
 const { WebSocketServer } = require('ws');
+const voucher = require('./lib/voucher');
 
 const PORT = Number(process.env.PORT) || 10000;
 const MAX_FRAME = 64 * 1024;
+
+// Configuración de minería on-chain. Si falta la clave del firmante o la
+// dirección del contrato, el relé sigue funcionando (chat y presencia), pero
+// el endpoint de vales responde 503.
+const CHAIN_ID = Number(process.env.CHAIN_ID) || 80002; // Polygon Amoy por defecto
+const MINING_CONTRACT = (process.env.MINING_CONTRACT || '').trim();
+const REPORT_SIGNER_KEY = (process.env.REPORT_SIGNER_KEY || '').trim();
+const VOUCHER_TTL_SECONDS = Number(process.env.VOUCHER_TTL_SECONDS) || 600;
 
 const app = express();
 app.disable('x-powered-by');
@@ -130,6 +139,106 @@ app.post('/api/mining/report', (req, res) => {
   ledger.set(peerId, entry);
 
   res.json({ ok: true, score, reward, total: entry });
+});
+
+// ── Minería on-chain ────────────────────────────────────────────────────────
+// La app necesita saber a qué contrato/cadena apuntar y si el relé puede firmar.
+app.get('/api/mining/config', (req, res) => {
+  res.json({
+    configured: Boolean(MINING_CONTRACT && REPORT_SIGNER_KEY),
+    chainId: CHAIN_ID,
+    contract: MINING_CONTRACT || null,
+    weights: {
+      relay: Number(voucher.WEIGHTS.relay),
+      store: Number(voucher.WEIGHTS.store),
+      uptime: Number(voucher.WEIGHTS.uptime),
+      call: Number(voucher.WEIGHTS.call),
+      reputation: Number(voucher.WEIGHTS.reputation),
+    },
+    rewardFactor: voucher.REWARD_FACTOR.toString(),
+  });
+});
+
+// Valida un entero de unidades (0..MAX_UNITS) y lo devuelve como BigInt.
+function readUnits(value) {
+  if (value === undefined || value === null || value === '') return 0n;
+  const n = typeof value === 'bigint' ? value : BigInt(String(value).trim());
+  if (n < 0n || n > voucher.MAX_UNITS) throw new Error('unidades fuera de rango');
+  return n;
+}
+
+function isAddress(value) {
+  return typeof value === 'string' && /^0x[0-9a-fA-F]{40}$/.test(value);
+}
+
+app.post('/api/mining/voucher', (req, res) => {
+  if (!MINING_CONTRACT || !REPORT_SIGNER_KEY) {
+    return res.status(503).json({ error: 'la minería on-chain no está configurada' });
+  }
+
+  const body = req.body || {};
+  const { user, reportHash, nonce } = body;
+  if (!isAddress(user)) {
+    return res.status(400).json({ error: 'dirección de wallet inválida' });
+  }
+
+  let units;
+  try {
+    units = {
+      relay: readUnits(body.relayUnits),
+      store: readUnits(body.storeUnits),
+      uptime: readUnits(body.uptimeUnits),
+      call: readUnits(body.callUnits),
+      reputation: readUnits(body.reputationUnits),
+    };
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+
+  const score = voucher.scoreOf(units);
+  if (score === 0n) {
+    return res.status(400).json({ error: 'score cero, no hay nada que reclamar' });
+  }
+
+  const hash = typeof reportHash === 'string' && /^0x[0-9a-fA-F]{64}$/.test(reportHash)
+    ? reportHash
+    : voucher.reportHashFor(body.peerId || 'anon', nonce || crypto.randomBytes(8).toString('hex'));
+
+  const deadline = Math.floor(Date.now() / 1000) + VOUCHER_TTL_SECONDS;
+
+  let signature;
+  try {
+    signature = voucher.signVoucher(REPORT_SIGNER_KEY, {
+      chainId: CHAIN_ID,
+      contract: MINING_CONTRACT,
+      user,
+      reportHash: hash,
+      units,
+      deadline,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: `no se pudo firmar: ${err.message}` });
+  }
+
+  res.json({
+    ok: true,
+    chainId: CHAIN_ID,
+    contract: MINING_CONTRACT,
+    user,
+    reportHash: hash,
+    units: {
+      relay: units.relay.toString(),
+      store: units.store.toString(),
+      uptime: units.uptime.toString(),
+      call: units.call.toString(),
+      reputation: units.reputation.toString(),
+    },
+    score: score.toString(),
+    reward: voucher.rewardUnits(units).toString(),
+    rewardFormatted: voucher.formatReward(units),
+    deadline,
+    signature,
+  });
 });
 
 app.get('/api/mining/:peerId', (req, res) => {

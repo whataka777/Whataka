@@ -631,6 +631,11 @@
             <p class="badge-live" id="node-status">● CONECTANDO A LA RED…</p>
           </div>
 
+          <div class="stat-box highlight" id="connect-wallet-box" style="grid-column: 1 / -1; cursor: pointer;">
+            <span class="stat-val" id="wallet-status-text" style="font-size: 15px;">🦊 Conectar MetaMask</span>
+            <span class="stat-lbl" id="wallet-address-sub">Vincular wallet para cobrar TTC on-chain</span>
+          </div>
+
           <div class="stats-grid">
             <div class="stat-box">
               <span class="stat-val" id="m-relay">0</span>
@@ -651,9 +656,9 @@
           </div>
 
           <button class="primary-btn" id="btn-send-report">
-            <i class="fa-solid fa-file-signature"></i> Firmar y Enviar MINING_REPORT
+            <i class="fa-solid fa-file-signature"></i> Firmar y Reclamar TTC on-chain
           </button>
-          <p class="hint-text" id="report-log">Los reportes se firman criptográficamente para el contrato WhaTakaMiningRewards.</p>
+          <p class="hint-text" id="report-log">Los reportes se firman criptográficamente y el contrato WhaTakaMiningRewards paga los TTC a tu wallet.</p>
         </div>
       </div>
 
@@ -780,6 +785,7 @@
     <div class="toast" id="toast"></div>
   </div>
 
+  <script src="./vendor/ethers.umd.min.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>

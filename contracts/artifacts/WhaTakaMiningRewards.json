@@ -1,0 +1,606 @@
+{
+  "contractName": "WhaTakaMiningRewards",
+  "sourceName": "contracts_WhaTakaMiningRewards.sol",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_ttcToken",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "_reportSigner",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "previousMax",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "newMax",
+          "type": "uint256"
+        }
+      ],
+      "name": "MaxRewardUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "previousSigner",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "newSigner",
+          "type": "address"
+        }
+      ],
+      "name": "ReportSignerUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "previousFactor",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "newFactor",
+          "type": "uint256"
+        }
+      ],
+      "name": "RewardFactorUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "reportHash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "RewardPaid",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "to",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "TokensRescued",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "relay",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "store",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "uptime",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "call",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "reputation",
+          "type": "uint256"
+        }
+      ],
+      "name": "WeightsUpdated",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "MAX_UNITS",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "callWeight",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "reportHash",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint256",
+          "name": "relayUnits",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "storeUnits",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "uptimeUnits",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "callUnits",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "reputationUnits",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "deadline",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes",
+          "name": "signature",
+          "type": "bytes"
+        }
+      ],
+      "name": "claimMiningReward",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "maxRewardPerReport",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "owner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "name": "processedReports",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "relayWeight",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "reportSigner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "reputationWeight",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "to",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "rescueTokens",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "rewardFactor",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "relayUnits",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "storeUnits",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "uptimeUnits",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "callUnits",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "reputationUnits",
+          "type": "uint256"
+        }
+      ],
+      "name": "rewardFor",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "rewardPool",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "relayUnits",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "storeUnits",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "uptimeUnits",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "callUnits",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "reputationUnits",
+          "type": "uint256"
+        }
+      ],
+      "name": "scoreOf",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "newMax",
+          "type": "uint256"
+        }
+      ],
+      "name": "setMaxRewardPerReport",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "newSigner",
+          "type": "address"
+        }
+      ],
+      "name": "setReportSigner",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "newFactor",
+          "type": "uint256"
+        }
+      ],
+      "name": "setRewardFactor",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "relay",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "store",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "uptime",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "call",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "reputation",
+          "type": "uint256"
+        }
+      ],
+      "name": "setWeights",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "storeWeight",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "ttcToken",
+      "outputs": [
+        {
+          "internalType": "contract ITTC",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "uptimeWeight",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "reportHash",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "relayUnits",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "storeUnits",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "uptimeUnits",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "callUnits",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "reputationUnits",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "deadline",
+          "type": "uint256"
+        }
+      ],
+      "name": "voucherDigest",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x60a0604052600560025560086003556001600455600a600555600360065566038d7ea4c6800060075569d3c21bcecceda1000000600855348015610041575f5ffd5b506040516111573803806111578339810160408190526100609161013e565b6001600160a01b0382166100a85760405162461bcd60e51b815260206004820152600a602482015269746f6b656e206365726f60b01b60448201526064015b60405180910390fd5b6001600160a01b0381166100ee5760405162461bcd60e51b815260206004820152600d60248201526c6669726d616e7465206365726f60981b604482015260640161009f565b6001600160a01b0391821660805260018054919092166001600160a01b0319918216179091555f80549091163317905561016f565b80516001600160a01b0381168114610139575f5ffd5b919050565b5f5f6040838503121561014f575f5ffd5b61015883610123565b915061016660208401610123565b90509250929050565b608051610fbb61019c5f395f81816102070152818161057f015281816107ef01526109030152610fbb5ff3fe608060405234801561000f575f5ffd5b506004361061013d575f3560e01c80638da5cb5b116100b4578063c7b5f66711610079578063c7b5f66714610295578063d9f09c871461029e578063e07b3737146102b1578063f1223a89146102ba578063f27254b0146102cd578063f511498e146102d6575f5ffd5b80638da5cb5b146102415780638eb3ed521461025357806393a1f6b41461025c5780639c1f60861461026f578063ad1dc00714610282575f5ffd5b80632163837f116101055780632163837f146101a157806357376198146101ac578063616a0630146101bf57806366666aa9146101f1578063816cebe2146101f9578063853ffc3214610202575f5ffd5b80630adca5d3146101415780630cc248b314610156578063184d61be1461017c5780631c41ef97146101855780632157c0e71461018e575b5f5ffd5b61015461014f366004610d17565b6102e9565b005b610169610164366004610de1565b61067d565b6040519081526020015b60405180910390f35b61016960025481565b61016960075481565b61015461019c366004610e3c565b6106f1565b610169633b9aca0081565b6101546101ba366004610e53565b61075b565b6101e16101cd366004610e3c565b60096020525f908152604090205460ff1681565b6040519015158152602001610173565b6101696108ec565b61016960065481565b6102297f000000000000000000000000000000000000000000000000000000000000000081565b6040516001600160a01b039091168152602001610173565b5f54610229906001600160a01b031681565b61016960035481565b600154610229906001600160a01b031681565b61016961027d366004610e7b565b610979565b610154610290366004610e7b565b6109ee565b61016960045481565b6101696102ac366004610e7b565b610a86565b61016960085481565b6101546102c8366004610eb2565b610aa1565b61016960055481565b6101546102e4366004610e3c565b610b6b565b8242111561032e5760405162461bcd60e51b815260206004820152600d60248201526c56616c6520657870697261646f60981b60448201526064015b60405180910390fd5b5f8981526009602052604090205460ff16156103835760405162461bcd60e51b81526020600482015260146024820152735265706f7274652079612070726f63657361646f60601b6044820152606401610325565b633b9aca00881115801561039b5750633b9aca008711155b80156103ab5750633b9aca008611155b80156103bb5750633b9aca008511155b80156103cb5750633b9aca008411155b6104175760405162461bcd60e51b815260206004820152601760248201527f556e6964616465732066756572612064652072616e676f0000000000000000006044820152606401610325565b5f6104288a338b8b8b8b8b8b61067d565b6001549091506001600160a01b0316610442828585610bd5565b6001600160a01b0316146104985760405162461bcd60e51b815260206004820152601a60248201527f4669726d612064656c206f726163756c6f20696e76616c6964610000000000006044820152606401610325565b5f6104a68a8a8a8a8a610a86565b90505f81116104e95760405162461bcd60e51b815260206004820152600f60248201526e5265636f6d70656e7361206365726f60881b6044820152606401610325565b60085415610543576008548111156105435760405162461bcd60e51b815260206004820152601e60248201527f5265636f6d70656e736120706f7220656e63696d612064656c20746f706500006044820152606401610325565b5f8b81526009602052604090819020805460ff191660011790555163a9059cbb60e01b8152336004820152602481018290526001600160a01b037f0000000000000000000000000000000000000000000000000000000000000000169063a9059cbb906044016020604051808303815f875af11580156105c5573d5f5f3e3d5ffd5b505050506040513d601f19601f820116820180604052508101906105e99190610ecb565b6106355760405162461bcd60e51b815260206004820152601a60248201527f46616c6c6f206c61207472616e73666572656e636961205454430000000000006044820152606401610325565b60408051828152602081018d905233917f25d820333c9a561247c10864c5a61ff35d1b52a4d260cd78ffd379c9921a4187910160405180910390a25050505050505050505050565b604080514660208083019190915230828401526001600160a01b03999099166060820152608081019990995260a089019690965260c088019490945260e087019290925261010086015261012085015261014080850191909152815180850390910181526101609093019052815191012090565b5f546001600160a01b0316331461071a5760405162461bcd60e51b815260040161032590610eea565b60075460408051918252602082018390527f977f10cdbafda6ab996d38277835a4c15d0040078976017f2b3b77496b88ea88910160405180910390a1600755565b5f546001600160a01b031633146107845760405162461bcd60e51b815260040161032590610eea565b6001600160a01b0382166107c95760405162461bcd60e51b815260206004820152600c60248201526b64657374696e6f206365726f60a01b6044820152606401610325565b60405163a9059cbb60e01b81526001600160a01b038381166004830152602482018390527f0000000000000000000000000000000000000000000000000000000000000000169063a9059cbb906044016020604051808303815f875af1158015610835573d5f5f3e3d5ffd5b505050506040513d601f19601f820116820180604052508101906108599190610ecb565b6108a55760405162461bcd60e51b815260206004820152601a60248201527f46616c6c6f206c61207472616e73666572656e636961205454430000000000006044820152606401610325565b816001600160a01b03167f68f67de89e96b13a3ea058af5fd44cc125efceb528482d539c7b43db2faa066e826040516108e091815260200190565b60405180910390a25050565b6040516370a0823160e01b81523060048201525f907f00000000000000000000000000000000000000000000000000000000000000006001600160a01b0316906370a0823190602401602060405180830381865afa158015610950573d5f5f3e3d5ffd5b505050506040513d601f19601f820116820180604052508101906109749190610f11565b905090565b5f600654826109889190610f3c565b6005546109959085610f3c565b6004546109a29087610f3c565b6003546109af9089610f3c565b6002546109bc908b610f3c565b6109c69190610f59565b6109d09190610f59565b6109da9190610f59565b6109e49190610f59565b9695505050505050565b5f546001600160a01b03163314610a175760405162461bcd60e51b815260040161032590610eea565b60028590556003849055600483905560058290556006819055604080518681526020810186905290810184905260608101839052608081018290527f7a67f6b72b463e6dde3e06b84d460f1227df198ea0e692d44697112f1fc8cb549060a00160405180910390a15050505050565b5f600754610a978787878787610979565b6109e49190610f3c565b5f546001600160a01b03163314610aca5760405162461bcd60e51b815260040161032590610eea565b6001600160a01b038116610b105760405162461bcd60e51b815260206004820152600d60248201526c6669726d616e7465206365726f60981b6044820152606401610325565b6001546040516001600160a01b038084169216907f7a24a7caf4f3af74b72509f640f071da9a8079c451a260cd3e999e5c679cc69b905f90a3600180546001600160a01b0319166001600160a01b0392909216919091179055565b5f546001600160a01b03163314610b945760405162461bcd60e51b815260040161032590610eea565b60085460408051918252602082018390527f64cc8b0bc5d539e03bf1ff414d078447028c16f47fc95ef5b7612a6a0b723607910160405180910390a1600855565b5f60418214610be557505f610d10565b8235602084013560408501355f1a601b811015610c0a57610c07601b82610f6c565b90505b8060ff16601b14158015610c2257508060ff16601c14155b15610c32575f9350505050610d10565b7f7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a0821115610c65575f9350505050610d10565b6040517f19457468657265756d205369676e6564204d6573736167653a0a3332000000006020820152603c81018890525f90605c0160408051601f1981840301815282825280516020918201205f845290830180835281905260ff8516918301919091526060820186905260808201859052915060019060a0016020604051602081039080840390855afa158015610cff573d5f5f3e3d5ffd5b505050602060405103519450505050505b9392505050565b5f5f5f5f5f5f5f5f5f6101008a8c031215610d30575f5ffd5b8935985060208a0135975060408a0135965060608a0135955060808a0135945060a08a0135935060c08a0135925060e08a013567ffffffffffffffff811115610d77575f5ffd5b8a01601f81018c13610d87575f5ffd5b803567ffffffffffffffff811115610d9d575f5ffd5b8c6020828401011115610dae575f5ffd5b60208201935080925050509295985092959850929598565b80356001600160a01b0381168114610ddc575f5ffd5b919050565b5f5f5f5f5f5f5f5f610100898b031215610df9575f5ffd5b88359750610e0960208a01610dc6565b979a9799505050506040860135956060810135956080820135955060a0820135945060c0820135935060e0909101359150565b5f60208284031215610e4c575f5ffd5b5035919050565b5f5f60408385031215610e64575f5ffd5b610e6d83610dc6565b946020939093013593505050565b5f5f5f5f5f60a08688031215610e8f575f5ffd5b505083359560208501359550604085013594606081013594506080013592509050565b5f60208284031215610ec2575f5ffd5b610d1082610dc6565b5f60208284031215610edb575f5ffd5b81518015158114610d10575f5ffd5b6020808252600d908201526c4e6f206175746f72697a61646f60981b604082015260600190565b5f60208284031215610f21575f5ffd5b5051919050565b634e487b7160e01b5f52601160045260245ffd5b8082028115828204841417610f5357610f53610f28565b92915050565b80820180821115610f5357610f53610f28565b60ff8181168382160190811115610f5357610f53610f2856fea2646970667358221220f338b2ca438d295daa5866238b3489cb4bd4571132fa7c70a7e7314d0aaaa6ed64736f6c63430008260033"
+}
