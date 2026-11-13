@@ -302,7 +302,7 @@ const state = {
 };
 
 // ─────────────────────────────────────────────────────────────
-// Web3 (MetaMask)
+// Web3 (MetaMask, Brave Wallet u otra wallet inyectada)
 // ─────────────────────────────────────────────────────────────
 
 // Carga la config de minería del relé (contrato + cadena) una sola vez.
@@ -326,9 +326,33 @@ function updateWalletUI() {
     status.textContent = 'Wallet conectada 🟢';
     sub.textContent = shortPeer(state.wallet, 6, 4);
   } else {
-    status.textContent = '🦊 Conectar MetaMask';
+    status.textContent = '🦊 Conectar wallet';
     sub.textContent = 'Vincular wallet para cobrar TTC on-chain';
   }
+}
+
+// Devuelve el proveedor Web3 disponible. Con MetaMask y Brave Wallet a la vez,
+// ambos inyectan su propio objeto en window.ethereum.providers; elegimos uno de
+// forma estable (Brave primero, luego MetaMask) en vez de dejar que decida el
+// orden de carga, que cambia entre navegaciones y rompe la conexión.
+function getWalletProvider() {
+  const injected = window.ethereum;
+  if (!injected) return null;
+  const list = Array.isArray(injected.providers) ? injected.providers : [];
+  if (list.length === 0) return injected;
+  return (
+    list.find((p) => p.isBraveWallet) ||
+    list.find((p) => p.isMetaMask) ||
+    injected
+  );
+}
+
+// Nombre de la wallet para los mensajes, según lo que anuncie el proveedor.
+function walletName(provider) {
+  if (!provider) return 'wallet';
+  if (provider.isBraveWallet) return 'Brave Wallet';
+  if (provider.isMetaMask) return 'MetaMask';
+  return 'wallet';
 }
 
 // Metadatos de las redes conocidas, para poder AÑADIRLAS a MetaMask si el
@@ -362,10 +386,10 @@ const KNOWN_CHAINS = {
 };
 
 // Cambia (o añade) la red en la wallet para que coincida con el contrato.
-async function ensureChain(chainId) {
+async function ensureChain(wallet, chainId) {
   const hex = '0x' + Number(chainId).toString(16);
   try {
-    await window.ethereum.request({
+    await wallet.request({
       method: 'wallet_switchEthereumChain',
       params: [{ chainId: hex }],
     });
@@ -376,7 +400,7 @@ async function ensureChain(chainId) {
     const meta = KNOWN_CHAINS[Number(chainId)];
     if ((code === 4902 || code === -32603) && meta) {
       try {
-        await window.ethereum.request({
+        await wallet.request({
           method: 'wallet_addEthereumChain',
           params: [{
             chainId: hex,
@@ -399,12 +423,13 @@ async function ensureChain(chainId) {
 }
 
 async function connectWallet() {
-  if (typeof window.ethereum === 'undefined') {
-    toast('Abre WhaTaka dentro de MetaMask o un navegador con wallet Web3');
+  const wallet = getWalletProvider();
+  if (!wallet) {
+    toast('Abre WhaTaka dentro de MetaMask, Brave Wallet u otra wallet Web3');
     return null;
   }
   try {
-    const provider = new ethers.BrowserProvider(window.ethereum);
+    const provider = new ethers.BrowserProvider(wallet);
     const accounts = await provider.send('eth_requestAccounts', []);
     const address = accounts && accounts[0];
     if (!address) throw new Error('sin cuentas');
@@ -413,17 +438,17 @@ async function connectWallet() {
     if (cfg) {
       const current = Number(await provider.send('eth_chainId', []));
       if (current !== Number(cfg.chainId)) {
-        await ensureChain(cfg.chainId);
+        await ensureChain(wallet, cfg.chainId);
       }
     }
 
     state.wallet = address;
     writeStore(STORE.wallet, address);
     updateWalletUI();
-    toast('Wallet conectada');
+    toast(`Wallet conectada (${walletName(wallet)})`);
     return address;
   } catch (err) {
-    console.warn('MetaMask', err);
+    console.warn('Wallet', err);
     toast('No se pudo conectar la wallet');
     return null;
   }
@@ -1023,7 +1048,7 @@ async function sendMiningReport() {
   try {
     // 1. Aseguramos wallet conectada.
     if (!state.wallet) {
-      log.textContent = 'Conecta tu MetaMask para reclamar TTC…';
+      log.textContent = 'Conecta tu wallet para reclamar TTC…';
       const addr = await connectWallet();
       if (!addr) return;
     }
@@ -1065,8 +1090,10 @@ async function sendMiningReport() {
     const voucherData = await voucherRes.json().catch(() => ({}));
     if (!voucherRes.ok) throw new Error(voucherData.error || `HTTP ${voucherRes.status}`);
 
-    // 4. Enviamos la transacción; MetaMask firma y el contrato verifica el vale.
-    const provider = new ethers.BrowserProvider(window.ethereum);
+    // 4. Enviamos la transacción; la wallet firma y el contrato verifica el vale.
+    const wallet = getWalletProvider();
+    if (!wallet) throw new Error('no hay wallet Web3 disponible');
+    const provider = new ethers.BrowserProvider(wallet);
     const signer = await provider.getSigner();
     const contract = new ethers.Contract(voucherData.contract, MINING_ABI, signer);
 
