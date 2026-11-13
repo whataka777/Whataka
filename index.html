@@ -191,6 +191,7 @@
     }
 
     .avatar.small { width: 38px; height: 38px; font-size: 18px; }
+    .avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
 
     .chat-meta {
       flex: 1;
@@ -362,11 +363,32 @@
     }
 
     .avatar-lg {
-      width: 58px; height: 58px; border-radius: 50%;
+      position: relative;
+      width: 58px; height: 58px;
+      flex-shrink: 0;
+      padding: 0; border: none; background: none;
+      cursor: pointer;
+    }
+
+    .avatar-media {
+      width: 100%; height: 100%;
+      border-radius: 50%;
       background: var(--purple-deep);
       display: flex; align-items: center; justify-content: center;
       font-size: 28px;
-      filter: hue-rotate(245deg) saturate(1.6);
+      overflow: hidden;
+    }
+
+    .avatar-media .mango-avatar { filter: hue-rotate(245deg) saturate(1.6); }
+    .avatar-media img { width: 100%; height: 100%; object-fit: cover; }
+
+    .photo-badge {
+      position: absolute; right: -2px; bottom: -2px;
+      width: 21px; height: 21px; border-radius: 50%;
+      background: var(--purple-primary); color: #fff;
+      font-size: 10px;
+      display: flex; align-items: center; justify-content: center;
+      border: 2px solid var(--bg-card);
     }
 
     .mono-text { font-family: monospace; font-size: 12px; color: var(--purple-glow); word-break: break-all; }
@@ -639,7 +661,10 @@
       <div id="tab-settings" class="tab-content">
         <div class="section-padding">
           <div class="profile-card">
-            <div class="avatar-lg">🥭</div>
+            <button class="avatar-lg" id="btn-photo-avatar" type="button" aria-label="Cambiar foto de perfil">
+              <span class="avatar-media" id="my-avatar-media"><span class="mango-avatar">🥭</span></span>
+              <span class="photo-badge"><i class="fa-solid fa-camera"></i></span>
+            </button>
             <div>
               <h3 id="display-username">Usuario WhaTaka</h3>
               <p id="display-peer-short" class="mono-text">Generando Peer ID...</p>
@@ -647,6 +672,13 @@
           </div>
 
           <div class="settings-list">
+            <div class="setting-item" id="btn-change-photo">
+              <i class="fa-solid fa-camera-retro"></i>
+              <div>
+                <h4>Foto de perfil</h4>
+                <p id="photo-status">Añade una foto que verán tus contactos</p>
+              </div>
+            </div>
             <div class="setting-item" id="copy-peer-btn">
               <i class="fa-solid fa-fingerprint"></i>
               <div>
@@ -711,7 +743,7 @@
     <div id="chat-screen" class="screen">
       <header class="chat-top-bar">
         <button id="btn-back-chats" class="back-btn"><i class="fa-solid fa-arrow-left"></i></button>
-        <div class="avatar purple-bg small"><span class="mango-avatar">🥭</span></div>
+        <div class="avatar purple-bg small" id="active-chat-avatar"><span class="mango-avatar">🥭</span></div>
         <div class="chat-peer-details" id="btn-peer-security">
           <h4 id="active-chat-name">Contacto</h4>
           <span id="active-chat-sub">Cifrado de extremo a extremo</span>

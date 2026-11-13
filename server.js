@@ -38,8 +38,17 @@ function peerList() {
     id: p.id,
     name: p.name,
     agreePub: p.agreePub,
+    photo: p.photo,
     connections: p.sockets.size,
   }));
+}
+
+// Solo aceptamos una miniatura JPEG en base64 y con un tope de tamaño; así la
+// foto nunca desborda la presencia ni puede colarse otro tipo de dato.
+const PHOTO_RE = /^data:image\/jpeg;base64,[A-Za-z0-9+/=]{40,24000}$/;
+
+function sanitizePhoto(photo) {
+  return typeof photo === 'string' && PHOTO_RE.test(photo) ? photo : undefined;
 }
 
 function validatePeerId(id) {
@@ -181,6 +190,12 @@ wss.on('connection', (socket) => {
           connectedAt: new Date().toISOString(),
         };
         peer.name = typeof msg.name === 'string' ? msg.name.slice(0, 40) : peer.name;
+        if (msg.photo === null) {
+          peer.photo = undefined;
+        } else {
+          const photo = sanitizePhoto(msg.photo);
+          if (photo !== undefined) peer.photo = photo;
+        }
         peer.agreePub = typeof msg.agreePub === 'string' ? msg.agreePub : peer.agreePub;
         peer.signPub = typeof msg.signPub === 'string' ? msg.signPub : peer.signPub;
         peer.sockets.add(socket);

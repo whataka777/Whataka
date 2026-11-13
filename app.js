@@ -17,6 +17,7 @@ const STORE = {
   messages: 'whataka.messages',
   status: 'whataka.status',
   relay: 'whataka.relay',
+  avatar: 'whataka.avatar',
 };
 
 const params = new URLSearchParams(location.search);
@@ -128,6 +129,73 @@ function escapeHtml(str) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// Fotos de perfil
+// ─────────────────────────────────────────────────────────────
+
+const PHOTO_MAX = 220;
+const PHOTO_QUALITY = 0.72;
+// La foto viaja en la presencia y en los mensajes, así que se mantiene pequeña.
+const PHOTO_BUDGET = 16000;
+
+function readImage(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('No se pudo leer la imagen'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('Imagen no válida'));
+    img.src = src;
+  });
+}
+
+function renderPhoto(img, max, quality) {
+  const side = Math.min(img.width, img.height);
+  const sx = (img.width - side) / 2;
+  const sy = (img.height - side) / 2;
+  const out = Math.min(side, max);
+  const canvas = document.createElement('canvas');
+  canvas.width = out;
+  canvas.height = out;
+  canvas.getContext('2d').drawImage(img, sx, sy, side, side, 0, 0, out, out);
+  return canvas.toDataURL('image/jpeg', quality);
+}
+
+// Recorta al centro, reduce a un cuadrado y baja calidad/tamaño hasta caber.
+function fitPhoto(img, budget) {
+  let side = PHOTO_MAX;
+  for (let round = 0; round < 3; round++) {
+    for (let quality = PHOTO_QUALITY; quality >= 0.3; quality -= 0.08) {
+      const data = renderPhoto(img, side, quality);
+      if (data.length <= budget) return data;
+    }
+    side = Math.round(side * 0.72);
+  }
+  return renderPhoto(img, Math.min(side, 96), 0.5);
+}
+
+async function compressPhoto(file) {
+  if (!file || !/^image\//.test(file.type)) throw new Error('Selecciona un archivo de imagen');
+  const img = await loadImage(await readImage(file));
+  return fitPhoto(img, PHOTO_BUDGET);
+}
+
+function avatarInner(photo) {
+  if (photo) return `<img src="${escapeHtml(photo)}" alt="">`;
+  return '<span class="mango-avatar">🥭</span>';
+}
+
+function applyAvatar(el, photo) {
+  if (el) el.innerHTML = avatarInner(photo);
+}
+
+// ─────────────────────────────────────────────────────────────
 // Criptografía
 // ─────────────────────────────────────────────────────────────
 
@@ -205,7 +273,7 @@ const state = {
   identity: null,
   signKey: null,
   agreeKey: null,
-  profile: readStore(STORE.profile, { name: 'Usuario WhaTaka' }),
+  profile: readStore(STORE.profile, { name: 'Usuario WhaTaka', photo: null }),
   peers: readStore(STORE.peers, {}),        // peerId -> { name, agreePub, lastSeen }
   keyCache: readStore(STORE.keys, {}),      // peerId -> agreePub
   messages: readStore(STORE.messages, {}),  // peerId -> [{ from, text, ts }]
@@ -269,7 +337,7 @@ function renderChats() {
       const last = msgs[msgs.length - 1];
       const peer = state.peers[id] || {};
       const name = peer.name || `Peer ${shortPeer(id, 8, 4)}`;
-      return { id, name, last };
+      return { id, name, last, photo: peer.photo };
     })
     .filter((r) => !filter || r.name.toLowerCase().includes(filter) || r.id.toLowerCase().includes(filter))
     .sort((a, b) => (b.last?.ts || 0) - (a.last?.ts || 0));
@@ -290,7 +358,7 @@ function renderChats() {
   list.innerHTML = rows.map((r) => `
     <div class="chat-row" data-peer="${escapeHtml(r.id)}">
       <div class="avatar purple-bg">
-        <span class="mango-avatar">🥭</span>
+        ${avatarInner(r.photo)}
         ${state.online.has(r.id) ? '<span class="dot-online"></span>' : ''}
       </div>
       <div class="chat-meta">
@@ -339,6 +407,11 @@ function renderProfile() {
   $('#display-peer-short').textContent = `Peer ID: ${shortPeer(id, 14, 8)}`;
   $('#full-peer-display').textContent = id;
   $('#relay-display').textContent = RELAY_HTTP;
+  applyAvatar($('#my-avatar-media'), state.profile.photo);
+  const status = $('#photo-status');
+  if (status) status.textContent = state.profile.photo
+    ? 'Toca para cambiar o quitar tu foto'
+    : 'Añade una foto que verán tus contactos';
 }
 
 function renderStatus() {
@@ -402,6 +475,7 @@ function connect() {
       t: 'hello',
       id: state.identity.peerId,
       name: state.profile.name,
+      photo: state.profile.photo || null,
       signPub: state.identity.signPub,
       agreePub: state.identity.agreePub,
     });
@@ -446,8 +520,9 @@ function handleRelayMessage(msg) {
   switch (msg.t) {
     case 'presence': {
       state.online = new Set((msg.peers || []).map((p) => p.id));
-      (msg.peers || []).forEach((p) => rememberPeer(p.id, p.name, p.agreePub));
+      (msg.peers || []).forEach((p) => rememberPeer(p.id, p.name, p.agreePub, p.photo));
       renderChats();
+      refreshChatHeader();
       break;
     }
     case 'key': {
@@ -469,7 +544,7 @@ function handleRelayMessage(msg) {
   }
 }
 
-function rememberPeer(id, name, agreePub) {
+function rememberPeer(id, name, agreePub, photo) {
   if (!id || id === state.identity.peerId) return;
   const peer = state.peers[id] || {};
   peer.name = name || peer.name || `Peer ${shortPeer(id, 8, 4)}`;
@@ -477,6 +552,7 @@ function rememberPeer(id, name, agreePub) {
     peer.agreePub = agreePub;
     state.keyCache[id] = agreePub;
   }
+  if (photo !== undefined && photo !== null) peer.photo = photo;
   peer.lastSeen = Date.now();
   state.peers[id] = peer;
   writeStore(STORE.peers, state.peers);
@@ -516,7 +592,7 @@ async function sendMessage() {
   try {
     const theirPub = await requestKey(peerId);
     const key = await sessionKey(state.agreeKey, theirPub, state.identity.peerId, peerId);
-    const sealed = await encryptPayload(key, { text, ts: entry.ts, name: state.profile.name });
+    const sealed = await encryptPayload(key, { text, ts: entry.ts, name: state.profile.name, photo: state.profile.photo || null });
     const ok = sendRaw({ t: 'msg', to: peerId, iv: sealed.iv, ct: sealed.ct });
     if (!ok) throw new Error('Sin conexión con el relé');
     state.relayUnits += 1;
@@ -542,7 +618,7 @@ async function receiveMessage(msg) {
   const key = await sessionKey(state.agreeKey, agreePub, state.identity.peerId, from);
   const data = await decryptPayload(key, msg.iv, msg.ct);
 
-  rememberPeer(from, data.name, agreePub);
+  rememberPeer(from, data.name, agreePub, data.photo);
   (state.messages[from] = state.messages[from] || []).push({
     from, text: data.text, ts: data.ts || Date.now(),
   });
@@ -559,13 +635,20 @@ async function receiveMessage(msg) {
 // Acciones de interfaz
 // ─────────────────────────────────────────────────────────────
 
-function openChat(peerId) {
-  state.activePeer = peerId;
+function refreshChatHeader() {
+  const peerId = state.activePeer;
+  if (!peerId) return;
   const peer = state.peers[peerId] || {};
   $('#active-chat-name').textContent = peer.name || `Peer ${shortPeer(peerId, 8, 4)}`;
   $('#active-chat-sub').textContent = state.online.has(peerId)
     ? 'en línea · cifrado de extremo a extremo'
     : 'cifrado de extremo a extremo';
+  applyAvatar($('#active-chat-avatar'), peer.photo);
+}
+
+function openChat(peerId) {
+  state.activePeer = peerId;
+  refreshChatHeader();
   renderChat();
   showScreen('chat-screen');
 }
@@ -601,6 +684,55 @@ function askAddPeer(prefill) {
   });
 }
 
+function applyMyPhoto(photo) {
+  state.profile.photo = photo || null;
+  writeStore(STORE.profile, state.profile);
+  renderProfile();
+  if (state.connected) {
+    sendRaw({
+      t: 'hello',
+      id: state.identity.peerId,
+      name: state.profile.name,
+      photo: state.profile.photo || null,
+      signPub: state.identity.signPub,
+      agreePub: state.identity.agreePub,
+    });
+  }
+}
+
+function askPhoto() {
+  const has = !!state.profile.photo;
+  openModal('Foto de perfil', `
+    <p>Elige una imagen cuadrada. Se recorta al centro y se envía cifrada a tus contactos.</p>
+    <input type="file" id="photo-input" accept="image/*" class="modal-input">
+    <div class="modal-btn-row">
+      <button class="ghost-btn" id="photo-cancel">Cancelar</button>
+      ${has ? '<button class="ghost-btn" id="photo-remove">Quitar</button>' : ''}
+    </div>`);
+
+  const input = $('#photo-input');
+  $('#photo-cancel').addEventListener('click', closeModal);
+  if (has) {
+    $('#photo-remove').addEventListener('click', () => {
+      applyMyPhoto(null);
+      closeModal();
+      toast('Foto eliminada');
+    });
+  }
+  input.addEventListener('change', async () => {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    try {
+      const photo = await compressPhoto(file);
+      applyMyPhoto(photo);
+      closeModal();
+      toast('Foto actualizada');
+    } catch (err) {
+      toast(err.message);
+    }
+  });
+}
+
 function askEditName() {
   openModal('Editar nombre', `
     <p>Este nombre lo verán tus contactos.</p>
@@ -620,7 +752,7 @@ function askEditName() {
     writeStore(STORE.profile, state.profile);
     renderProfile();
     if (state.connected) {
-      sendRaw({ t: 'hello', id: state.identity.peerId, name, signPub: state.identity.signPub, agreePub: state.identity.agreePub });
+      sendRaw({ t: 'hello', id: state.identity.peerId, name, photo: state.profile.photo || null, signPub: state.identity.signPub, agreePub: state.identity.agreePub });
     }
     closeModal();
     toast('Nombre actualizado');
@@ -772,6 +904,8 @@ function bindEvents() {
   $('#btn-security-info').addEventListener('click', showSecurity);
   $('#btn-privacy-settings').addEventListener('click', showPrivacy);
   $('#btn-change-name').addEventListener('click', askEditName);
+  $('#btn-change-photo').addEventListener('click', askPhoto);
+  $('#btn-photo-avatar').addEventListener('click', askPhoto);
   $('#btn-relay').addEventListener('click', askRelay);
   $('#btn-add-status').addEventListener('click', askStatus);
   $('#btn-voice-call').addEventListener('click', voiceCall);

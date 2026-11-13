@@ -222,3 +222,29 @@ test('un peerId mal formado no puede entrar al relé', async () => {
   const code = await new Promise((resolve) => ws.on('close', resolve));
   assert.equal(code, 1008);
 });
+
+test('la foto de perfil se difunde solo si es una miniatura JPEG válida', async () => {
+  const a = await openSocket();
+  const b = await openSocket();
+
+  const idA = makePeerId('foto-a');
+  const idB = makePeerId('foto-b');
+  const photo = `data:image/jpeg;base64,${'A'.repeat(200)}`;
+
+  const seenByB = nextMessage(b, 'presence');
+  a.send(JSON.stringify({ t: 'hello', id: idA, name: 'Con foto', photo, agreePub: 'P-A', signPub: 'S-A' }));
+  const presence = await seenByB;
+  const peerA = presence.peers.find((p) => p.id === idA);
+  assert.equal(peerA.photo, photo);
+
+  // Una foto que no sea JPEG (por ejemplo un SVG) se ignora.
+  const seenByA = nextMessage(a, 'presence');
+  b.send(JSON.stringify({ t: 'hello', id: idB, name: 'Sin foto', photo: 'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=', agreePub: 'P-B', signPub: 'S-B' }));
+  const presence2 = await seenByA;
+  const peerB = presence2.peers.find((p) => p.id === idB);
+  assert.equal(peerB.photo, undefined);
+  assert.equal(peerB.name, 'Sin foto');
+
+  a.close();
+  b.close();
+});
