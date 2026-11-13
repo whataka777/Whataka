@@ -59,13 +59,36 @@ node -e "const {Wallet}=require('ethers');const w=Wallet.createRandom();console.
 Guarda la **ADDR** (la necesitas al desplegar) y la **PRIV** como secreto en
 Render (`REPORT_SIGNER_KEY`). No subas la clave privada al repositorio.
 
-### 2. Despliega el contrato en Remix
+### 2. Despliega el contrato
 
-1. Abre https://remix.ethereum.org y pega el fichero elegido.
-2. En *Solidity Compiler* elige 0.8.20 (o superior) y compila.
-3. En *Deploy & Run*, selecciona *Injected Provider – MetaMask* y la red
-   (por ejemplo Polygon Amoy, chainId `80002`).
-4. Rellena el constructor (ver abajo) y pulsa Deploy. Copia la dirección.
+Tienes dos caminos; el primero es más rápido y no depende de Remix.
+
+**Camino A — script incluido (recomendado).** Despliega y te dice los valores
+exactos para Render. Necesitas una wallet con gas y el RPC de la red:
+
+```bash
+# 1) Clave del firmante (oráculo). Guarda PRIV y ADDR.
+node -e "const {Wallet}=require('ethers');const w=Wallet.createRandom();console.log('PRIV',w.privateKey);console.log('ADDR',w.address)"
+
+# 2) Compila y despliega (ejemplo: Polygon Amoy)
+npm run compile
+RPC_URL="https://rpc-amoy.polygon.technology" \
+DEPLOYER_KEY="0x<clave de la wallet que paga el gas>" \
+REPORT_SIGNER_ADDRESS="0x<ADDR del paso 1>" \
+CONTRACT=ttc \
+INITIAL_SUPPLY=1000000 HALVING_SECONDS=31536000 REWARD_FACTOR=0.001 ANNUAL_MINT_CAP=100000000 \
+node scripts/deploy.js
+```
+
+Para la opción A (`WhaTakaMiningRewards`) usa `CONTRACT=rewards` y añade
+`TTC_TOKEN=0x<tu ERC-20>`. El script imprime al final la dirección, el `CHAIN_ID`,
+el `MINING_CONTRACT` y un registro JSON del despliegue.
+
+RPC útiles: Amoy `https://rpc-amoy.polygon.technology`, Polygon
+`https://polygon-rpc.com`.
+
+**Camino B — Remix.** Pega el fichero elegido, compila con 0.8.20+ y despliega
+con *Injected Provider – MetaMask*.
 
 **Opción A — `WhaTakaMiningRewards`** (necesita un token TTC aparte):
 
