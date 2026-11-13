@@ -84,8 +84,12 @@ Para la opción A (`WhaTakaMiningRewards`) usa `CONTRACT=rewards` y añade
 `TTC_TOKEN=0x<tu ERC-20>`. El script imprime al final la dirección, el `CHAIN_ID`,
 el `MINING_CONTRACT` y un registro JSON del despliegue.
 
-RPC útiles: Amoy `https://rpc-amoy.polygon.technology`, Polygon
-`https://polygon-rpc.com`.
+RPC útiles: **BNB Smart Chain** `https://bsc-dataseed.binance.org` (chainId
+`56`), **BNB testnet** `https://data-seed-prebsc-1-s1.binance.org:8545` (`97`),
+Polygon `https://polygon-rpc.com` (`137`), Amoy
+`https://rpc-amoy.polygon.technology` (`80002`). El contrato es agnóstico a la
+red: el mismo bytecode sirve en cualquiera de ellas. La app añade la red a
+MetaMask sola si aún no la tienes (BNB no viene de fábrica).
 
 **Camino B — Remix.** Pega el fichero elegido, compila con 0.8.20+ y despliega
 con *Injected Provider – MetaMask*.

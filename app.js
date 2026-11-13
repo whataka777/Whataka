@@ -331,7 +331,73 @@ function updateWalletUI() {
   }
 }
 
-// Conecta MetaMask y devuelve la dirección. Cambia a la red del contrato si hace falta.
+// Metadatos de las redes conocidas, para poder AÑADIRLAS a MetaMask si el
+// usuario no las tiene. `wallet_switchEthereumChain` solo funciona si la red
+// ya existe en la wallet; si no, hay que llamar antes a wallet_addEthereumChain.
+const KNOWN_CHAINS = {
+  56: {
+    name: 'BNB Smart Chain',
+    rpc: 'https://bsc-dataseed.binance.org',
+    symbol: 'BNB',
+    explorer: 'https://bscscan.com',
+  },
+  97: {
+    name: 'BNB Smart Chain Testnet',
+    rpc: 'https://data-seed-prebsc-1-s1.binance.org:8545',
+    symbol: 'tBNB',
+    explorer: 'https://testnet.bscscan.com',
+  },
+  137: {
+    name: 'Polygon',
+    rpc: 'https://polygon-rpc.com',
+    symbol: 'POL',
+    explorer: 'https://polygonscan.com',
+  },
+  80002: {
+    name: 'Polygon Amoy',
+    rpc: 'https://rpc-amoy.polygon.technology',
+    symbol: 'POL',
+    explorer: 'https://amoy.polygonscan.com',
+  },
+};
+
+// Cambia (o añade) la red en la wallet para que coincida con el contrato.
+async function ensureChain(chainId) {
+  const hex = '0x' + Number(chainId).toString(16);
+  try {
+    await window.ethereum.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: hex }],
+    });
+    return true;
+  } catch (err) {
+    // 4902 = la wallet no conoce esa red; la añadimos.
+    const code = err && err.code;
+    const meta = KNOWN_CHAINS[Number(chainId)];
+    if ((code === 4902 || code === -32603) && meta) {
+      try {
+        await window.ethereum.request({
+          method: 'wallet_addEthereumChain',
+          params: [{
+            chainId: hex,
+            chainName: meta.name,
+            nativeCurrency: { name: meta.symbol, symbol: meta.symbol, decimals: 18 },
+            rpcUrls: [meta.rpc],
+            blockExplorerUrls: [meta.explorer],
+          }],
+        });
+        return true;
+      } catch {
+        toast(`No se pudo añadir la red ${meta.name} en tu wallet`);
+        return false;
+      }
+    }
+    if (code === 4001) return false; // el usuario canceló
+    toast(`Cambia tu wallet a la red ${chainId}`);
+    return false;
+  }
+}
+
 async function connectWallet() {
   if (typeof window.ethereum === 'undefined') {
     toast('Abre WhaTaka dentro de MetaMask o un navegador con wallet Web3');
@@ -347,14 +413,7 @@ async function connectWallet() {
     if (cfg) {
       const current = Number(await provider.send('eth_chainId', []));
       if (current !== Number(cfg.chainId)) {
-        try {
-          await window.ethereum.request({
-            method: 'wallet_switchEthereumChain',
-            params: [{ chainId: '0x' + Number(cfg.chainId).toString(16) }],
-          });
-        } catch {
-          toast(`Cambia tu wallet a la red ${cfg.chainId}`);
-        }
+        await ensureChain(cfg.chainId);
       }
     }
 
