@@ -9,11 +9,6 @@
 
 const DEFAULT_RELAY = 'https://whataka-relay.onrender.com';
 
-const params = new URLSearchParams(location.search);
-const RELAY_HTTP = (params.get('relay') || localStorage.getItem('whataka.relay') || DEFAULT_RELAY)
-  .replace(/\/+$/, '');
-const RELAY_WS = RELAY_HTTP.replace(/^http/, 'ws');
-
 const STORE = {
   identity: 'whataka.identity',
   profile: 'whataka.profile',
@@ -23,6 +18,21 @@ const STORE = {
   status: 'whataka.status',
   relay: 'whataka.relay',
 };
+
+const params = new URLSearchParams(location.search);
+
+// Un enlace compartido con ?relay=… se adopta y se guarda, y luego se quita de
+// la barra de direcciones para que el ajuste "Nodo relé" pueda cambiarlo.
+const relayParam = params.get('relay');
+if (relayParam) {
+  localStorage.setItem(STORE.relay, JSON.stringify(relayParam.replace(/\/+$/, '')));
+  params.delete('relay');
+  const qs = params.toString();
+  history.replaceState(null, '', location.pathname + (qs ? `?${qs}` : ''));
+}
+
+const RELAY_HTTP = (readStore(STORE.relay, DEFAULT_RELAY) || DEFAULT_RELAY).replace(/\/+$/, '');
+const RELAY_WS = RELAY_HTTP.replace(/^http/, 'ws');
 
 const E2E_INFO = 'whataka-e2e-v1';
 
@@ -328,6 +338,7 @@ function renderProfile() {
   $('#display-username').textContent = state.profile.name;
   $('#display-peer-short').textContent = `Peer ID: ${shortPeer(id, 14, 8)}`;
   $('#full-peer-display').textContent = id;
+  $('#relay-display').textContent = RELAY_HTTP;
 }
 
 function renderStatus() {
@@ -395,6 +406,7 @@ function connect() {
       agreePub: state.identity.agreePub,
     });
     renderMining();
+    renderStatus();
     renderChats();
   });
 
@@ -402,6 +414,7 @@ function connect() {
     state.connected = false;
     state.online.clear();
     renderMining();
+    renderStatus();
     renderChats();
     setTimeout(connect, 4000);
   });
@@ -614,6 +627,29 @@ function askEditName() {
   });
 }
 
+function askRelay() {
+  openModal('Nodo relé', `
+    <p>Dirección del relé que transporta tus sobres cifrados. Déjala vacía para usar el relé oficial.</p>
+    <input class="modal-input" id="relay-input" value="${escapeHtml(readStore(STORE.relay, '') || '')}" placeholder="${escapeHtml(DEFAULT_RELAY)}">
+    <div class="modal-btn-row">
+      <button class="ghost-btn" id="relay-cancel">Cancelar</button>
+      <button class="primary-btn" id="relay-save">Guardar y reconectar</button>
+    </div>`);
+  $('#relay-cancel').addEventListener('click', closeModal);
+  $('#relay-save').addEventListener('click', () => {
+    const value = $('#relay-input').value.trim().replace(/\/+$/, '');
+    if (value && !/^https?:\/\//.test(value)) {
+      toast('La dirección debe empezar por http:// o https://');
+      return;
+    }
+    if (value) writeStore(STORE.relay, value);
+    else localStorage.removeItem(STORE.relay);
+    closeModal();
+    toast('Reconectando…');
+    setTimeout(() => location.reload(), 600);
+  });
+}
+
 function showSecurity() {
   const id = state.identity.peerId;
   const fingerprint = id.replace('wt1', '').slice(0, 32).match(/.{1,4}/g).join(' ');
@@ -736,6 +772,7 @@ function bindEvents() {
   $('#btn-security-info').addEventListener('click', showSecurity);
   $('#btn-privacy-settings').addEventListener('click', showPrivacy);
   $('#btn-change-name').addEventListener('click', askEditName);
+  $('#btn-relay').addEventListener('click', askRelay);
   $('#btn-add-status').addEventListener('click', askStatus);
   $('#btn-voice-call').addEventListener('click', voiceCall);
   $('#btn-verify-keys').addEventListener('click', showPeerSecurity);
