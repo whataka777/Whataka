@@ -373,13 +373,13 @@ const KNOWN_CHAINS = {
   },
   137: {
     name: 'Polygon',
-    rpc: 'https://polygon-rpc.com',
+    rpc: 'https://polygon-bor-rpc.publicnode.com',
     symbol: 'POL',
     explorer: 'https://polygonscan.com',
   },
   80002: {
     name: 'Polygon Amoy',
-    rpc: 'https://rpc-amoy.polygon.technology',
+    rpc: 'https://polygon-amoy-bor-rpc.publicnode.com',
     symbol: 'POL',
     explorer: 'https://amoy.polygonscan.com',
   },

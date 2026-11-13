@@ -86,8 +86,8 @@ el `MINING_CONTRACT` y un registro JSON del despliegue.
 
 RPC útiles: **BNB Smart Chain** `https://bsc-dataseed.binance.org` (chainId
 `56`), **BNB testnet** `https://data-seed-prebsc-1-s1.binance.org:8545` (`97`),
-Polygon `https://polygon-rpc.com` (`137`), Amoy
-`https://rpc-amoy.polygon.technology` (`80002`). El contrato es agnóstico a la
+Polygon `https://polygon-bor-rpc.publicnode.com` (`137`), Amoy
+`https://polygon-amoy-bor-rpc.publicnode.com` (`80002`). El contrato es agnóstico a la
 red: el mismo bytecode sirve en cualquiera de ellas. La app añade la red a
 MetaMask sola si aún no la tienes (BNB no viene de fábrica).
 
