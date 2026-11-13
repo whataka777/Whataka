@@ -247,6 +247,19 @@ app.get('/api/mining/:peerId', (req, res) => {
   res.json(entry);
 });
 
+// Copia de respaldo de la app, servida desde el propio relé. Sirve para los
+// navegadores internos de las wallets (MetaMask, Brave), que a veces no abren
+// github.io. Solo se exponen los ficheros del frontend, nunca el código del
+// servidor ni node_modules.
+const PUBLIC_FILES = new Set(['/', '/index.html', '/app.js', '/sw.js', '/manifest.webmanifest']);
+const PUBLIC_DIRS = ['/vendor/', '/icons/'];
+app.use((req, res, next) => {
+  if (req.method !== 'GET') return next();
+  const p = req.path;
+  if (!PUBLIC_FILES.has(p) && !PUBLIC_DIRS.some((d) => p.startsWith(d))) return next();
+  express.static(__dirname, { index: 'index.html' })(req, res, next);
+});
+
 app.use((req, res) => res.status(404).json({ error: 'ruta no encontrada' }));
 
 // ── Servidor HTTP + WebSocket ────────────────────────────────────────────────
