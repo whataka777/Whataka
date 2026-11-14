@@ -336,12 +336,17 @@ function updateWalletUI() {
 // forma estable (Brave primero, luego MetaMask) en vez de dejar que decida el
 // orden de carga, que cambia entre navegaciones y rompe la conexión.
 function getWalletProvider() {
+  // Binance Wallet se inyecta a veces como window.BinanceChain y a veces dentro
+  // de window.ethereum.providers. Lo preferimos si está, porque su provider de
+  // window.ethereum puede ser en realidad el de otra wallet.
+  if (window.BinanceChain) return window.BinanceChain;
   const injected = window.ethereum;
   if (!injected) return null;
   const list = Array.isArray(injected.providers) ? injected.providers : [];
   if (list.length === 0) return injected;
   return (
     list.find((p) => p.isBraveWallet) ||
+    list.find((p) => p.isBinance || p.isBinanceWallet) ||
     list.find((p) => p.isMetaMask) ||
     injected
   );
@@ -352,6 +357,7 @@ function walletName(provider) {
   if (!provider) return 'wallet';
   if (provider.isBraveWallet) return 'Brave Wallet';
   if (provider.isMetaMask) return 'MetaMask';
+  if (provider.isBinance || provider.isBinanceWallet) return 'Binance Wallet';
   return 'wallet';
 }
 
