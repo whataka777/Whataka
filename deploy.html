@@ -82,6 +82,17 @@
     <div id="st-verify" class="status hide"></div>
   </div>
 
+  <div class="card hide" id="card-publish">
+    <h2>4 · Verificar el código (opcional)</h2>
+    <p class="step" style="margin-bottom:8px">Publicar el código en el explorador hace el token de confianza. Estos son los datos exactos que usó el despliegue:</p>
+    <div class="row"><span class="k">Compilador</span><span class="v" id="pub-solc">v0.8.38+commit.1835d247</span></div>
+    <div class="row"><span class="k">Optimización</span><span class="v">Sí, 200 runs</span></div>
+    <div class="row"><span class="k">Contrato</span><span class="v">WhaTakaTTC.sol</span></div>
+    <button class="ghost" id="btn-copy-args">Copiar argumentos del constructor</button>
+    <button class="ghost" id="btn-open-verify">Abrir verificación en el explorador</button>
+    <div id="st-publish" class="status hide"></div>
+  </div>
+
   <div class="card" id="card-help">
     <h2>Si el saldo de gas es 0</h2>
     <p class="step" style="margin-bottom:8px">Necesitas POL de prueba (gratis). Pide en un faucet:</p>
@@ -102,7 +113,18 @@
     const $ = (s) => document.querySelector(s);
     const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
 
-    let provider = null, signer = null, account = null;
+    let provider = null, signer = null, account = null, lastArgs = null;
+
+    function constructorTypes() {
+      const ctor = (window.WHATAKA_TTC_ARTIFACT.abi || []).find((e) => e.type === 'constructor');
+      return (ctor && ctor.inputs || []).map((i) => i.type);
+    }
+    function abiArgs(args) {
+      const types = constructorTypes();
+      const values = [args.signerAddr, args.supply, args.halving, args.factor, args.cap];
+      const encoded = ethers.AbiCoder.defaultAbiCoder().encode(types, values);
+      return encoded.slice(2);
+    }
 
     function setStatus(sel, msg, kind) {
       const el = $(sel);
@@ -215,12 +237,14 @@
         const address = await contract.getAddress();
 
         store.set('whataka.mining.deployment', JSON.stringify({ address, chainId: AMOY, txHash: tx.hash, reportSigner: signerAddr, at: new Date().toISOString() }));
+        lastArgs = { signerAddr, supply, halving, factor, cap };
 
         $('#out-addr').textContent = address;
         $('#out-tx').textContent = short(tx.hash, 10, 8);
         const m = CHAIN_META[AMOY];
         $('#out-link').href = m.explorer + '/address/' + address;
         $('#card-result').classList.remove('hide');
+        $('#card-publish').classList.remove('hide');
         setStatus('#st-deploy', '¡Listo! Token desplegado en el bloque ' + receipt.blockNumber + '.', 'ok');
         $('#card-result').scrollIntoView({ behavior: 'smooth' });
       } catch (err) {
@@ -260,6 +284,18 @@
     $('#btn-connect').addEventListener('click', connect);
     $('#btn-deploy').addEventListener('click', deploy);
     $('#btn-verify').addEventListener('click', verify);
+    $('#btn-copy-args').addEventListener('click', async () => {
+      if (!lastArgs) { setStatus('#st-publish', 'Vuelve a desplegar en esta sesión para calcular los argumentos.', 'err'); return; }
+      const text = abiArgs(lastArgs);
+      try { await navigator.clipboard.writeText(text); setStatus('#st-publish', 'Argumentos copiados (' + text.length + ' caracteres). En el explorador van en el campo «Constructor Arguments ABI-encoded».', 'ok'); }
+      catch { setStatus('#st-publish', text, 'ok'); }
+    });
+    $('#btn-open-verify').addEventListener('click', () => {
+      const dep = JSON.parse(store.get('whataka.mining.deployment') || '{}');
+      const base = CHAIN_META[AMOY].explorer + '/verifyContract';
+      const url = dep.address ? base + '?a=' + dep.address : base;
+      window.open(url, '_blank');
+    });
     $('#btn-copy').addEventListener('click', async () => {
       const a = $('#out-addr').textContent;
       try { await navigator.clipboard.writeText(a); $('#btn-copy').textContent = '¡Copiada!'; setTimeout(() => { $('#btn-copy').textContent = 'Copiar dirección'; }, 1500); }
