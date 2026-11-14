@@ -636,6 +636,10 @@
             <span class="stat-lbl" id="wallet-address-sub">Vincular wallet para cobrar TTC on-chain</span>
           </div>
 
+          <button class="primary-btn" id="btn-connect-wallet" style="margin-bottom: 12px;">
+            <i class="fa-solid fa-wallet"></i> Conectar MetaMask u otra wallet
+          </button>
+
           <div class="stats-grid">
             <div class="stat-box">
               <span class="stat-val" id="m-relay">0</span>
@@ -717,6 +721,13 @@
               <div>
                 <h4>Nodo relé</h4>
                 <p id="relay-display" class="truncate">…</p>
+              </div>
+            </div>
+            <div class="setting-item" id="btn-walletconnect">
+              <i class="fa-solid fa-wallet"></i>
+              <div>
+                <h4>WalletConnect (conectar MetaMask)</h4>
+                <p id="wc-display" class="truncate">Sin Project ID</p>
               </div>
             </div>
             <div class="setting-item" id="btn-deploy-token">

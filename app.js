@@ -9,6 +9,16 @@
 
 const DEFAULT_RELAY = 'https://whataka-relay.onrender.com';
 
+// Project ID de Reown/WalletConnect Cloud (gratuito). Con él, la app conecta
+// con MetaMask desde el navegador normal del móvil: no hace falta abrir
+// WhaTaka dentro de MetaMask. Si está vacío, se usa el que el usuario pegue
+// en Ajustes → WalletConnect, y si tampoco hay, se ofrece abrir la app en
+// MetaMask mediante enlace directo.
+const DEFAULT_WC_PROJECT_ID = '';
+const WC_BUNDLE =
+  'https://cdn.jsdelivr.net/npm/@walletconnect/ethereum-provider@2.17.2/dist/index.umd.js';
+const METAMASK_DEEPLINK = 'https://metamask.app.link/dapp/';
+
 const STORE = {
   identity: 'whataka.identity',
   profile: 'whataka.profile',
@@ -19,6 +29,7 @@ const STORE = {
   relay: 'whataka.relay',
   avatar: 'whataka.avatar',
   wallet: 'whataka.wallet',
+  wc: 'whataka.wcProjectId',
 };
 
 // Pesos de minería: idénticos a los del contrato WhaTakaMiningRewards.
@@ -299,6 +310,7 @@ const state = {
   // Web3
   wallet: null,
   miningConfig: null,
+  wcProvider: null,
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -309,7 +321,12 @@ const state = {
 async function loadMiningConfig() {
   if (state.miningConfig) return state.miningConfig;
   try {
-    const res = await fetch(`${RELAY_HTTP}/api/mining/config`);
+    // El plan gratis de Render duerme el relé: sin este tope, un primer clic
+    // se quedaría colgado hasta un minuto esperando la respuesta.
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    const res = await fetch(`${RELAY_HTTP}/api/mining/config`, { signal: ctrl.signal });
+    clearTimeout(timer);
     const cfg = await res.json();
     state.miningConfig = cfg && cfg.configured ? cfg : null;
   } catch {
@@ -341,15 +358,149 @@ function getWalletProvider() {
   // window.ethereum puede ser en realidad el de otra wallet.
   if (window.BinanceChain) return window.BinanceChain;
   const injected = window.ethereum;
-  if (!injected) return null;
-  const list = Array.isArray(injected.providers) ? injected.providers : [];
-  if (list.length === 0) return injected;
-  return (
-    list.find((p) => p.isBraveWallet) ||
-    list.find((p) => p.isBinance || p.isBinanceWallet) ||
-    list.find((p) => p.isMetaMask) ||
-    injected
-  );
+  if (injected) {
+    const list = Array.isArray(injected.providers) ? injected.providers : [];
+    if (list.length === 0) return injected;
+    return (
+      list.find((p) => p.isBraveWallet) ||
+      list.find((p) => p.isBinance || p.isBinanceWallet) ||
+      list.find((p) => p.isMetaMask) ||
+      injected
+    );
+  }
+  // Sin wallet inyectada, si ya abrimos una sesión WalletConnect, esa manda.
+  return state.wcProvider || null;
+}
+
+// ── WalletConnect (Reown) ───────────────────────────────────────────────────
+// Permite conectar MetaMask u otra wallet DESDE el navegador normal del móvil,
+// sin abrir la app dentro de MetaMask. Necesita un Project ID gratuito de
+// https://cloud.reown.com que se pega en Ajustes → WalletConnect.
+
+function wcProjectId() {
+  return (readStore(STORE.wc, DEFAULT_WC_PROJECT_ID) || '').trim();
+}
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) return resolve();
+    const el = document.createElement('script');
+    el.src = src;
+    el.onload = () => resolve();
+    el.onerror = () => reject(new Error(`no se pudo cargar ${src}`));
+    document.head.appendChild(el);
+  });
+}
+
+// Crea (o reutiliza) el proveedor WalletConnect para la cadena del contrato.
+async function openWcSession(chainId) {
+  const projectId = wcProjectId();
+  if (!projectId) return null;
+  // El bundle de WalletConnect referencia process.env.NODE_ENV; en el
+  // navegador `process` no existe y lanzaría ReferenceError.
+  if (typeof window.process === 'undefined') {
+    window.process = { env: { NODE_ENV: 'production' } };
+  }
+  await loadScript(WC_BUNDLE);
+  const mod = window['@walletconnect/ethereum-provider'];
+  if (!mod || !mod.EthereumProvider) throw new Error('WalletConnect no cargó');
+
+  const id = Number(chainId) || 80002;
+  const meta = KNOWN_CHAINS[id] || KNOWN_CHAINS[80002];
+  const provider = await mod.EthereumProvider.init({
+    projectId,
+    chains: [id],
+    optionalChains: [id],
+    showQrModal: true,
+    rpcMap: { [id]: meta.rpc },
+    metadata: {
+      name: 'WhaTaka',
+      description: 'Mensajería P2P cifrada y minería TTC',
+      url: location.origin,
+      icons: [`${location.origin}/icons/icon-192.png`],
+    },
+  });
+  state.wcProvider = provider;
+  return provider;
+}
+
+// Abre WhaTaka dentro de la app de MetaMask (deep link). Es el respaldo cuando
+// no hay Project ID de WalletConnect: ahí MetaMask sí inyecta su proveedor.
+function openInMetaMask() {
+  const target = location.href.replace(/^https?:\/\//, '');
+  window.location.href = METAMASK_DEEPLINK + target;
+}
+
+async function connectWallet() {
+  const cfg = await loadMiningConfig();
+  const chainId = cfg ? cfg.chainId : 80002;
+  let wallet = getWalletProvider();
+
+  // 1. Wallet inyectada (MetaMask dentro de su navegador, Brave, etc.).
+  if (!wallet) {
+    // 2. WalletConnect: conecta MetaMask desde el navegador normal del móvil.
+    try {
+      wallet = await openWcSession(chainId);
+    } catch (err) {
+      console.warn('WalletConnect', err);
+      wallet = null;
+    }
+  }
+
+  // 3. Sin nada disponible: ofrecemos abrir la app dentro de MetaMask.
+  if (!wallet) {
+    if (!wcProjectId()) {
+      openModal('Conectar wallet', `
+        <p>Para conectar MetaMask desde este navegador hay dos caminos:</p>
+        <p><strong>Opción A (recomendada).</strong> Abre WhaTaka dentro de MetaMask con un toque.</p>
+        <button class="primary-btn" id="wc-open-mm">🦊 Abrir WhaTaka en MetaMask</button>
+        <p class="hint-text">Si no se abre, toca los tres puntos de MetaMask → Navegador y pega la dirección.</p>
+        <hr style="border-color:var(--border-color);margin:14px 0">
+        <p><strong>Opción B.</strong> Pega tu <em>Project ID</em> gratuito de WalletConnect (cloud.reown.com)
+        y podrás conectar sin salir de este navegador.</p>
+        <input class="modal-input" id="wc-pid-input" placeholder="Project ID de WalletConnect">
+        <button class="primary-btn" id="wc-pid-save">Guardar Project ID</button>`);
+      $('#wc-open-mm').addEventListener('click', openInMetaMask);
+      $('#wc-pid-save').addEventListener('click', () => {
+        const v = $('#wc-pid-input').value.trim();
+        if (!v) {
+          toast('Escribe un Project ID válido');
+          return;
+        }
+        writeStore(STORE.wc, v);
+        renderProfile();
+        closeModal();
+        toast('Project ID guardado; reintentando…');
+        setTimeout(() => connectWallet(), 300);
+      });
+      return null;
+    }
+    toast('No hay wallet disponible para conectar');
+    return null;
+  }
+
+  try {
+    const provider = new ethers.BrowserProvider(wallet);
+    const accounts = await provider.send('eth_requestAccounts', []);
+    const address = accounts && accounts[0];
+    if (!address) throw new Error('sin cuentas');
+
+    const current = Number(await provider.send('eth_chainId', []));
+    if (current !== Number(chainId)) {
+      await ensureChain(wallet, chainId);
+    }
+
+    state.wallet = address;
+    writeStore(STORE.wallet, address);
+    updateWalletUI();
+    toast(`Wallet conectada (${walletName(wallet)})`);
+    return address;
+  } catch (err) {
+    console.warn('Wallet', err);
+    if (err && err.code === 4001) toast('Conexión cancelada');
+    else toast('No se pudo conectar la wallet');
+    return null;
+  }
 }
 
 // Nombre de la wallet para los mensajes, según lo que anuncie el proveedor.
@@ -358,6 +509,7 @@ function walletName(provider) {
   if (provider.isBraveWallet) return 'Brave Wallet';
   if (provider.isMetaMask) return 'MetaMask';
   if (provider.isBinance || provider.isBinanceWallet) return 'Binance Wallet';
+  if (provider.isWalletConnect) return 'WalletConnect';
   return 'wallet';
 }
 
@@ -425,38 +577,6 @@ async function ensureChain(wallet, chainId) {
     if (code === 4001) return false; // el usuario canceló
     toast(`Cambia tu wallet a la red ${chainId}`);
     return false;
-  }
-}
-
-async function connectWallet() {
-  const wallet = getWalletProvider();
-  if (!wallet) {
-    toast('Abre WhaTaka dentro de MetaMask, Brave Wallet u otra wallet Web3');
-    return null;
-  }
-  try {
-    const provider = new ethers.BrowserProvider(wallet);
-    const accounts = await provider.send('eth_requestAccounts', []);
-    const address = accounts && accounts[0];
-    if (!address) throw new Error('sin cuentas');
-
-    const cfg = await loadMiningConfig();
-    if (cfg) {
-      const current = Number(await provider.send('eth_chainId', []));
-      if (current !== Number(cfg.chainId)) {
-        await ensureChain(wallet, cfg.chainId);
-      }
-    }
-
-    state.wallet = address;
-    writeStore(STORE.wallet, address);
-    updateWalletUI();
-    toast(`Wallet conectada (${walletName(wallet)})`);
-    return address;
-  } catch (err) {
-    console.warn('Wallet', err);
-    toast('No se pudo conectar la wallet');
-    return null;
   }
 }
 
@@ -580,6 +700,8 @@ function renderProfile() {
   $('#display-peer-short').textContent = `Peer ID: ${shortPeer(id, 14, 8)}`;
   $('#full-peer-display').textContent = id;
   $('#relay-display').textContent = RELAY_HTTP;
+  const wcEl = $('#wc-display');
+  if (wcEl) wcEl.textContent = wcProjectId() ? 'Project ID configurado' : 'Sin Project ID (toca para añadir)';
   applyAvatar($('#my-avatar-media'), state.profile.photo);
   const status = $('#photo-status');
   if (status) status.textContent = state.profile.photo
@@ -953,6 +1075,35 @@ function askEditName() {
   });
 }
 
+function askWalletConnect() {
+  openModal('WalletConnect', `
+    <p>Pega tu <strong>Project ID</strong> gratuito de WalletConnect (cloud.reown.com).
+    Con él, WhaTaka conecta MetaMask desde este mismo navegador, sin abrir la app dentro de MetaMask.</p>
+    <input class="modal-input" id="wc-input" value="${escapeHtml(wcProjectId())}" placeholder="Project ID de WalletConnect">
+    <p class="hint-text">Cómo conseguirlo: entra en cloud.reown.com → crea un proyecto → copia el Project ID.</p>
+    <div class="modal-btn-row">
+      <button class="ghost-btn" id="wc-clear">Borrar</button>
+      <button class="primary-btn" id="wc-save">Guardar</button>
+    </div>`);
+  $('#wc-clear').addEventListener('click', () => {
+    localStorage.removeItem(STORE.wc);
+    closeModal();
+    renderProfile();
+    toast('Project ID borrado');
+  });
+  $('#wc-save').addEventListener('click', () => {
+    const v = $('#wc-input').value.trim();
+    if (!v) {
+      toast('Escribe un Project ID válido');
+      return;
+    }
+    writeStore(STORE.wc, v);
+    closeModal();
+    renderProfile();
+    toast('Project ID guardado');
+  });
+}
+
 function askRelay() {
   openModal('Nodo relé', `
     <p>Dirección del relé que transporta tus sobres cifrados. Déjala vacía para usar el relé oficial.</p>
@@ -1097,7 +1248,12 @@ async function sendMiningReport() {
     if (!voucherRes.ok) throw new Error(voucherData.error || `HTTP ${voucherRes.status}`);
 
     // 4. Enviamos la transacción; la wallet firma y el contrato verifica el vale.
-    const wallet = getWalletProvider();
+    let wallet = getWalletProvider();
+    if (!wallet) {
+      const addr = await connectWallet();
+      if (!addr) return;
+      wallet = getWalletProvider();
+    }
     if (!wallet) throw new Error('no hay wallet Web3 disponible');
     const provider = new ethers.BrowserProvider(wallet);
 
@@ -1204,6 +1360,8 @@ function bindEvents() {
   });
   $('#btn-send-report').addEventListener('click', sendMiningReport);
   $('#connect-wallet-box').addEventListener('click', connectWallet);
+  $('#btn-connect-wallet').addEventListener('click', connectWallet);
+  $('#btn-walletconnect').addEventListener('click', askWalletConnect);
 }
 
 async function boot() {
