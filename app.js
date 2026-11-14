@@ -1174,6 +1174,9 @@ function bindEvents() {
   $('#btn-change-photo').addEventListener('click', askPhoto);
   $('#btn-photo-avatar').addEventListener('click', askPhoto);
   $('#btn-relay').addEventListener('click', askRelay);
+  $('#btn-deploy-token').addEventListener('click', () => {
+    window.open(new URL('deploy.html', location.href).href, '_blank');
+  });
   $('#btn-add-status').addEventListener('click', askStatus);
   $('#btn-voice-call').addEventListener('click', voiceCall);
   $('#btn-verify-keys').addEventListener('click', showPeerSecurity);

@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#6c3483">
+  <title>WhaTaka · Desplegar token</title>
+  <style>
+    :root { --purple:#8e44ad; --deep:#5b2c6f; --glow:#bb8fce; --bg:#0b141a; --card:#182229; --bar:#1f2c34; --text:#e9edef; --muted:#8696a0; }
+    * { box-sizing:border-box; margin:0; padding:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; -webkit-tap-highlight-color:transparent; }
+    body { background:var(--bg); color:var(--text); padding:16px; padding-bottom:40px; max-width:520px; margin:0 auto; }
+    h1 { font-size:22px; margin-bottom:4px; }
+    h1 .m { filter:hue-rotate(245deg) saturate(1.8); }
+    .sub { color:var(--muted); font-size:13px; margin-bottom:16px; }
+    .card { background:var(--card); border-radius:14px; padding:16px; margin-bottom:14px; border:1px solid #222d34; }
+    .card h2 { font-size:15px; margin-bottom:10px; color:var(--glow); }
+    .row { display:flex; justify-content:space-between; gap:10px; padding:7px 0; font-size:14px; }
+    .row .k { color:var(--muted); }
+    .row .v { font-family:ui-monospace,Menlo,monospace; font-size:12.5px; word-break:break-all; text-align:right; }
+    button { width:100%; padding:15px; border:none; border-radius:12px; font-size:16px; font-weight:600; cursor:pointer; margin-top:10px; background:var(--purple); color:#fff; }
+    button:disabled { opacity:.45; cursor:not-allowed; }
+    button.ghost { background:var(--bar); color:var(--text); font-size:14px; padding:11px; }
+    .status { margin-top:12px; padding:12px; border-radius:10px; font-size:13.5px; line-height:1.45; background:var(--bar); }
+    .status.err { background:#3a1d1d; color:#f5b7b1; }
+    .status.ok { background:#1d3a28; color:#a9dfbf; }
+    .status.busy { background:#2c1638; color:var(--glow); }
+    label { display:block; font-size:12.5px; color:var(--muted); margin-top:10px; margin-bottom:4px; }
+    input { width:100%; padding:12px; border-radius:10px; border:1px solid #2c3b44; background:var(--bg); color:#fff; font-size:14px; font-family:ui-monospace,Menlo,monospace; }
+    details { margin-top:6px; }
+    summary { color:var(--muted); font-size:13px; cursor:pointer; padding:8px 0; }
+    .addr { font-family:ui-monospace,Menlo,monospace; font-size:13px; word-break:break-all; background:var(--bg); padding:12px; border-radius:10px; margin:8px 0; border:1px solid var(--purple); color:var(--glow); }
+    a { color:var(--glow); }
+    .step { font-size:12px; color:var(--muted); margin-top:2px; }
+    ol { padding-left:20px; font-size:14px; line-height:1.6; }
+    .hide { display:none; }
+  </style>
+</head>
+<body>
+  <h1><span class="m">🥭</span> Desplegar token TTC</h1>
+  <p class="sub">Crea tu token en Polygon Amoy desde el móvil, con un toque.</p>
+
+  <div class="card">
+    <h2>1 · Conecta tu wallet</h2>
+    <div class="row"><span class="k">Wallet</span><span class="v" id="w-name">—</span></div>
+    <div class="row"><span class="k">Cuenta</span><span class="v" id="w-acc">—</span></div>
+    <div class="row"><span class="k">Red</span><span class="v" id="w-net">—</span></div>
+    <div class="row"><span class="k">Saldo gas</span><span class="v" id="w-bal">—</span></div>
+    <button id="btn-connect">Conectar wallet</button>
+  </div>
+
+  <div class="card hide" id="card-deploy">
+    <h2>2 · Despliega el token</h2>
+    <div class="row"><span class="k">Nombre</span><span class="v">WhaTaka TTC</span></div>
+    <div class="row"><span class="k">Símbolo</span><span class="v">TTC</span></div>
+    <div class="row"><span class="k">Fondo inicial</span><span class="v">1.000.000 TTC</span></div>
+    <label>Dirección del oráculo (firmante de pagos)</label>
+    <input id="in-signer" value="0xA5f1711DC508Fe8b256F1a8A834CFf2a47f41186">
+    <p class="step">Déjalo como está. Es la dirección que autoriza los pagos de minería.</p>
+    <details>
+      <summary>Opciones avanzadas</summary>
+      <label>Suministro inicial (TTC)</label>
+      <input id="in-supply" value="1000000">
+      <label>Segundos por halving (31536000 = 1 año)</label>
+      <input id="in-halving" value="31536000">
+      <label>Factor de recompensa (TTC por punto)</label>
+      <input id="in-factor" value="0.001">
+      <label>Tope de emisión anual (TTC)</label>
+      <input id="in-cap" value="100000000">
+    </details>
+    <button id="btn-deploy">Desplegar token</button>
+    <div id="st-deploy" class="status hide"></div>
+  </div>
+
+  <div class="card hide" id="card-result">
+    <h2>3 · ¡Token desplegado! 🎉</h2>
+    <p class="step">Esta es la dirección de tu contrato. Cópiala y mándasela al asistente.</p>
+    <div class="addr" id="out-addr">—</div>
+    <button class="ghost" id="btn-copy">Copiar dirección</button>
+    <div class="row"><span class="k">Transacción</span><span class="v" id="out-tx">—</span></div>
+    <div class="row"><span class="k">Ver en explorer</span><span class="v"><a id="out-link" href="#" target="_blank">amoy.polygonscan.com</a></span></div>
+    <button id="btn-verify" class="ghost">Comprobar que funciona</button>
+    <div id="st-verify" class="status hide"></div>
+  </div>
+
+  <div class="card" id="card-help">
+    <h2>Si el saldo de gas es 0</h2>
+    <p class="step" style="margin-bottom:8px">Necesitas POL de prueba (gratis). Pide en un faucet:</p>
+    <ol>
+      <li><a href="https://faucets.chain.link/polygon-amoy" target="_blank">faucets.chain.link/polygon-amoy</a> — pega tu dirección, pulsa Send</li>
+      <li><a href="https://faucet.polygon.technology" target="_blank">faucet.polygon.technology</a> — conecta tu wallet</li>
+    </ol>
+    <p class="step" style="margin-top:8px">Luego vuelve aquí y pulsa Conectar wallet otra vez.</p>
+  </div>
+
+  <script src="./vendor/ethers.umd.min.js"></script>
+  <script src="./contract-artifact.js"></script>
+  <script>
+    const AMOY = 80002;
+    const CHAIN_META = {
+      80002: { name: 'Polygon Amoy', rpc: 'https://polygon-amoy-bor-rpc.publicnode.com', symbol: 'POL', explorer: 'https://amoy.polygonscan.com' },
+    };
+    const $ = (s) => document.querySelector(s);
+    const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
+
+    let provider = null, signer = null, account = null;
+
+    function setStatus(sel, msg, kind) {
+      const el = $(sel);
+      el.className = 'status' + (kind ? ' ' + kind : '');
+      el.textContent = msg;
+      el.classList.remove('hide');
+    }
+    function short(a, n = 6, m = 4) { return a ? a.slice(0, n) + '…' + a.slice(-m) : '—'; }
+
+    function getInjected() {
+      if (window.ethereum) return window.ethereum;
+      if (window.BinanceChain) return window.BinanceChain;
+      return null;
+    }
+    function walletLabel(p) {
+      if (!p) return 'wallet';
+      if (p.isMetaMask) return 'MetaMask';
+      if (p.isBraveWallet) return 'Brave Wallet';
+      if (p.isBinance || p.isBinanceWallet) return 'Binance Wallet';
+      return 'wallet';
+    }
+
+    async function ensureAmoy(eth) {
+      const hex = '0x' + AMOY.toString(16);
+      try {
+        await eth.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: hex }] });
+        return true;
+      } catch (err) {
+        if (err && (err.code === 4902 || err.code === -32603)) {
+          const m = CHAIN_META[AMOY];
+          await eth.request({
+            method: 'wallet_addEthereumChain',
+            params: [{ chainId: hex, chainName: m.name, nativeCurrency: { name: m.symbol, symbol: m.symbol, decimals: 18 }, rpcUrls: [m.rpc], blockExplorerUrls: [m.explorer] }],
+          });
+          return true;
+        }
+        return false;
+      }
+    }
+
+    async function connect() {
+      const eth = getInjected();
+      if (!eth) {
+        setStatus('#card-help', '', '');
+        alert('No encuentro ninguna wallet. Abre esta página dentro de MetaMask (menú ⋮ → Browser) o instala la extensión.');
+        return;
+      }
+      try {
+        provider = new ethers.BrowserProvider(eth);
+        const accs = await provider.send('eth_requestAccounts', []);
+        account = accs[0];
+        $('#w-name').textContent = walletLabel(eth);
+
+        const chainId = Number(await provider.send('eth_chainId', []));
+        if (chainId !== AMOY) {
+          const ok = await ensureAmoy(eth);
+          if (!ok) {
+            $('#w-net').textContent = 'red ' + chainId + ' (necesita Amoy)';
+            alert('Cambia tu wallet a la red Polygon Amoy para continuar.');
+            return;
+          }
+        }
+        $('#w-net').textContent = 'Polygon Amoy';
+        $('#w-acc').textContent = short(account);
+
+        const bal = await provider.getBalance(account);
+        const balStr = ethers.formatEther(bal);
+        $('#w-bal').textContent = balStr.slice(0, 8) + ' POL';
+
+        $('#card-deploy').classList.remove('hide');
+        if (bal === 0n) {
+          setStatus('#st-deploy', 'Tu cuenta no tiene POL de prueba. Pide gas gratis en un faucet (abajo) y vuelve a conectar.', 'err');
+          $('#btn-deploy').disabled = true;
+        } else {
+          $('#st-deploy').classList.add('hide');
+          $('#btn-deploy').disabled = false;
+        }
+      } catch (err) {
+        console.warn(err);
+        setStatus('#st-deploy', 'No se pudo conectar: ' + (err.shortMessage || err.message), 'err');
+      }
+    }
+
+    async function deploy() {
+      const art = window.WHATAKA_TTC_ARTIFACT;
+      if (!art) { setStatus('#st-deploy', 'Falta el contrato embebido (contract-artifact.js).', 'err'); return; }
+      try {
+        const eth = getInjected();
+        provider = provider || new ethers.BrowserProvider(eth);
+        signer = await provider.getSigner();
+
+        const signerAddr = $('#in-signer').value.trim();
+        if (!/^0x[0-9a-fA-F]{40}$/.test(signerAddr)) { setStatus('#st-deploy', 'La dirección del oráculo no es válida.', 'err'); return; }
+
+        const supply = ethers.parseUnits($('#in-supply').value.trim() || '0', 18);
+        const halving = BigInt($('#in-halving').value.trim() || '31536000');
+        const factor = ethers.parseUnits($('#in-factor').value.trim() || '0.001', 18);
+        const cap = ethers.parseUnits($('#in-cap').value.trim() || '0', 18);
+
+        $('#btn-deploy').disabled = true;
+        setStatus('#st-deploy', 'Esperando tu confirmación en la wallet…', 'busy');
+
+        const factory = new ethers.ContractFactory(art.abi, art.bytecode, signer);
+        const contract = await factory.deploy(signerAddr, supply, halving, factor, cap);
+        const tx = contract.deploymentTransaction();
+
+        setStatus('#st-deploy', 'Transacción enviada: ' + short(tx.hash, 10, 8) + '\nEsperando confirmación (unos 5-15 segundos)…', 'busy');
+
+        const receipt = await tx.wait();
+        const address = await contract.getAddress();
+
+        store.set('whataka.mining.deployment', JSON.stringify({ address, chainId: AMOY, txHash: tx.hash, reportSigner: signerAddr, at: new Date().toISOString() }));
+
+        $('#out-addr').textContent = address;
+        $('#out-tx').textContent = short(tx.hash, 10, 8);
+        const m = CHAIN_META[AMOY];
+        $('#out-link').href = m.explorer + '/address/' + address;
+        $('#card-result').classList.remove('hide');
+        setStatus('#st-deploy', '¡Listo! Token desplegado en el bloque ' + receipt.blockNumber + '.', 'ok');
+        $('#card-result').scrollIntoView({ behavior: 'smooth' });
+      } catch (err) {
+        console.warn(err);
+        const msg = err.shortMessage || err.message || 'error';
+        setStatus('#st-deploy', 'No se pudo desplegar: ' + msg, 'err');
+        $('#btn-deploy').disabled = false;
+      }
+    }
+
+    async function verify() {
+      const raw = store.get('whataka.mining.deployment');
+      if (!raw) return;
+      const dep = JSON.parse(raw);
+      const art = window.WHATAKA_TTC_ARTIFACT;
+      try {
+        const eth = getInjected();
+        provider = provider || new ethers.BrowserProvider(eth);
+        const c = new ethers.Contract(dep.address, art.abi, provider);
+        // Cada lectura por separado: si una falla, las demás se muestran igual.
+        const safe = async (fn) => { try { return await fn(); } catch { return null; } };
+        const name = await safe(() => c.name());
+        const symbol = await safe(() => c.symbol());
+        const decimals = await safe(() => c.decimals());
+        const pool = await safe(() => c.balanceOf(dep.address));
+        const lines = ['Funciona ✅'];
+        if (name || symbol) lines.push((name || '?') + ' (' + (symbol || '?') + ')');
+        if (decimals !== null) lines.push('Decimales: ' + decimals);
+        if (pool !== null) lines.push('Fondo de minería: ' + ethers.formatUnits(pool, 18) + ' TTC listos para pagar.');
+        lines.push('Contrato: ' + dep.address);
+        setStatus('#st-verify', lines.join('\n'), 'ok');
+      } catch (err) {
+        setStatus('#st-verify', 'No se pudo comprobar: ' + (err.shortMessage || err.message), 'err');
+      }
+    }
+
+    $('#btn-connect').addEventListener('click', connect);
+    $('#btn-deploy').addEventListener('click', deploy);
+    $('#btn-verify').addEventListener('click', verify);
+    $('#btn-copy').addEventListener('click', async () => {
+      const a = $('#out-addr').textContent;
+      try { await navigator.clipboard.writeText(a); $('#btn-copy').textContent = '¡Copiada!'; setTimeout(() => { $('#btn-copy').textContent = 'Copiar dirección'; }, 1500); }
+      catch { alert(a); }
+    });
+
+    // Si ya desplegó antes, mostrarlo al abrir.
+    const prev = store.get('whataka.mining.deployment');
+    if (prev) {
+      try {
+        const dep = JSON.parse(prev);
+        $('#out-addr').textContent = dep.address;
+        $('#out-tx').textContent = short(dep.txHash || '', 10, 8);
+        $('#out-link').href = CHAIN_META[AMOY].explorer + '/address/' + dep.address;
+        $('#card-result').classList.remove('hide');
+      } catch {}
+    }
+  </script>
+</body>
+</html>

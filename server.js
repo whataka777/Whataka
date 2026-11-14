@@ -251,7 +251,10 @@ app.get('/api/mining/:peerId', (req, res) => {
 // navegadores internos de las wallets (MetaMask, Brave), que a veces no abren
 // github.io. Solo se exponen los ficheros del frontend, nunca el código del
 // servidor ni node_modules.
-const PUBLIC_FILES = new Set(['/', '/index.html', '/app.js', '/sw.js', '/manifest.webmanifest']);
+const PUBLIC_FILES = new Set([
+  '/', '/index.html', '/app.js', '/sw.js', '/manifest.webmanifest',
+  '/deploy.html', '/contract-artifact.js',
+]);
 const PUBLIC_DIRS = ['/vendor/', '/icons/'];
 app.use((req, res, next) => {
   if (req.method !== 'GET') return next();
