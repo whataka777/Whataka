@@ -293,7 +293,7 @@ test('el vale firmado recupera al firmante del relé y calcula la recompensa', a
   assert.equal(res.status, 200);
   const data = await res.json();
 
-  // Score 10*5 + 2*8 + 30*1 + 1*10 + 5*3 = 121 -> 0.121 TTC
+  // Score 10*5 + 2*8 + 30*1 + 1*10 + 5*3 = 121 -> 0.121 WTK
   assert.equal(data.score, '121');
   assert.equal(data.rewardFormatted, '0.121');
   assert.equal(data.contract, TEST_CONTRACT);

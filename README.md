@@ -97,7 +97,7 @@ cualquier nodo sin recompilar. Sin parámetro se usa el relé de Render.
   se difunden por GossipSub real.
 - Las llamadas de voz muestran el canal de señalización; el audio WebRTC directo
   está pendiente.
-- Las recompensas TTC del reporte son una puntuación del relé, no un contrato
+- Las recompensas WTK del reporte son una puntuación del relé, no un contrato
   desplegado: no hay cadena ni token on-chain todavía.
 
 ## Licencia

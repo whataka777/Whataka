@@ -1,12 +1,12 @@
-# Minería TTC on-chain (WhaTaka)
+# Minería WTK on-chain (WhaTaka)
 
-Pago de recompensas de minería en tokens TTC reales, reclamables desde MetaMask.
+Pago de recompensas de minería en tokens WTK reales, reclamables desde MetaMask.
 
 ## Dos contratos: elige uno
 
 | Contrato | Cuándo usarlo |
 | --- | --- |
-| `contracts/WhaTakaMiningRewards.sol` | Ya tienes un token TTC desplegado y solo quieres el sistema de recompensas. |
+| `contracts/WhaTakaMiningRewards.sol` | Ya tienes un token WTK desplegado y solo quieres el sistema de recompensas. |
 | `contracts/WhaTakaTTC.sol` | Quieres que WhaTaka controle su propio token, con emisión, halving y tope anual. Es autocontenido (es el ERC-20 **y** el pagador). |
 
 La app y el backend funcionan igual con cualquiera de los dos: lo único que
@@ -17,7 +17,7 @@ cambia es la dirección que pones en `MINING_CONTRACT`. Los dos exponen
 
 | Pieza | Fichero | Qué hace |
 | --- | --- | --- |
-| Contrato (opción A) | `contracts/WhaTakaMiningRewards.sol` | Verifica el vale firmado y transfiere los TTC de un token ya existente. |
+| Contrato (opción A) | `contracts/WhaTakaMiningRewards.sol` | Verifica el vale firmado y transfiere los WTK de un token ya existente. |
 | Contrato (opción B) | `contracts/WhaTakaTTC.sol` | ERC-20 propio + halving + tope anual + economía circular, todo en uno. |
 | Firma de vales | `lib/voucher.js` | El backend firma el vale con su clave secp256k1. |
 | Endpoints | `server.js` | `GET /api/mining/config` y `POST /api/mining/voucher`. |
@@ -27,7 +27,7 @@ cambia es la dirección que pones en `MINING_CONTRACT`. Los dos exponen
 
 `claimMiningReward` **no** se fía de las unidades que envía quien llama. Si lo
 hiciera, cualquiera podría llamar con `relayUnits = 1000000000` y vaciar el
-saldo de TTC del contrato en una sola transacción.
+saldo de WTK del contrato en una sola transacción.
 
 En su lugar, el backend (el relé de Render, que ya verifica los reportes ECDSA)
 calcula la puntuación y firma un vale. El contrato recalcula el hash, recupera
@@ -39,8 +39,8 @@ se puede reutilizar.
 
 `score = relay*5 + store*8 + uptime*1 + call*10 + reputation*3`
 
-`reward (en wei de TTC) = score * rewardFactor`, con `rewardFactor = 1e15`.
-Ejemplo: score 121 → 121 × 1e15 = 0,121 TTC.
+`reward (en wei de WTK) = score * rewardFactor`, con `rewardFactor = 1e15`.
+Ejemplo: score 121 → 121 × 1e15 = 0,121 WTK.
 
 Con `WhaTakaTTC.sol` el importe además baja a la mitad en cada halving (ver
 abajo), así que el mismo score paga menos con el tiempo. La app lee el importe
@@ -94,11 +94,11 @@ MetaMask sola si aún no la tienes (BNB no viene de fábrica).
 **Camino B — Remix.** Pega el fichero elegido, compila con 0.8.20+ y despliega
 con *Injected Provider – MetaMask*.
 
-**Opción A — `WhaTakaMiningRewards`** (necesita un token TTC aparte):
+**Opción A — `WhaTakaMiningRewards`** (necesita un token WTK aparte):
 
 | Argumento | Valor |
 | --- | --- |
-| `_ttcToken` | dirección de tu ERC-20 de TTC en esa red |
+| `_ttcToken` | dirección de tu ERC-20 de WTK en esa red |
 | `_reportSigner` | la **ADDR** del paso 1 |
 
 **Opción B — `WhaTakaTTC`** (token propio con halving):
@@ -106,14 +106,14 @@ con *Injected Provider – MetaMask*.
 | Argumento | Valor sugerido |
 | --- | --- |
 | `_reportSigner` | la **ADDR** del paso 1 |
-| `_initialSupply` | TTC de arranque del fondo, p. ej. `1000000e18` (1 millón) |
+| `_initialSupply` | WTK de arranque del fondo, p. ej. `1000000e18` (1 millón) |
 | `_halvingInterval` | segundos por época; `0` = 1 año |
-| `_rewardFactor` | TTC por punto en la época 0; `0` = `1e15` (0,001 TTC/punto) |
+| `_rewardFactor` | WTK por punto en la época 0; `0` = `1e15` (0,001 WTK/punto) |
 | `_annualMintCap` | tope de emisión por año, p. ej. `100000000e18` (100 millones) |
 
 ### 3. Fondea el fondo de minería
 
-- Opción A: transfiere TTC al contrato; ese es el saldo que se reparte.
+- Opción A: transfiere WTK al contrato; ese es el saldo que se reparte.
 - Opción B: el `_initialSupply` ya entra en el fondo al desplegar. Puedes
   añadir más con `mint(amount)` o `fundMiningPool(amount)` (respetan el tope
   anual), o con comisiones vía `recycleFees(amount)` (no acuña).
@@ -143,14 +143,14 @@ Comprueba: `GET /api/mining/config` debe responder `"configured": true`.
 ### 5. Úsalo desde la app
 
 Abre https://whataka777.github.io/Whataka/ dentro del navegador de MetaMask,
-ve a **Minería**, pulsa **Conectar MetaMask** y después **Firmar y Reclamar TTC
+ve a **Minería**, pulsa **Conectar MetaMask** y después **Firmar y Reclamar WTK
 on-chain**. MetaMask pedirá confirmar la transacción.
 
 ## Tokenomics de `WhaTakaTTC` (opción B)
 
 ### Halving (escasez)
 
-`halvingInterval` define una época. En la época 0 se pagan `rewardFactor` TTC
+`halvingInterval` define una época. En la época 0 se pagan `rewardFactor` WTK
 por punto de score; en la época 1, la mitad; en la 2, un cuarto, y así
 sucesivamente: `rewardFactor >> epoch`. Hay un suelo `minRewardFactor` para que
 la minería nunca llegue a cero.
@@ -164,7 +164,7 @@ Con `halvingInterval = 1 año` el comportamiento es el de Bitcoin: la primera
 
 ### Tope anual de emisión (antiinflación)
 
-`annualMintCap` es el máximo de TTC acuñables por año natural desde el
+`annualMintCap` es el máximo de WTK acuñables por año natural desde el
 despliegue. Es un techo duro: `mintedInYear` lo vigila y la acuñación revierte
 con *"Tope anual de emision alcanzado"* si se supera. Consulta `remainingAnnualMint()`.
 
@@ -179,7 +179,7 @@ se quedan sin cobrar, pero la emisión sigue acotada. Con `autoMintTopUp` en
 
 `recycleFees(amount)` toma comisiones ya existentes (aprueba antes) y las mete
 en el fondo. **No acuña nada**, así que reduce la emisión necesaria y la presión
-de venta: cuanto más recircula la app, menos TTC nuevos hacen falta.
+de venta: cuanto más recircula la app, menos WTK nuevos hacen falta.
 
 ### Parámetros ajustables (solo el dueño)
 

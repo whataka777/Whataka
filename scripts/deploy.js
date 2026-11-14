@@ -16,10 +16,10 @@
  *   TTC_TOKEN              solo para CONTRACT=rewards: el ERC-20 a pagar.
  *
  * Para "ttc" (token propio con halving), además:
- *   INITIAL_SUPPLY   TTC de arranque del fondo, en TTC (por defecto 1000000).
+ *   INITIAL_SUPPLY   WTK de arranque del fondo, en WTK (por defecto 1000000).
  *   HALVING_SECONDS  segundos por época (por defecto 31536000 = 1 año).
- *   REWARD_FACTOR    TTC por punto en la época 0 (por defecto 0.001).
- *   ANNUAL_MINT_CAP  tope de emisión anual, en TTC (por defecto 100000000).
+ *   REWARD_FACTOR    WTK por punto en la época 0 (por defecto 0.001).
+ *   ANNUAL_MINT_CAP  tope de emisión anual, en WTK (por defecto 100000000).
  *
  * Al terminar imprime la dirección y los valores exactos para Render.
  * Requiere haber compilado antes:  npm run compile
@@ -101,7 +101,7 @@ async function main() {
     factory = new ethers.ContractFactory(art.abi, art.bytecode, deployer);
     args = [token, signerAddress];
     console.log('Contrato     : WhaTakaMiningRewards');
-    console.log('TTC a pagar  :', token);
+    console.log('WTK a pagar  :', token);
   } else if (kind === 'ttc') {
     const art = artifact('WhaTakaTTC');
     const initialSupply = ethers.parseUnits(process.env.INITIAL_SUPPLY || '1000000', 18);
@@ -113,10 +113,10 @@ async function main() {
     args = [signerAddress, initialSupply, halvingSeconds, rewardFactor, annualMintCap];
 
     console.log('Contrato     : WhaTakaTTC');
-    console.log('Suministro   :', ethers.formatUnits(initialSupply, 18), 'TTC al fondo');
+    console.log('Suministro   :', ethers.formatUnits(initialSupply, 18), 'WTK al fondo');
     console.log('Halving cada :', halvingSeconds.toString(), 's');
-    console.log('Factor época0:', ethers.formatUnits(rewardFactor, 18), 'TTC/punto');
-    console.log('Tope anual   :', ethers.formatUnits(annualMintCap, 18), 'TTC');
+    console.log('Factor época0:', ethers.formatUnits(rewardFactor, 18), 'WTK/punto');
+    console.log('Tope anual   :', ethers.formatUnits(annualMintCap, 18), 'WTK');
   } else {
     console.error('CONTRACT debe ser "ttc" o "rewards".');
     process.exit(1);

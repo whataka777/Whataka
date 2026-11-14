@@ -36,11 +36,11 @@ const CHAIN_ID = 1338;
 const EVM_PORT = 18546;
 
 const HALF = 1000n; // segundos por época en los tests
-const FACTOR = 10n ** 15n; // 1e15 TTC-wei por punto
+const FACTOR = 10n ** 15n; // 1e15 WTK-wei por punto
 
 const UNITS = { relay: 10n, store: 2n, uptime: 30n, call: 1n, reputation: 5n };
 const SCORE = 121n; // 10*5 + 2*8 + 30*1 + 1*10 + 5*3
-const REWARD_EPOCH0 = SCORE * FACTOR; // 0.121 TTC
+const REWARD_EPOCH0 = SCORE * FACTOR; // 0.121 WTK
 
 async function expectRevert(promise, match) {
   try {
@@ -85,14 +85,14 @@ test('WhaTakaTTC: halving, tope anual, economía circular y seguridad', { skip: 
     const art = artifact('WhaTakaTTC');
     const signerAddr = voucher.signerAddress(SIGNER_PK);
     const genesis = ethers.parseUnits('1000', 18);
-    const cap = ethers.parseUnits('100', 18); // tope anual: 100 TTC
+    const cap = ethers.parseUnits('100', 18); // tope anual: 100 WTK
 
     const ttc = await new ethers.ContractFactory(art.abi, art.bytecode, owner)
       .deploy(signerAddr, genesis, HALF, FACTOR, cap);
     await ttc.waitForDeployment();
     const addr = await ttc.getAddress();
 
-    // 0. Génesis: 1000 TTC en el pool, sin contar contra el tope anual.
+    // 0. Génesis: 1000 WTK en el pool, sin contar contra el tope anual.
     assert.equal(await ttc.rewardPool(), genesis);
     assert.equal(await ttc.totalSupply(), genesis);
     assert.equal(await ttc.mintedThisYear(), 0n);
@@ -103,7 +103,7 @@ test('WhaTakaTTC: halving, tope anual, economía circular y seguridad', { skip: 
     assert.equal(await ttc.rewardFactorAt(2), FACTOR / 4n);
     assert.equal(await ttc.rewardFactorAt(50), await ttc.minRewardFactor());
 
-    // 2. Reclamo válido en la época 0: paga 0.121 TTC desde el pool (sin acuñar).
+    // 2. Reclamo válido en la época 0: paga 0.121 WTK desde el pool (sin acuñar).
     const h0 = voucher.reportHashFor('wt1', 'e0');
     const dl = (await nowTs(provider)) + 600;
     await (await ttc.connect(user).claimMiningReward(

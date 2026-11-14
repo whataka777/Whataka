@@ -4,12 +4,12 @@ pragma solidity ^0.8.20;
 /*
  * WhaTakaMiningRewards
  * --------------------
- * Paga tokens TTC por los reportes de minería de WhaTaka.
+ * Paga tokens WTK por los reportes de minería de WhaTaka.
  *
  * Modelo de confianza (IMPORTANTE):
  *   El contrato NO se fía de las unidades que le manda quien llama. Si lo
  *   hiciera, cualquiera podría llamar con relayUnits = 1_000_000 y vaciar el
- *   saldo de TTC en una sola transacción. Por eso cada reclamo exige un
+ *   saldo de WTK en una sola transacción. Por eso cada reclamo exige un
  *   "vale" (voucher) firmado fuera de la cadena por la clave `reportSigner`,
  *   que es la del backend que ya verifica los reportes ECDSA en el relé.
  *
@@ -22,10 +22,10 @@ pragma solidity ^0.8.20;
  *   2. El backend firma `voucherDigest(...)` con su clave secp256k1.
  *   3. La app llama a `claimMiningReward(...)` con ese vale.
  *   4. El contrato verifica la firma, marca el reporte como procesado y
- *      transfiere los TTC al usuario.
+ *      transfiere los WTK al usuario.
  */
 
-/// @notice Interfaz mínima del token TTC (ERC-20).
+/// @notice Interfaz mínima del token WTK (ERC-20).
 interface ITTC {
     function transfer(address to, uint256 amount) external returns (bool);
 
@@ -33,7 +33,7 @@ interface ITTC {
 }
 
 contract WhaTakaMiningRewards {
-    /// @notice Token TTC con el que se pagan las recompensas.
+    /// @notice Token WTK con el que se pagan las recompensas.
     ITTC public immutable ttcToken;
 
     /// @notice Dueño del contrato (despliega, ajusta pesos y rescata fondos).
@@ -49,7 +49,7 @@ contract WhaTakaMiningRewards {
     uint256 public callWeight = 10;
     uint256 public reputationWeight = 3;
 
-    /// @notice Factor de escala: score * rewardFactor = cantidad de TTC (en wei).
+    /// @notice Factor de escala: score * rewardFactor = cantidad de WTK (en wei).
     uint256 public rewardFactor = 1e15;
 
     /// @notice Tope por unidad para que la aritmética nunca desborde.
@@ -61,7 +61,7 @@ contract WhaTakaMiningRewards {
     /// @notice reportHash ya pagado. Protege contra doble gasto (doble reclamo).
     mapping(bytes32 => bool) public processedReports;
 
-    /// @notice Se emite cuando los TTC llegan con éxito al usuario.
+    /// @notice Se emite cuando los WTK llegan con éxito al usuario.
     event RewardPaid(address indexed user, uint256 amount, bytes32 reportHash);
 
     event ReportSignerUpdated(address indexed previousSigner, address indexed newSigner);
@@ -79,7 +79,7 @@ contract WhaTakaMiningRewards {
         _;
     }
 
-    /// @param _ttcToken     Dirección del contrato ERC-20 de TTC en esta red.
+    /// @param _ttcToken     Dirección del contrato ERC-20 de WTK en esta red.
     /// @param _reportSigner Dirección que corresponde a la clave privada del backend.
     constructor(address _ttcToken, address _reportSigner) {
         require(_ttcToken != address(0), "token cero");
@@ -108,7 +108,7 @@ contract WhaTakaMiningRewards {
             + reputationUnits * reputationWeight;
     }
 
-    /// @notice Cantidad de TTC (en wei) que corresponde a esas unidades.
+    /// @notice Cantidad de WTK (en wei) que corresponde a esas unidades.
     function rewardFor(
         uint256 relayUnits,
         uint256 storeUnits,
@@ -206,7 +206,7 @@ contract WhaTakaMiningRewards {
         // Efecto antes de la transferencia (patrón checks-effects-interactions).
         processedReports[reportHash] = true;
 
-        require(ttcToken.transfer(msg.sender, rewardAmount), "Fallo la transferencia TTC");
+        require(ttcToken.transfer(msg.sender, rewardAmount), "Fallo la transferencia WTK");
 
         emit RewardPaid(msg.sender, rewardAmount, reportHash);
     }
@@ -246,14 +246,14 @@ contract WhaTakaMiningRewards {
         maxRewardPerReport = newMax;
     }
 
-    /// @notice Rescata TTC que hayan quedado atrapados en el contrato.
+    /// @notice Rescata WTK que hayan quedado atrapados en el contrato.
     function rescueTokens(address to, uint256 amount) external onlyOwner {
         require(to != address(0), "destino cero");
-        require(ttcToken.transfer(to, amount), "Fallo la transferencia TTC");
+        require(ttcToken.transfer(to, amount), "Fallo la transferencia WTK");
         emit TokensRescued(to, amount);
     }
 
-    /// @notice Saldo de TTC disponible en el contrato para pagar recompensas.
+    /// @notice Saldo de WTK disponible en el contrato para pagar recompensas.
     function rewardPool() external view returns (uint256) {
         return ttcToken.balanceOf(address(this));
     }

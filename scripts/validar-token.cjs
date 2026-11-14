@@ -5,7 +5,7 @@
  *
  *   node scripts/validar-token.cjs [dirección]
  *
- * Por defecto valida el token WhaTaka TTC de Polygon Amoy. Si existe la clave
+ * Por defecto valida el token WhaTaka WTK de Polygon Amoy. Si existe la clave
  * del oráculo en /workspace/.whataka-keys/signer.key, además simula un cobro
  * (eth_call) para comprobar que el pago funcionaría de verdad.
  */
@@ -94,9 +94,9 @@ async function main() {
     rewardPool = await c.rewardPool();
     totalSupply = await c.totalSupply();
     const paid = totalSupply - rewardPool;
-    console.log('  ✅ rewardPool()  =', fmt(rewardPool), 'TTC');
-    console.log('  ✅ totalSupply() =', fmt(totalSupply), 'TTC');
-    console.log(`  ${paid === 0n ? '⚠️' : '✅'} TTC pagados    = ${fmt(paid)} TTC`);
+    console.log('  ✅ rewardPool()  =', fmt(rewardPool), 'WTK');
+    console.log('  ✅ totalSupply() =', fmt(totalSupply), 'WTK');
+    console.log(`  ${paid === 0n ? '⚠️' : '✅'} WTK pagados    = ${fmt(paid)} WTK`);
     console.log(`  → ${paid === 0n ? 'Nunca se ha pagado nada todavía' : 'Ya se han pagado recompensas'}`);
   } catch (err) {
     console.log('  ❌ →', (err.shortMessage || err.message).slice(0, 70));
@@ -141,7 +141,7 @@ async function main() {
 
   console.log('  Importe que pagaría rewardFor(...) =', fmt(
     await c.rewardFor(units.relay, units.store, units.uptime, units.call, units.reputation),
-  ), 'TTC');
+  ), 'WTK');
 
   // El remitente de la simulación tiene que ser el mismo usuario del vale: el
   // contrato comprueba la firma contra msg.sender.

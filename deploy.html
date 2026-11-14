@@ -36,7 +36,7 @@
   </style>
 </head>
 <body>
-  <h1><span class="m">🥭</span> Desplegar token TTC</h1>
+  <h1><span class="m">🥭</span> Desplegar token WTK</h1>
   <p class="sub">Crea tu token en Polygon Amoy desde el móvil, con un toque.</p>
 
   <div class="card">
@@ -50,21 +50,21 @@
 
   <div class="card hide" id="card-deploy">
     <h2>2 · Despliega el token</h2>
-    <div class="row"><span class="k">Nombre</span><span class="v">WhaTaka TTC</span></div>
-    <div class="row"><span class="k">Símbolo</span><span class="v">TTC</span></div>
-    <div class="row"><span class="k">Fondo inicial</span><span class="v">1.000.000 TTC</span></div>
+    <div class="row"><span class="k">Nombre</span><span class="v">WhaTaka Coin</span></div>
+    <div class="row"><span class="k">Símbolo</span><span class="v">WTK</span></div>
+    <div class="row"><span class="k">Fondo inicial</span><span class="v">1.000.000 WTK</span></div>
     <label>Dirección del oráculo (firmante de pagos)</label>
     <input id="in-signer" value="0xA5f1711DC508Fe8b256F1a8A834CFf2a47f41186">
     <p class="step">Déjalo como está. Es la dirección que autoriza los pagos de minería.</p>
     <details>
       <summary>Opciones avanzadas</summary>
-      <label>Suministro inicial (TTC)</label>
+      <label>Suministro inicial (WTK)</label>
       <input id="in-supply" value="1000000">
       <label>Segundos por halving (31536000 = 1 año)</label>
       <input id="in-halving" value="31536000">
-      <label>Factor de recompensa (TTC por punto)</label>
+      <label>Factor de recompensa (WTK por punto)</label>
       <input id="in-factor" value="0.001">
-      <label>Tope de emisión anual (TTC)</label>
+      <label>Tope de emisión anual (WTK)</label>
       <input id="in-cap" value="100000000">
     </details>
     <button id="btn-deploy">Desplegar token</button>
@@ -273,7 +273,7 @@
         const lines = ['Funciona ✅'];
         if (name || symbol) lines.push((name || '?') + ' (' + (symbol || '?') + ')');
         if (decimals !== null) lines.push('Decimales: ' + decimals);
-        if (pool !== null) lines.push('Fondo de minería: ' + ethers.formatUnits(pool, 18) + ' TTC listos para pagar.');
+        if (pool !== null) lines.push('Fondo de minería: ' + ethers.formatUnits(pool, 18) + ' WTK listos para pagar.');
         lines.push('Contrato: ' + dep.address);
         setStatus('#st-verify', lines.join('\n'), 'ok');
       } catch (err) {

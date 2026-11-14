@@ -1,6 +1,6 @@
 {
   "contractName": "IERC20",
-  "sourceName": "contracts_WhaTakaTTC.sol",
+  "sourceName": "WhaTakaTTC.sol",
   "abi": [
     {
       "anonymous": false,

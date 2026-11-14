@@ -2,7 +2,7 @@
 
 /* Prueba de integración del contrato WhaTakaMiningRewards sobre una EVM real
  * (ganache). Comprueba el camino completo: vale firmado -> transferencia de
- * TTC -> evento RewardPaid, y todos los rechazos de seguridad.
+ * WTK -> evento RewardPaid, y todos los rechazos de seguridad.
  *
  * Se salta sola si no está ganache instalado o los artefactos no existen:
  *   npm run compile && npm run test:contract
@@ -77,7 +77,7 @@ test('WhaTakaMiningRewards: camino completo y rechazos de seguridad', { skip: !r
     await (await ttc.mint(miningAddr, ethers.parseUnits('1000', 18))).wait();
 
     const units = { relay: 10n, store: 2n, uptime: 30n, call: 1n, reputation: 5n };
-    const expectedReward = voucher.rewardUnits(units); // 0.121 TTC
+    const expectedReward = voucher.rewardUnits(units); // 0.121 WTK
     const reportHash = voucher.reportHashFor('wt1testpeer', 'nonce123');
     const deadline = Math.floor(Date.now() / 1000) + 600;
     const sig = voucher.signVoucher(SIGNER_PK, {

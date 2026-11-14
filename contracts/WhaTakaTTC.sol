@@ -2,9 +2,9 @@
 pragma solidity ^0.8.20;
 
 /*
- * WhaTakaTTC — token TTC con emisión controlada y minería sostenible
+ * WhaTakaTTC — token WTK con emisión controlada y minería sostenible
  * -----------------------------------------------------------------
- * Contrato autocontenido: es a la vez el ERC-20 de TTC y el sistema que paga
+ * Contrato autocontenido: es a la vez el ERC-20 de WTK y el sistema que paga
  * las recompensas de minería. Sustituye a la pareja (token externo +
  * WhaTakaMiningRewards) cuando quieres que WhaTaka controle su propia emisión.
  *
@@ -13,10 +13,10 @@ pragma solidity ^0.8.20;
  *
  *   1. HALVING (escasez). La recompensa por punto de score se parte por la
  *      mitad cada `halvingInterval` segundos, igual que Bitcoin. Así cada vez
- *      hacen falta más nodos y más tiempo para emitir la misma cantidad de TTC.
+ *      hacen falta más nodos y más tiempo para emitir la misma cantidad de WTK.
  *
  *   2. TOPE ANUAL DE EMISIÓN (antiinflación). Solo se pueden acuñar
- *      `annualMintCap` TTC por año. Es un techo duro: aunque el halving no
+ *      `annualMintCap` WTK por año. Es un techo duro: aunque el halving no
  *      bastara, la inflación nunca supera ese número.
  *
  *   3. ECONOMÍA CIRCULAR (sostenibilidad). Las comisiones que la app recolecta
@@ -55,8 +55,8 @@ contract WhaTakaTTC is IERC20 {
     // ERC-20
     // ─────────────────────────────────────────────────────────────
 
-    string public constant name = "WhaTaka Token";
-    string public constant symbol = "TTC";
+    string public constant name = "WhaTaka Coin";
+    string public constant symbol = "WTK";
     uint8 public constant decimals = 18;
 
     uint256 public totalSupply;
@@ -86,7 +86,7 @@ contract WhaTakaTTC is IERC20 {
     /// @notice Duración de una época (segundos). Cada época parte la recompensa.
     uint256 public halvingInterval;
 
-    /// @notice TTC (en wei) por punto de score durante la época 0.
+    /// @notice WTK (en wei) por punto de score durante la época 0.
     ///         `rewardFactor` se va dividiendo por 2 en cada halving.
     uint256 public rewardFactor;
 
@@ -96,10 +96,10 @@ contract WhaTakaTTC is IERC20 {
     /// @notice Un año de emisión (base del tope anual).
     uint256 public constant YEAR = 365 days;
 
-    /// @notice Máximo de TTC (en wei) acuñables por año. Techo duro de inflación.
+    /// @notice Máximo de WTK (en wei) acuñables por año. Techo duro de inflación.
     uint256 public annualMintCap;
 
-    /// @notice TTC ya acuñados (no génesis) en cada año.
+    /// @notice WTK ya acuñados (no génesis) en cada año.
     mapping(uint256 => uint256) public mintedInYear;
 
     /// @notice Si es `true`, un reclamo acuña lo que falte para pagar (dentro del
@@ -164,10 +164,10 @@ contract WhaTakaTTC is IERC20 {
     }
 
     /// @param _reportSigner    Dirección del backend que firma los vales.
-    /// @param _initialSupply   TTC iniciales (génesis). Van directos al fondo de
+    /// @param _initialSupply   WTK iniciales (génesis). Van directos al fondo de
     ///                         minería y NO cuentan contra el tope anual.
     /// @param _halvingInterval Segundos por época. 0 → un año.
-    /// @param _rewardFactor    TTC por punto en la época 0 (wei). 0 → 1e15.
+    /// @param _rewardFactor    WTK por punto en la época 0 (wei). 0 → 1e15.
     /// @param _annualMintCap   Tope de acuñación por año (wei).
     constructor(
         address _reportSigner,
@@ -205,7 +205,7 @@ contract WhaTakaTTC is IERC20 {
         return (block.timestamp - startTime) / halvingInterval;
     }
 
-    /// @notice Recompensa (wei TTC por punto de score) vigente en una época.
+    /// @notice Recompensa (wei WTK por punto de score) vigente en una época.
     ///         Es `rewardFactor >> epoch`, con suelo `minRewardFactor`.
     function rewardFactorAt(uint256 epoch) public view returns (uint256) {
         if (epoch >= 256) return minRewardFactor;
@@ -229,7 +229,7 @@ contract WhaTakaTTC is IERC20 {
         return (block.timestamp - startTime) / YEAR;
     }
 
-    /// @notice TTC acuñados (sin contar génesis) en el año actual.
+    /// @notice WTK acuñados (sin contar génesis) en el año actual.
     function mintedThisYear() public view returns (uint256) {
         return mintedInYear[yearIndex()];
     }
@@ -259,7 +259,7 @@ contract WhaTakaTTC is IERC20 {
             + reputationUnits * reputationWeight;
     }
 
-    /// @notice TTC (en wei) que corresponden a esas unidades HOY, ya con el
+    /// @notice WTK (en wei) que corresponden a esas unidades HOY, ya con el
     ///         halving aplicado.
     function rewardFor(
         uint256 relayUnits,
@@ -386,7 +386,7 @@ contract WhaTakaTTC is IERC20 {
     // Fondo de minería y economía circular
     // ─────────────────────────────────────────────────────────────
 
-    /// @notice Acuña TTC hacia el fondo de minería. Protegida y acotada por el
+    /// @notice Acuña WTK hacia el fondo de minería. Protegida y acotada por el
     ///         tope anual. Los tokens van SIEMPRE al propio contrato (el fondo).
     function mint(uint256 amount) external onlyMinter returns (uint256) {
         _mintCapped(address(this), amount);
@@ -408,7 +408,7 @@ contract WhaTakaTTC is IERC20 {
         emit FeesRecycled(msg.sender, amount);
     }
 
-    /// @notice TTC disponibles en el contrato para pagar recompensas.
+    /// @notice WTK disponibles en el contrato para pagar recompensas.
     function rewardPool() external view returns (uint256) {
         return balanceOf[address(this)];
     }
@@ -545,7 +545,7 @@ contract WhaTakaTTC is IERC20 {
         owner = newOwner;
     }
 
-    /// @notice Rescata TTC atrapados en el contrato (distintos del fondo, si
+    /// @notice Rescata WTK atrapados en el contrato (distintos del fondo, si
     ///         hicieran falta). No puede tocar el fondo de minería en uso.
     function rescueTokens(address to, uint256 amount) external onlyOwner {
         require(to != address(0), "destino cero");

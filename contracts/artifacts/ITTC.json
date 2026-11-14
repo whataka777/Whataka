@@ -1,6 +1,6 @@
 {
   "contractName": "ITTC",
-  "sourceName": "contracts_WhaTakaMiningRewards.sol",
+  "sourceName": "WhaTakaMiningRewards.sol",
   "abi": [
     {
       "inputs": [

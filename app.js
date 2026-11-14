@@ -344,7 +344,7 @@ function updateWalletUI() {
     sub.textContent = shortPeer(state.wallet, 6, 4);
   } else {
     status.textContent = '🦊 Conectar wallet';
-    sub.textContent = 'Vincular wallet para cobrar TTC on-chain';
+    sub.textContent = 'Vincular wallet para cobrar WTK on-chain';
   }
 }
 
@@ -415,7 +415,7 @@ async function openWcSession(chainId) {
     rpcMap: { [id]: meta.rpc },
     metadata: {
       name: 'WhaTaka',
-      description: 'Mensajería P2P cifrada y minería TTC',
+      description: 'Mensajería P2P cifrada y minería WTK',
       url: location.origin,
       icons: [`${location.origin}/icons/icon-192.png`],
     },
@@ -1205,7 +1205,7 @@ async function sendMiningReport() {
   try {
     // 1. Aseguramos wallet conectada.
     if (!state.wallet) {
-      log.textContent = 'Conecta tu wallet para reclamar TTC…';
+      log.textContent = 'Conecta tu wallet para reclamar WTK…';
       const addr = await connectWallet();
       if (!addr) return;
     }
@@ -1281,7 +1281,7 @@ async function sendMiningReport() {
       /* el contrato podría no exponer rewardFor; usamos el del backend */
     }
 
-    log.textContent = `Reclamando ${rewardLabel} TTC… confirma en tu wallet`;
+    log.textContent = `Reclamando ${rewardLabel} WTK… confirma en tu wallet`;
     const tx = await contract.claimMiningReward(
       voucherData.reportHash,
       u.relay,
@@ -1295,8 +1295,8 @@ async function sendMiningReport() {
     log.textContent = `Tx enviada ${tx.hash.slice(0, 12)}… esperando confirmación`;
     await tx.wait();
 
-    log.textContent = `¡Recompensa de ${rewardLabel} TTC enviada a tu wallet! 🪙`;
-    toast('TTC reclamados on-chain');
+    log.textContent = `¡Recompensa de ${rewardLabel} WTK enviada a tu wallet! 🪙`;
+    toast('WTK reclamados on-chain');
 
     // 5. Reiniciamos los contadores locales ya cobrados.
     state.relayUnits = 0;

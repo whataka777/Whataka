@@ -4,8 +4,8 @@ pragma solidity ^0.8.20;
 // Token de prueba SOLO para los tests: implementa lo mínimo del ERC-20 que
 // necesita WhaTakaMiningRewards. NO se despliega en producción.
 contract TestTTC {
-    string public name = "TTC Test";
-    string public symbol = "TTC";
+    string public name = "WTK Test";
+    string public symbol = "WTK";
     uint8 public decimals = 18;
 
     mapping(address => uint256) public balanceOf;
