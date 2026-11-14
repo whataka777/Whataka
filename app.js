@@ -1100,6 +1100,15 @@ async function sendMiningReport() {
     const wallet = getWalletProvider();
     if (!wallet) throw new Error('no hay wallet Web3 disponible');
     const provider = new ethers.BrowserProvider(wallet);
+
+    // La wallet tiene que estar en la red del contrato, o la transacción iría a
+    // la cadena equivocada (p. ej. Binance en BNB y el contrato en Polygon).
+    const onChain = Number(await provider.send('eth_chainId', []));
+    if (onChain !== Number(voucherData.chainId)) {
+      const ok = await ensureChain(wallet, voucherData.chainId);
+      if (!ok) throw new Error('cambia la wallet a la red del contrato');
+    }
+
     const signer = await provider.getSigner();
     const contract = new ethers.Contract(voucherData.contract, MINING_ABI, signer);
 
