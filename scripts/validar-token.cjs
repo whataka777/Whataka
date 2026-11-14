@@ -13,7 +13,7 @@
 const { ethers } = require('ethers');
 const fs = require('node:fs');
 
-const CONTRACT = process.argv[2] || '0xBc4DdB653828d00a7bDFE3F833BB0E6F9E36B26b';
+const CONTRACT = process.argv[2] || '0x7FC7502fC87e36ab08846C193264182805b5F536';
 const SIGNER_KEY_FILE = '/workspace/.whataka-keys/signer.key';
 const CHAIN = 80002;
 
