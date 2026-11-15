@@ -97,6 +97,14 @@ test('GET /health responde con estado del relé', async () => {
   assert.equal(body.service, 'whataka-relay');
 });
 
+test('el relé anuncia los permisos que necesita la app', async () => {
+  const res = await fetch(`${BASE}/health`);
+  const policy = res.headers.get('permissions-policy') || '';
+  assert.match(policy, /camera=\(self\)/);
+  assert.match(policy, /microphone=\(self\)/);
+  assert.match(policy, /notifications=\(self\)/);
+});
+
 test('el relé difunde presencia entre pares', async () => {
   const a = await openSocket();
   const b = await openSocket();
