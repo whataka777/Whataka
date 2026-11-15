@@ -33,6 +33,13 @@ app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', process.env.CORS_ORIGIN || '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  // Permisos que la app necesita (cámara, micrófono, ubicación y avisos del
+  // sistema). Sin esta cabecera, los navegadores embebidos de las wallets
+  // bloquean cámara y micrófono aunque la persona los conceda.
+  res.setHeader(
+    'Permissions-Policy',
+    'camera=(self), microphone=(self), geolocation=(self), notifications=(self)',
+  );
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   return next();
 });

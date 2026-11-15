@@ -1422,7 +1422,11 @@ async function receiveMessage(msg) {
   state.relayUnits += 1;
 
   if (state.activePeer === from) renderChat();
-  else toast(`Nuevo mensaje de ${state.peers[from]?.name || shortPeer(from)}`);
+  else {
+    const nombre = state.peers[from]?.name || shortPeer(from);
+    toast(`Nuevo mensaje de ${nombre}`);
+    notifyIncoming(from, nombre);
+  }
   renderChats();
   renderMining();
 }
@@ -1805,6 +1809,125 @@ async function sendMiningReport() {
 }
 
 // ─────────────────────────────────────────────────────────────
+// Permisos (cámara, micrófono y avisos de mensajes)
+// ─────────────────────────────────────────────────────────────
+
+// El navegador lanza un DOMException cuyo `message` viene en inglés ("Permission
+// denied") y no dice qué hacer; su `name` sí es estable y está en la spec. Se
+// traduce a partir del `name` para que la persona sepa qué le pasa.
+const MEDIA_ERROR_MESSAGES = {
+  NotAllowedError: 'Permiso denegado. Actívalo en los ajustes del navegador para este sitio y vuelve a intentarlo.',
+  PermissionDeniedError: 'Permiso denegado. Actívalo en los ajustes del navegador para este sitio y vuelve a intentarlo.',
+  NotFoundError: 'No se encontró ninguna cámara ni micrófono en este dispositivo.',
+  DevicesNotFoundError: 'No se encontró ninguna cámara ni micrófono en este dispositivo.',
+  NotReadableError: 'La cámara o el micrófono están siendo usados por otra aplicación.',
+  TrackStartError: 'La cámara o el micrófono están siendo usados por otra aplicación.',
+  OverconstrainedError: 'Este dispositivo no tiene la cámara que se pidió.',
+  SecurityError: 'El navegador bloqueó el acceso a la cámara y el micrófono.',
+};
+
+function mediaErrorMessage(err) {
+  return MEDIA_ERROR_MESSAGES[err && err.name] || 'No se pudo acceder a la cámara o al micrófono.';
+}
+
+// Estado actual de un permiso sin provocarlo. `navigator.permissions` no existe
+// en todos los navegadores (Safari antiguo), así que si falla se responde
+// 'unknown' y la interfaz lo muestra como "No disponible".
+async function permissionState(name) {
+  if (!navigator.permissions || !navigator.permissions.query) return 'unknown';
+  try {
+    const status = await navigator.permissions.query({ name });
+    return status.state;
+  } catch {
+    return 'unknown';
+  }
+}
+
+const PERMISSION_LABELS = {
+  granted: 'Concedido', denied: 'Bloqueado', prompt: 'Sin decidir',
+  unknown: 'No disponible', unsupported: 'No disponible',
+};
+
+function permissionBadge(state) {
+  const color = state === 'granted' ? 'var(--success)'
+    : state === 'denied' ? 'var(--danger)'
+      : 'var(--text-muted)';
+  return `<span style="color:${color};font-weight:600">${PERMISSION_LABELS[state] || state}</span>`;
+}
+
+// Consultar el estado no basta: para conceder hay que provocar la solicitud del
+// sistema. Para cámara y micrófono se abre un flujo de un instante y se cierra;
+// solo interesa que el navegador deje el permiso concedido.
+async function requestMediaPermission(kind) {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    toast('Este navegador no permite cámara ni micrófono (requiere HTTPS)');
+    return;
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia(
+      kind === 'camera' ? { video: true } : { audio: true },
+    );
+    stream.getTracks().forEach((t) => t.stop());
+    toast(kind === 'camera' ? 'Cámara activada' : 'Micrófono activado');
+  } catch (err) {
+    toast(mediaErrorMessage(err));
+  }
+}
+
+async function requestNotificationPermission() {
+  if (!('Notification' in window)) { toast('Este navegador no admite avisos'); return; }
+  if (Notification.permission === 'granted') { toast('Los avisos ya están activados'); return; }
+  if (Notification.permission === 'denied') { toast('Los avisos están bloqueados en el navegador'); return; }
+  try {
+    const result = await Notification.requestPermission();
+    toast(result === 'granted' ? 'Avisos activados' : 'Avisos no concedidos');
+  } catch {
+    toast('No se pudo pedir el permiso de avisos');
+  }
+}
+
+async function showPermissions() {
+  const [cam, mic] = await Promise.all([permissionState('camera'), permissionState('microphone')]);
+  const notif = ('Notification' in window) ? Notification.permission : 'unsupported';
+  openModal('Permisos', `
+    <p>WhaTaka necesita estos permisos para las llamadas y los avisos.</p>
+    <div class="settings-list">
+      <div class="setting-item" id="perm-camera">
+        <i class="fa-solid fa-camera"></i>
+        <div><h4>Cámara</h4><p>Para fotos y videollamadas · ${permissionBadge(cam)}</p></div>
+      </div>
+      <div class="setting-item" id="perm-microphone">
+        <i class="fa-solid fa-microphone"></i>
+        <div><h4>Micrófono</h4><p>Para notas de voz y llamadas · ${permissionBadge(mic)}</p></div>
+      </div>
+      <div class="setting-item" id="perm-notifications">
+        <i class="fa-solid fa-bell"></i>
+        <div><h4>Avisos de mensajes</h4><p>Para enterarte de un mensaje nuevo · ${permissionBadge(notif)}</p></div>
+      </div>
+    </div>
+    <p class="hint-text">Si algo aparece bloqueado, ábrelo en los ajustes del navegador para este sitio.</p>`);
+  $('#perm-camera').addEventListener('click', () => requestMediaPermission('camera'));
+  $('#perm-microphone').addEventListener('click', () => requestMediaPermission('microphone'));
+  $('#perm-notifications').addEventListener('click', () => requestNotificationPermission());
+}
+
+// Aviso del sistema al recibir un mensaje cuando la app no está a la vista.
+// En móvil el constructor `Notification` no siempre funciona; se prefiere el
+// service worker y se cae al constructor solo si aquel no está listo.
+function notifyIncoming(from, name) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  if (document.visibilityState === 'visible') return;
+  const options = { body: `Nuevo mensaje de ${name}`, tag: `wt-${from}` };
+  if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+    navigator.serviceWorker.ready
+      .then((reg) => reg.showNotification('WhaTaka', options))
+      .catch(() => { try { new Notification('WhaTaka', options); } catch { /* ignorado */ } });
+    return;
+  }
+  try { new Notification('WhaTaka', options); } catch { /* ignorado */ }
+}
+
+// ─────────────────────────────────────────────────────────────
 // Arranque
 // ─────────────────────────────────────────────────────────────
 
@@ -1852,6 +1975,7 @@ function bindEvents() {
   $('#connect-wallet-box').addEventListener('click', connectWallet);
   $('#btn-connect-wallet').addEventListener('click', connectWallet);
   $('#btn-walletconnect').addEventListener('click', askWalletConnect);
+  $('#btn-permissions').addEventListener('click', showPermissions);
 }
 
 async function boot() {
