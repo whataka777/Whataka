@@ -1061,6 +1061,8 @@ async function sendAttachment(kind, data, caption) {
 // Composer: emojis, stickers, adjuntos, cámara y notas de voz
 // ─────────────────────────────────────────────────────────────
 
+const MEDIA_MAX = 250000; // tamano maximo de un dataURL de medio (base64)
+
 const EMOJIS = [
   '😀','😃','😄','😁','😆','😅','😂','🤣','😊','😇','🙂','🙃','😉','😌','😍','🥰',
   '😘','😗','😙','😚','😋','😛','😝','😜','🤪','🤨','🧐','🤓','😎','🥳','🤩','🥺',
@@ -1184,8 +1186,8 @@ function pickFile(accept, kind) {
       sendAttachment('document', { name: file.name, size });
       return;
     }
-    compressImage(file, 900, 0.7).then((dataUrl) => {
-      if (dataUrl.length > 44000) {
+    compressImage(file, 1080, 0.7).then((dataUrl) => {
+      if (dataUrl.length > MEDIA_MAX) {
         toast('Imagen demasiado grande para el relé');
         return;
       }
@@ -1204,9 +1206,9 @@ function openCamera() {
   $('#cam-input').addEventListener('change', () => {
     const file = $('#cam-input').files && $('#cam-input').files[0];
     if (!file) return;
-    compressImage(file, 900, 0.7).then((dataUrl) => {
+    compressImage(file, 1080, 0.7).then((dataUrl) => {
       closeModal();
-      if (dataUrl.length > 44000) { toast('Imagen demasiado grande'); return; }
+      if (dataUrl.length > MEDIA_MAX) { toast('Imagen demasiado grande'); return; }
       sendAttachment('image', dataUrl);
     }).catch(() => toast('No se pudo procesar la imagen'));
   });
@@ -1327,7 +1329,7 @@ async function toggleRecording() {
     toast('Permiso de micrófono denegado');
     return;
   }
-  recorder = new MediaRecorder(recStream);
+  recorder = new MediaRecorder(recStream, { audioBitsPerSecond: 16000 });
   recChunks = [];
   recorder.addEventListener('dataavailable', (e) => { if (e.data.size) recChunks.push(e.data); });
   recorder.addEventListener('stop', onRecordingStop);
@@ -1353,7 +1355,7 @@ function showRecordingUI() {
     const s = Math.floor((Date.now() - recStart) / 1000);
     const el = $('#rec-time');
     if (el) el.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-    if (s >= 120) stopRecording(true);
+    if (s >= 60) stopRecording(true);
   }, 500);
 }
 
@@ -1376,7 +1378,7 @@ function onRecordingStop() {
   const reader = new FileReader();
   reader.onload = () => {
     const dataUrl = reader.result;
-    if (String(dataUrl).length > 44000) { toast('Nota de voz demasiado larga'); return; }
+    if (String(dataUrl).length > MEDIA_MAX) { toast('Nota de voz demasiado larga'); return; }
     sendAttachment('audio', dataUrl);
   };
   reader.readAsDataURL(blob);
