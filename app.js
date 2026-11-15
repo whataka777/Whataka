@@ -632,6 +632,7 @@ function showScreen(id) {
   document.querySelectorAll('.screen').forEach((s) => {
     s.classList.toggle('active', s.id === id);
   });
+  if (id !== 'chat-screen') toggleEmojiPanel(false);
 }
 
 function renderChats() {
@@ -712,14 +713,42 @@ function renderChat() {
     const tick = out
       ? `<span class="tick${state.online.has(peerId) ? ' read' : ''}"><i class="fa-solid fa-check${state.online.has(peerId) ? '-double' : ''}"></i></span>`
       : '';
+    const sticker = m.kind === 'sticker';
     return `${chip}
-      <div class="msg-bubble ${out ? 'out' : 'in'}">
-        ${escapeHtml(m.text)}
+      <div class="msg-bubble ${out ? 'out' : 'in'}${sticker ? ' sticker' : ''}">
+        ${renderBubbleContent(m)}
         <span class="msg-time">${timeLabel(m.ts)}${tick}</span>
       </div>`;
   }).join('');
   area.innerHTML = bubbles;
   area.scrollTop = area.scrollHeight;
+}
+
+// Dibuja el cuerpo de una burbuja según el tipo de contenido.
+function renderBubbleContent(m) {
+  const cap = m.caption ? `<span class="bubble-cap">${escapeHtml(m.caption)}</span>` : '';
+  switch (m.kind) {
+    case 'image':
+      return `<div class="bubble-media"><img src="${escapeHtml(m.data)}" alt="Imagen"></div>${cap}`;
+    case 'audio':
+      return `<audio controls preload="metadata" src="${escapeHtml(m.data)}"></audio>${cap}`;
+    case 'video':
+      return `<div class="bubble-media"><video controls preload="metadata" style="width:100%;display:block" src="${escapeHtml(m.data)}"></video></div>${cap}`;
+    case 'sticker':
+      return `<span class="bubble-sticker">${escapeHtml(m.data)}</span>`;
+    case 'location':
+      return `<div class="bubble-loc"><i class="fa-solid fa-location-dot"></i><div>${escapeHtml(m.data)}</div></div>${cap}`;
+    case 'contact':
+      return `<div class="bubble-card"><h5><i class="fa-solid fa-address-card"></i> ${escapeHtml(m.data.name)}</h5><div style="font-size:12px;color:var(--text-muted)">${escapeHtml(m.data.peerId)}</div></div>${cap}`;
+    case 'document':
+      return `<div class="bubble-card"><h5><i class="fa-solid fa-file-lines"></i> ${escapeHtml(m.data.name)}</h5><div style="font-size:12px;color:var(--text-muted)">${escapeHtml(m.data.size || '')}</div></div>${cap}`;
+    case 'poll':
+      return `<div class="bubble-card"><h5><i class="fa-solid fa-square-poll-vertical"></i> ${escapeHtml(m.data.question)}</h5><ul>${m.data.options.map((o) => `<li>${escapeHtml(o)}</li>`).join('')}</ul></div>${cap}`;
+    case 'event':
+      return `<div class="bubble-card"><h5><i class="fa-solid fa-calendar-days"></i> ${escapeHtml(m.data.title)}</h5><div style="font-size:12.5px;color:var(--text-muted)">${escapeHtml(m.data.date)}${m.data.time ? ' · ' + escapeHtml(m.data.time) : ''}</div></div>${cap}`;
+    default:
+      return escapeHtml(m.text || '');
+  }
 }
 
 function renderProfile() {
@@ -991,8 +1020,13 @@ async function sendMessage() {
   const peerId = state.activePeer;
   if (!text || !peerId) return;
   input.value = '';
-
+  toggleComposerState();
   const entry = { from: state.identity.peerId, text, ts: Date.now() };
+  await dispatchEntry(peerId, entry);
+}
+
+// Guarda la entrada, repinta y la entrega cifrada al contacto.
+async function dispatchEntry(peerId, entry) {
   (state.messages[peerId] = state.messages[peerId] || []).push(entry);
   writeStore(STORE.messages, state.messages);
   renderChat();
@@ -1001,13 +1035,360 @@ async function sendMessage() {
   try {
     const theirPub = await requestKey(peerId);
     const key = await sessionKey(state.agreeKey, theirPub, state.identity.peerId, peerId);
-    const sealed = await encryptPayload(key, { text, ts: entry.ts, name: state.profile.name, photo: state.profile.photo || null });
+    const payload = { ts: entry.ts, name: state.profile.name, photo: state.profile.photo || null };
+    if (entry.kind) { payload.kind = entry.kind; payload.data = entry.data; }
+    else payload.text = entry.text;
+    if (entry.caption) payload.text = entry.caption;
+    const sealed = await encryptPayload(key, payload);
     const ok = sendRaw({ t: 'msg', to: peerId, iv: sealed.iv, ct: sealed.ct });
     if (!ok) throw new Error('Sin conexión con el relé');
     state.relayUnits += 1;
     renderMining();
   } catch (err) {
     toast(`No entregado: ${err.message}`);
+  }
+}
+
+// Envía un adjunto (imagen, audio, ubicación, contacto, documento, encuesta o evento).
+async function sendAttachment(kind, data, caption) {
+  const peerId = state.activePeer;
+  if (!peerId) return;
+  const entry = { from: state.identity.peerId, ts: Date.now(), kind, data, caption: caption || '' };
+  await dispatchEntry(peerId, entry);
+}
+
+// ─────────────────────────────────────────────────────────────
+// Composer: emojis, stickers, adjuntos, cámara y notas de voz
+// ─────────────────────────────────────────────────────────────
+
+const EMOJIS = [
+  '😀','😃','😄','😁','😆','😅','😂','🤣','😊','😇','🙂','🙃','😉','😌','😍','🥰',
+  '😘','😗','😙','😚','😋','😛','😝','😜','🤪','🤨','🧐','🤓','😎','🥳','🤩','🥺',
+  '😏','😒','😞','😔','😟','😕','🙁','😣','😖','😫','😩','🥱','😤','😠','😡','🤬',
+  '🤯','😳','🥵','🥶','😱','😨','😰','😥','😓','🤗','🤔','🤭','🤫','🤥','😶','😐',
+  '👍','👎','👌','🤌','✌️','🤞','🤟','🤘','🤙','👈','👉','👆','👇','☝️','✋','🤚',
+  '👏','🙌','🤝','🙏','💪','🫶','❤️','🧡','💛','💚','💙','💜','🖤','🤍','💔','💯',
+  '🔥','✨','⭐','🌟','🎉','🎊','🥳','🎁','🥭','🍕','🍔','🍟','☕','🍺','🍻','🥂',
+];
+
+const STICKERS = ['🥭','🟣','😎','🤩','😂','😭','🥳','🤝','🔥','💜','✨','🎉','👍','🙌','💯','🫶'];
+
+const ATTACH_ACTIONS = [
+  { id: 'gallery', label: 'Galería', icon: 'fa-image', color: '#8e44ad' },
+  { id: 'camera', label: 'Cámara', icon: 'fa-camera', color: '#e91e63' },
+  { id: 'location', label: 'Ubicación', icon: 'fa-location-dot', color: '#1e88e5' },
+  { id: 'contact', label: 'Contacto', icon: 'fa-address-card', color: '#43a047' },
+  { id: 'document', label: 'Documento', icon: 'fa-file-lines', color: '#6d4c41' },
+  { id: 'poll', label: 'Encuesta', icon: 'fa-square-poll-vertical', color: '#f0932b' },
+  { id: 'event', label: 'Evento', icon: 'fa-calendar-days', color: '#00acc1' },
+];
+
+// Muestra u oculta el botón de enviar según haya texto escrito.
+function toggleComposerState() {
+  const bar = $('#input-bar');
+  const val = $('#msg-input').value.trim();
+  bar.classList.toggle('has-text', val.length > 0);
+}
+
+// Conecta los botones de la barra de escritura (emoji, clip, cámara, micro, enviar).
+function bindComposer() {
+  const send = $('#btn-send-msg');
+  const input = $('#msg-input');
+  if (!send || !input) return;
+  send.addEventListener('click', sendMessage);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendMessage(); });
+  input.addEventListener('input', toggleComposerState);
+  const emoji = $('#btn-emoji');
+  const attach = $('#btn-attach');
+  const cam = $('#btn-camera');
+  const mic = $('#btn-mic');
+  if (emoji) emoji.addEventListener('click', () => toggleEmojiPanel());
+  if (attach) attach.addEventListener('click', openAttachMenu);
+  if (cam) cam.addEventListener('click', openCamera);
+  if (mic) mic.addEventListener('click', toggleRecording);
+  document.querySelectorAll('.emoji-tabs button').forEach((b) => {
+    b.addEventListener('click', () => renderEmojiBody(b.dataset.panel));
+  });
+  toggleComposerState();
+}
+
+function toggleEmojiPanel(force) {
+  const panel = $('#emoji-panel');
+  const open = force !== undefined ? force : !panel.classList.contains('open');
+  panel.classList.toggle('open', open);
+  if (open) renderEmojiBody('emoji');
+}
+
+function renderEmojiBody(kind) {
+  const body = $('#emoji-body');
+  document.querySelectorAll('.emoji-tabs button').forEach((b) => {
+    b.classList.toggle('active', b.dataset.panel === kind);
+  });
+  const items = kind === 'stickers' ? STICKERS : EMOJIS;
+  body.className = kind === 'stickers' ? 'sticker-grid' : 'emoji-grid';
+  body.innerHTML = items.map((e) => `<button data-e="${e}">${e}</button>`).join('');
+  body.querySelectorAll('button').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      if (kind === 'stickers') {
+        sendAttachment('sticker', btn.dataset.e);
+      } else {
+        const input = $('#msg-input');
+        input.value += btn.dataset.e;
+        input.focus();
+        toggleComposerState();
+      }
+    });
+  });
+}
+
+function openAttachMenu() {
+  const grid = ATTACH_ACTIONS.map((a) => `
+    <button class="attach-item" data-act="${a.id}">
+      <span class="attach-ic" style="background:${a.color}"><i class="fa-solid ${a.icon}"></i></span>
+      <span>${a.label}</span>
+    </button>`).join('');
+  openModal('Adjuntar', `<div class="attach-grid">${grid}</div>`);
+  document.querySelectorAll('#modal-body .attach-item').forEach((el) => {
+    el.addEventListener('click', () => {
+      closeModal();
+      handleAttach(el.dataset.act);
+    });
+  });
+}
+
+function handleAttach(act) {
+  switch (act) {
+    case 'gallery': return pickFile('image/*', 'image');
+    case 'camera': return openCamera();
+    case 'location': return shareLocation();
+    case 'contact': return shareContact();
+    case 'document': return pickFile('*/*', 'document');
+    case 'poll': return askPoll();
+    case 'event': return askEvent();
+    default: break;
+  }
+}
+
+// Lee un archivo local y lo envía cifrado (imagen o documento).
+function pickFile(accept, kind) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = accept;
+  input.addEventListener('change', () => {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    if (kind === 'document') {
+      const size = file.size > 1024 * 1024
+        ? `${(file.size / 1048576).toFixed(1)} MB`
+        : `${Math.max(1, Math.round(file.size / 1024))} KB`;
+      sendAttachment('document', { name: file.name, size });
+      return;
+    }
+    compressImage(file, 900, 0.7).then((dataUrl) => {
+      if (dataUrl.length > 44000) {
+        toast('Imagen demasiado grande para el relé');
+        return;
+      }
+      sendAttachment('image', dataUrl);
+    }).catch(() => toast('No se pudo procesar la imagen'));
+  });
+  input.click();
+}
+
+function openCamera() {
+  openModal('Cámara', `
+    <p>Toma una foto con la cámara del dispositivo.</p>
+    <input type="file" id="cam-input" accept="image/*" capture="environment" class="modal-input">
+    <div class="modal-btn-row"><button class="ghost-btn" id="cam-cancel">Cerrar</button></div>`);
+  $('#cam-cancel').addEventListener('click', closeModal);
+  $('#cam-input').addEventListener('change', () => {
+    const file = $('#cam-input').files && $('#cam-input').files[0];
+    if (!file) return;
+    compressImage(file, 900, 0.7).then((dataUrl) => {
+      closeModal();
+      if (dataUrl.length > 44000) { toast('Imagen demasiado grande'); return; }
+      sendAttachment('image', dataUrl);
+    }).catch(() => toast('No se pudo procesar la imagen'));
+  });
+}
+
+// Redimensiona y comprime una imagen a un dataURL JPEG.
+function compressImage(file, maxSide, quality) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('imagen inválida')); };
+    img.src = url;
+  });
+}
+
+function shareLocation() {
+  if (!navigator.geolocation) { toast('Ubicación no disponible'); return; }
+  toast('Obteniendo ubicación…');
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const { latitude, longitude } = pos.coords;
+      const text = `Lat ${latitude.toFixed(5)}, Lng ${longitude.toFixed(5)}\nhttps://maps.google.com/?q=${latitude},${longitude}`;
+      sendAttachment('location', text);
+    },
+    () => toast('No se pudo obtener la ubicación'),
+    { enableHighAccuracy: true, timeout: 8000 },
+  );
+}
+
+function shareContact() {
+  const peers = Object.keys(state.peers);
+  if (!peers.length) { toast('No tienes contactos que compartir'); return; }
+  const opts = peers.map((id) => {
+    const p = state.peers[id] || {};
+    const name = p.name || `Peer ${shortPeer(id, 8, 4)}`;
+    return `<button class="contact-pick primary-btn" data-peer="${escapeHtml(id)}" style="width:100%;margin-bottom:8px">${escapeHtml(name)}</button>`;
+  }).join('');
+  openModal('Compartir contacto', `<div>${opts}</div>`);
+  document.querySelectorAll('.contact-pick').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.peer;
+      const p = state.peers[id] || {};
+      closeModal();
+      sendAttachment('contact', { name: p.name || shortPeer(id, 8, 4), peerId: id });
+    });
+  });
+}
+
+function askPoll() {
+  openModal('Crear encuesta', `
+    <input class="modal-input" id="poll-q" placeholder="Pregunta">
+    <input class="modal-input" id="poll-a" placeholder="Opción 1">
+    <input class="modal-input" id="poll-b" placeholder="Opción 2">
+    <input class="modal-input" id="poll-c" placeholder="Opción 3 (opcional)">
+    <div class="modal-btn-row">
+      <button class="ghost-btn" id="poll-cancel">Cancelar</button>
+      <button class="primary-btn" id="poll-ok">Enviar</button>
+    </div>`);
+  $('#poll-cancel').addEventListener('click', closeModal);
+  $('#poll-ok').addEventListener('click', () => {
+    const q = $('#poll-q').value.trim();
+    const options = ['#poll-a', '#poll-b', '#poll-c'].map((s) => $(s).value.trim()).filter(Boolean);
+    if (!q || options.length < 2) { toast('Pregunta y al menos 2 opciones'); return; }
+    closeModal();
+    sendAttachment('poll', { question: q, options });
+  });
+}
+
+function askEvent() {
+  openModal('Crear evento', `
+    <input class="modal-input" id="ev-title" placeholder="Título del evento">
+    <input class="modal-input" id="ev-date" type="date">
+    <input class="modal-input" id="ev-time" type="time">
+    <div class="modal-btn-row">
+      <button class="ghost-btn" id="ev-cancel">Cancelar</button>
+      <button class="primary-btn" id="ev-ok">Enviar</button>
+    </div>`);
+  $('#ev-cancel').addEventListener('click', closeModal);
+  $('#ev-ok').addEventListener('click', () => {
+    const title = $('#ev-title').value.trim();
+    const date = $('#ev-date').value;
+    const time = $('#ev-time').value;
+    if (!title || !date) { toast('Título y fecha obligatorios'); return; }
+    closeModal();
+    sendAttachment('event', { title, date, time });
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// Notas de voz
+// ─────────────────────────────────────────────────────────────
+
+let recorder = null;
+let recChunks = [];
+let recTimer = null;
+let recStart = 0;
+let recStream = null;
+
+async function toggleRecording() {
+  if (recorder && recorder.state === 'recording') { stopRecording(true); return; }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    toast('Micrófono no disponible (requiere HTTPS)');
+    return;
+  }
+  try {
+    recStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch {
+    toast('Permiso de micrófono denegado');
+    return;
+  }
+  recorder = new MediaRecorder(recStream);
+  recChunks = [];
+  recorder.addEventListener('dataavailable', (e) => { if (e.data.size) recChunks.push(e.data); });
+  recorder.addEventListener('stop', onRecordingStop);
+  recorder.start();
+  recStart = Date.now();
+  showRecordingUI();
+}
+
+function showRecordingUI() {
+  const bar = $('#input-bar');
+  bar.dataset.prev = bar.innerHTML;
+  bar.innerHTML = `
+    <div class="rec-bar">
+      <span class="rec-dot"></span>
+      <span class="rec-time" id="rec-time">0:00</span>
+      <span class="rec-hint">Grabando… toca ✓ para enviar</span>
+    </div>
+    <button class="icon-btn" id="rec-cancel" title="Cancelar"><i class="fa-solid fa-trash"></i></button>
+    <button class="send-circle" id="rec-send" title="Enviar"><i class="fa-solid fa-check"></i></button>`;
+  $('#rec-cancel').addEventListener('click', () => stopRecording(false));
+  $('#rec-send').addEventListener('click', () => stopRecording(true));
+  recTimer = setInterval(() => {
+    const s = Math.floor((Date.now() - recStart) / 1000);
+    const el = $('#rec-time');
+    if (el) el.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    if (s >= 120) stopRecording(true);
+  }, 500);
+}
+
+function stopRecording(send) {
+  if (!recorder) return;
+  recorder._send = send;
+  if (recorder.state !== 'inactive') recorder.stop();
+}
+
+function onRecordingStop() {
+  clearInterval(recTimer);
+  recTimer = null;
+  const send = recorder && recorder._send;
+  if (recStream) recStream.getTracks().forEach((t) => t.stop());
+  recStream = null;
+  const blob = new Blob(recChunks, { type: recChunks[0] ? recChunks[0].type : 'audio/webm' });
+  recChunks = [];
+  restoreComposer();
+  if (!send || !blob.size) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const dataUrl = reader.result;
+    if (String(dataUrl).length > 44000) { toast('Nota de voz demasiado larga'); return; }
+    sendAttachment('audio', dataUrl);
+  };
+  reader.readAsDataURL(blob);
+}
+
+function restoreComposer() {
+  const bar = $('#input-bar');
+  if (bar.dataset.prev) {
+    bar.innerHTML = bar.dataset.prev;
+    delete bar.dataset.prev;
+    bindComposer();
+    toggleComposerState();
   }
 }
 
@@ -1029,7 +1410,11 @@ async function receiveMessage(msg) {
 
   rememberPeer(from, data.name, agreePub, data.photo);
   (state.messages[from] = state.messages[from] || []).push({
-    from, text: data.text, ts: data.ts || Date.now(),
+    from,
+    text: data.text || '',
+    kind: data.kind || null,
+    data: data.data || null,
+    ts: data.ts || Date.now(),
   });
   writeStore(STORE.messages, state.messages);
   state.relayUnits += 1;
@@ -1447,10 +1832,7 @@ function bindEvents() {
     showScreen('home-screen');
     renderChats();
   });
-  $('#btn-send-msg').addEventListener('click', sendMessage);
-  $('#msg-input').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') sendMessage();
-  });
+  bindComposer();
   $('#search-input').addEventListener('input', renderChats);
   $('#modal-close').addEventListener('click', closeModal);
   $('#modal-overlay').addEventListener('click', (e) => {

@@ -492,6 +492,83 @@
     }
     .send-circle:active { transform: scale(.95); }
 
+    /* ============ BARRA DE ENTRADA ESTILO WHATSAPP ============ */
+    .icon-btn {
+      background: none; border: none; color: var(--text-muted);
+      font-size: 20px; width: 42px; height: 42px; border-radius: 50%;
+      display: inline-flex; align-items: center; justify-content: center;
+      cursor: pointer; flex-shrink: 0;
+    }
+    .icon-btn:active { background: rgba(255,255,255,.08); }
+    .icon-btn.in-pill { width: 34px; height: 34px; font-size: 19px; }
+    .input-bar #btn-send-msg { display: none; }
+    .input-bar.has-text #btn-send-msg { display: inline-flex; }
+    .input-bar.has-text #btn-mic { display: none; }
+
+    /* Panel de emojis y stickers */
+    .emoji-panel {
+      display: none;
+      background: var(--bg-bar-2);
+      border-top: 1px solid var(--divider);
+      padding: 10px 10px calc(10px + env(safe-area-inset-bottom));
+      max-height: 44dvh; overflow-y: auto;
+    }
+    .emoji-panel.open { display: block; }
+    .emoji-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+    .emoji-tabs button {
+      flex: 1; padding: 8px; border-radius: 20px; border: none; cursor: pointer;
+      background: var(--bg-panel); color: var(--text-muted); font-size: 13px; font-weight: 600;
+    }
+    .emoji-tabs button.active { background: var(--purple-primary); color: #fff; }
+    .emoji-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
+    .emoji-grid button {
+      font-size: 24px; background: none; border: none; cursor: pointer;
+      padding: 4px; border-radius: 8px; line-height: 1;
+    }
+    .emoji-grid button:active { background: rgba(255,255,255,.1); }
+    .sticker-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .sticker-grid button {
+      background: var(--bg-panel); border: none; border-radius: 12px; cursor: pointer;
+      font-size: 40px; padding: 8px; line-height: 1;
+    }
+    .sticker-grid button:active { background: rgba(255,255,255,.1); }
+
+    /* Menú de adjuntos (clip) */
+    .attach-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; padding: 8px 0; }
+    .attach-item {
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
+      cursor: pointer; background: none; border: none;
+    }
+    .attach-item .attach-ic {
+      width: 56px; height: 56px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; color: #fff;
+    }
+    .attach-item span { font-size: 12.5px; color: var(--text-main); }
+    .attach-item:active .attach-ic { filter: brightness(1.15); }
+
+    /* Grabación de nota de voz */
+    .rec-bar { display: flex; align-items: center; gap: 10px; flex: 1; }
+    .rec-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--danger); animation: recPulse 1s infinite; }
+    @keyframes recPulse { 0%,100%{opacity:1} 50%{opacity:.25} }
+    .rec-time { font-size: 15px; color: var(--text-main); font-variant-numeric: tabular-nums; }
+    .rec-hint { font-size: 12px; color: var(--text-muted); }
+
+    /* Burbujas con contenido multimedia */
+    .msg-bubble .bubble-media { border-radius: 10px; overflow: hidden; margin: 2px 0 4px; max-width: 240px; }
+    .msg-bubble .bubble-media img { width: 100%; display: block; }
+    .msg-bubble audio { width: 230px; max-width: 100%; margin: 2px 0 4px; }
+    .bubble-loc { display: flex; align-items: center; gap: 8px; }
+    .bubble-loc i { font-size: 22px; color: var(--accent); }
+    .bubble-card { background: rgba(0,0,0,.22); border-radius: 10px; padding: 8px 10px; margin: 2px 0 4px; }
+    .bubble-card h5 { font-size: 14px; color: var(--text-strong); margin-bottom: 4px; }
+    .bubble-card ul { margin-left: 16px; font-size: 13px; }
+    .bubble-card .poll-opt { display: flex; align-items: center; gap: 6px; }
+    .bubble-sticker { font-size: 62px; line-height: 1; display: block; text-align: center; padding: 2px 6px; }
+    .msg-bubble.sticker { background: none !important; box-shadow: none; }
+    .msg-bubble.sticker::after { display: none; }
+    .bubble-cap { display: block; margin-top: 2px; }
+
     /* ============ NOVEDADES / ESTADOS ============ */
     .my-status-card, .status-item {
       display: flex; align-items: center; gap: 14px;
@@ -893,14 +970,23 @@
 
       <div class="messages-area" id="messages-area"></div>
 
-      <div class="input-bar">
-        <div class="input-pill">
-          <i class="fa-regular fa-face-smile lead"></i>
+      <div class="input-bar" id="input-bar">
+        <div class="input-pill" id="input-pill">
+          <button class="icon-btn in-pill" id="btn-emoji" title="Emojis y stickers"><i class="fa-regular fa-face-smile"></i></button>
           <input type="text" id="msg-input" placeholder="Mensaje">
-          <i class="fa-solid fa-paperclip lead"></i>
-          <i class="fa-solid fa-camera lead"></i>
+          <button class="icon-btn in-pill" id="btn-attach" title="Adjuntar"><i class="fa-solid fa-paperclip"></i></button>
+          <button class="icon-btn in-pill" id="btn-camera" title="Cámara"><i class="fa-solid fa-camera"></i></button>
         </div>
-        <button id="btn-send-msg" class="send-circle"><i class="fa-solid fa-paper-plane"></i></button>
+        <button id="btn-mic" class="icon-btn" title="Grabar nota de voz"><i class="fa-solid fa-microphone"></i></button>
+        <button id="btn-send-msg" class="send-circle" title="Enviar"><i class="fa-solid fa-paper-plane"></i></button>
+      </div>
+
+      <div class="emoji-panel" id="emoji-panel">
+        <div class="emoji-tabs">
+          <button data-panel="emoji" class="active">Emojis</button>
+          <button data-panel="stickers">Stickers</button>
+        </div>
+        <div id="emoji-body"></div>
       </div>
     </div>
 
