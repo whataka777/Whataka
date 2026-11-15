@@ -14,7 +14,7 @@ const { WebSocketServer } = require('ws');
 const voucher = require('./lib/voucher');
 
 const PORT = Number(process.env.PORT) || 10000;
-const MAX_FRAME = 64 * 1024;
+const MAX_FRAME = 512 * 1024;
 
 // Configuración de minería on-chain. Si falta la clave del firmante o la
 // dirección del contrato, el relé sigue funcionando (chat y presencia), pero
@@ -348,7 +348,7 @@ wss.on('connection', (socket) => {
           t: 'msg',
           from: socket.peerId,
           iv: String(msg.iv || '').slice(0, 128),
-          ct: String(msg.ct || '').slice(0, 48000),
+          ct: String(msg.ct || '').slice(0, 400000),
         });
         for (const s of target.sockets) {
           if (s.readyState === 1) s.send(envelope);

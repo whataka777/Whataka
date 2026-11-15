@@ -3,6 +3,8 @@
 
 'use strict';
 
+window.__wtBootAt = Date.now();
+
 // ─────────────────────────────────────────────────────────────
 // Configuración
 // ─────────────────────────────────────────────────────────────
@@ -30,6 +32,7 @@ const STORE = {
   avatar: 'whataka.avatar',
   wallet: 'whataka.wallet',
   wc: 'whataka.wcProjectId',
+  calls: 'whataka.calls',
 };
 
 // Pesos de minería: idénticos a los del contrato WhaTakaMiningRewards.
@@ -142,6 +145,17 @@ function timeLabel(ts) {
   const hhmm = d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
   if (sameDay) return hhmm;
   return `${d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })} ${hhmm}`;
+}
+
+// Etiqueta de fecha estilo WhatsApp para los separadores del chat.
+function dayLabel(ts) {
+  const d = new Date(ts);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  if (d.toDateString() === today.toDateString()) return 'HOY';
+  if (d.toDateString() === yesterday.toDateString()) return 'AYER';
+  return d.toLocaleDateString('es-ES', { day: '2-digit', month: 'long' }).toUpperCase();
 }
 
 function escapeHtml(str) {
@@ -610,12 +624,15 @@ function switchTab(target) {
   document.querySelectorAll('.nav-item').forEach((b) => {
     b.classList.toggle('active', b.dataset.target === target);
   });
+  if (target === 'tab-calls') renderCalls();
+  if (target === 'tab-status') renderStatus();
 }
 
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach((s) => {
     s.classList.toggle('active', s.id === id);
   });
+  if (id !== 'chat-screen') toggleEmojiPanel(false);
 }
 
 function renderChats() {
@@ -683,15 +700,55 @@ function renderChat() {
     return;
   }
 
-  area.innerHTML = msgs.map((m) => {
+  let lastDay = '';
+  const bubbles = msgs.map((m) => {
     const out = m.from === state.identity.peerId;
-    return `
-      <div class="msg-bubble ${out ? 'out' : 'in'}">
-        ${escapeHtml(m.text)}
-        <span class="msg-time">${timeLabel(m.ts)}${out ? ' <i class="fa-solid fa-check"></i>' : ''}</span>
+    const day = new Date(m.ts).toDateString();
+    let chip = '';
+    if (day !== lastDay) {
+      lastDay = day;
+      chip = `<span class="date-chip">${dayLabel(m.ts)}</span>`;
+    }
+    // Ticks estilo WhatsApp: enviado (✓) o leído (✓✓) si el peer ya tiene clave.
+    const tick = out
+      ? `<span class="tick${state.online.has(peerId) ? ' read' : ''}"><i class="fa-solid fa-check${state.online.has(peerId) ? '-double' : ''}"></i></span>`
+      : '';
+    const sticker = m.kind === 'sticker';
+    return `${chip}
+      <div class="msg-bubble ${out ? 'out' : 'in'}${sticker ? ' sticker' : ''}">
+        ${renderBubbleContent(m)}
+        <span class="msg-time">${timeLabel(m.ts)}${tick}</span>
       </div>`;
   }).join('');
+  area.innerHTML = bubbles;
   area.scrollTop = area.scrollHeight;
+}
+
+// Dibuja el cuerpo de una burbuja según el tipo de contenido.
+function renderBubbleContent(m) {
+  const cap = m.caption ? `<span class="bubble-cap">${escapeHtml(m.caption)}</span>` : '';
+  switch (m.kind) {
+    case 'image':
+      return `<div class="bubble-media"><img src="${escapeHtml(m.data)}" alt="Imagen"></div>${cap}`;
+    case 'audio':
+      return `<audio controls preload="metadata" src="${escapeHtml(m.data)}"></audio>${cap}`;
+    case 'video':
+      return `<div class="bubble-media"><video controls preload="metadata" style="width:100%;display:block" src="${escapeHtml(m.data)}"></video></div>${cap}`;
+    case 'sticker':
+      return `<span class="bubble-sticker">${escapeHtml(m.data)}</span>`;
+    case 'location':
+      return `<div class="bubble-loc"><i class="fa-solid fa-location-dot"></i><div>${escapeHtml(m.data)}</div></div>${cap}`;
+    case 'contact':
+      return `<div class="bubble-card"><h5><i class="fa-solid fa-address-card"></i> ${escapeHtml(m.data.name)}</h5><div style="font-size:12px;color:var(--text-muted)">${escapeHtml(m.data.peerId)}</div></div>${cap}`;
+    case 'document':
+      return `<div class="bubble-card"><h5><i class="fa-solid fa-file-lines"></i> ${escapeHtml(m.data.name)}</h5><div style="font-size:12px;color:var(--text-muted)">${escapeHtml(m.data.size || '')}</div></div>${cap}`;
+    case 'poll':
+      return `<div class="bubble-card"><h5><i class="fa-solid fa-square-poll-vertical"></i> ${escapeHtml(m.data.question)}</h5><ul>${m.data.options.map((o) => `<li>${escapeHtml(o)}</li>`).join('')}</ul></div>${cap}`;
+    case 'event':
+      return `<div class="bubble-card"><h5><i class="fa-solid fa-calendar-days"></i> ${escapeHtml(m.data.title)}</h5><div style="font-size:12.5px;color:var(--text-muted)">${escapeHtml(m.data.date)}${m.data.time ? ' · ' + escapeHtml(m.data.time) : ''}</div></div>${cap}`;
+    default:
+      return escapeHtml(m.text || '');
+  }
 }
 
 function renderProfile() {
@@ -730,7 +787,72 @@ function renderStatus() {
     </div>`).join('');
 }
 
-// Unidades actuales del nodo (mismas que espera el contrato).
+// Registro local de llamadas (solo diseño: refleja el historial P2P).
+function renderCalls() {
+  const list = $('#calls-list');
+  if (!list) return;
+  const calls = readStore(STORE.calls, []);
+  if (!calls.length) {
+    const ids = Object.keys(state.peers);
+    list.innerHTML = `
+      <div class="empty-state">
+        <i class="fa-solid fa-phone-volume"></i>
+        Aún no hay llamadas.<br>Abre un chat y toca <strong>📞</strong> o <strong>🎥</strong>.
+      </div>` +
+      ids.map((id) => {
+        const peer = state.peers[id] || {};
+        const name = peer.name || `Peer ${shortPeer(id, 8, 4)}`;
+        return `
+          <div class="call-row" data-peer="${escapeHtml(id)}">
+            <div class="avatar purple-bg">${avatarInner(peer.photo)}</div>
+            <div class="call-info">
+              <h4>${escapeHtml(name)}</h4>
+              <p><i class="fa-solid fa-phone"></i> Llamada P2P cifrada</p>
+            </div>
+            <button class="call-action" title="Llamar"><i class="fa-solid fa-phone"></i></button>
+          </div>`;
+      }).join('');
+    bindCallRows();
+    return;
+  }
+  list.innerHTML = calls.map((c) => `
+    <div class="call-row" data-peer="${escapeHtml(c.peerId)}">
+      <div class="avatar purple-bg">${avatarInner(c.photo)}</div>
+      <div class="call-info">
+        <h4>${escapeHtml(c.name)}</h4>
+        <p class="${c.missed ? 'missed' : ''}">
+          <i class="fa-solid fa-${c.video ? 'video' : 'phone'}${c.missed ? '-slash' : ''}"></i>
+          ${timeLabel(c.ts)}
+        </p>
+      </div>
+      <button class="call-action" title="Llamar"><i class="fa-solid fa-phone"></i></button>
+    </div>`).join('');
+  bindCallRows();
+}
+
+function bindCallRows() {
+  document.querySelectorAll('#calls-list .call-row').forEach((row) => {
+    row.addEventListener('click', () => {
+      const id = row.dataset.peer;
+      if (id) openChat(id);
+    });
+  });
+}
+
+function logCall(peerId, video) {
+  const peer = state.peers[peerId] || {};
+  const calls = readStore(STORE.calls, []);
+  calls.unshift({
+    peerId,
+    name: peer.name || `Peer ${shortPeer(peerId, 8, 4)}`,
+    photo: peer.photo,
+    video: !!video,
+    missed: false,
+    ts: Date.now(),
+  });
+  writeStore(STORE.calls, calls.slice(0, 60));
+  renderCalls();
+}
 function miningUnits() {
   const uptime = BigInt(Math.floor((Date.now() - state.startedAt) / 60000));
   const store = BigInt(Object.values(state.messages).reduce((n, arr) => n + arr.length, 0));
@@ -898,8 +1020,13 @@ async function sendMessage() {
   const peerId = state.activePeer;
   if (!text || !peerId) return;
   input.value = '';
-
+  toggleComposerState();
   const entry = { from: state.identity.peerId, text, ts: Date.now() };
+  await dispatchEntry(peerId, entry);
+}
+
+// Guarda la entrada, repinta y la entrega cifrada al contacto.
+async function dispatchEntry(peerId, entry) {
   (state.messages[peerId] = state.messages[peerId] || []).push(entry);
   writeStore(STORE.messages, state.messages);
   renderChat();
@@ -908,13 +1035,362 @@ async function sendMessage() {
   try {
     const theirPub = await requestKey(peerId);
     const key = await sessionKey(state.agreeKey, theirPub, state.identity.peerId, peerId);
-    const sealed = await encryptPayload(key, { text, ts: entry.ts, name: state.profile.name, photo: state.profile.photo || null });
+    const payload = { ts: entry.ts, name: state.profile.name, photo: state.profile.photo || null };
+    if (entry.kind) { payload.kind = entry.kind; payload.data = entry.data; }
+    else payload.text = entry.text;
+    if (entry.caption) payload.text = entry.caption;
+    const sealed = await encryptPayload(key, payload);
     const ok = sendRaw({ t: 'msg', to: peerId, iv: sealed.iv, ct: sealed.ct });
     if (!ok) throw new Error('Sin conexión con el relé');
     state.relayUnits += 1;
     renderMining();
   } catch (err) {
     toast(`No entregado: ${err.message}`);
+  }
+}
+
+// Envía un adjunto (imagen, audio, ubicación, contacto, documento, encuesta o evento).
+async function sendAttachment(kind, data, caption) {
+  const peerId = state.activePeer;
+  if (!peerId) return;
+  const entry = { from: state.identity.peerId, ts: Date.now(), kind, data, caption: caption || '' };
+  await dispatchEntry(peerId, entry);
+}
+
+// ─────────────────────────────────────────────────────────────
+// Composer: emojis, stickers, adjuntos, cámara y notas de voz
+// ─────────────────────────────────────────────────────────────
+
+const MEDIA_MAX = 250000; // tamano maximo de un dataURL de medio (base64)
+
+const EMOJIS = [
+  '😀','😃','😄','😁','😆','😅','😂','🤣','😊','😇','🙂','🙃','😉','😌','😍','🥰',
+  '😘','😗','😙','😚','😋','😛','😝','😜','🤪','🤨','🧐','🤓','😎','🥳','🤩','🥺',
+  '😏','😒','😞','😔','😟','😕','🙁','😣','😖','😫','😩','🥱','😤','😠','😡','🤬',
+  '🤯','😳','🥵','🥶','😱','😨','😰','😥','😓','🤗','🤔','🤭','🤫','🤥','😶','😐',
+  '👍','👎','👌','🤌','✌️','🤞','🤟','🤘','🤙','👈','👉','👆','👇','☝️','✋','🤚',
+  '👏','🙌','🤝','🙏','💪','🫶','❤️','🧡','💛','💚','💙','💜','🖤','🤍','💔','💯',
+  '🔥','✨','⭐','🌟','🎉','🎊','🥳','🎁','🥭','🍕','🍔','🍟','☕','🍺','🍻','🥂',
+];
+
+const STICKERS = ['🥭','🟣','😎','🤩','😂','😭','🥳','🤝','🔥','💜','✨','🎉','👍','🙌','💯','🫶'];
+
+const ATTACH_ACTIONS = [
+  { id: 'gallery', label: 'Galería', icon: 'fa-image', color: '#8e44ad' },
+  { id: 'camera', label: 'Cámara', icon: 'fa-camera', color: '#e91e63' },
+  { id: 'location', label: 'Ubicación', icon: 'fa-location-dot', color: '#1e88e5' },
+  { id: 'contact', label: 'Contacto', icon: 'fa-address-card', color: '#43a047' },
+  { id: 'document', label: 'Documento', icon: 'fa-file-lines', color: '#6d4c41' },
+  { id: 'poll', label: 'Encuesta', icon: 'fa-square-poll-vertical', color: '#f0932b' },
+  { id: 'event', label: 'Evento', icon: 'fa-calendar-days', color: '#00acc1' },
+];
+
+// Muestra u oculta el botón de enviar según haya texto escrito.
+function toggleComposerState() {
+  const bar = $('#input-bar');
+  const val = $('#msg-input').value.trim();
+  bar.classList.toggle('has-text', val.length > 0);
+}
+
+// Conecta los botones de la barra de escritura (emoji, clip, cámara, micro, enviar).
+function bindComposer() {
+  const send = $('#btn-send-msg');
+  const input = $('#msg-input');
+  if (!send || !input) return;
+  send.addEventListener('click', sendMessage);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendMessage(); });
+  input.addEventListener('input', toggleComposerState);
+  const emoji = $('#btn-emoji');
+  const attach = $('#btn-attach');
+  const cam = $('#btn-camera');
+  const mic = $('#btn-mic');
+  if (emoji) emoji.addEventListener('click', () => toggleEmojiPanel());
+  if (attach) attach.addEventListener('click', openAttachMenu);
+  if (cam) cam.addEventListener('click', openCamera);
+  if (mic) mic.addEventListener('click', toggleRecording);
+  document.querySelectorAll('.emoji-tabs button').forEach((b) => {
+    b.addEventListener('click', () => renderEmojiBody(b.dataset.panel));
+  });
+  toggleComposerState();
+}
+
+function toggleEmojiPanel(force) {
+  const panel = $('#emoji-panel');
+  const open = force !== undefined ? force : !panel.classList.contains('open');
+  panel.classList.toggle('open', open);
+  if (open) renderEmojiBody('emoji');
+}
+
+function renderEmojiBody(kind) {
+  const body = $('#emoji-body');
+  document.querySelectorAll('.emoji-tabs button').forEach((b) => {
+    b.classList.toggle('active', b.dataset.panel === kind);
+  });
+  const items = kind === 'stickers' ? STICKERS : EMOJIS;
+  body.className = kind === 'stickers' ? 'sticker-grid' : 'emoji-grid';
+  body.innerHTML = items.map((e) => `<button data-e="${e}">${e}</button>`).join('');
+  body.querySelectorAll('button').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      if (kind === 'stickers') {
+        sendAttachment('sticker', btn.dataset.e);
+      } else {
+        const input = $('#msg-input');
+        input.value += btn.dataset.e;
+        input.focus();
+        toggleComposerState();
+      }
+    });
+  });
+}
+
+function openAttachMenu() {
+  const grid = ATTACH_ACTIONS.map((a) => `
+    <button class="attach-item" data-act="${a.id}">
+      <span class="attach-ic" style="background:${a.color}"><i class="fa-solid ${a.icon}"></i></span>
+      <span>${a.label}</span>
+    </button>`).join('');
+  openModal('Adjuntar', `<div class="attach-grid">${grid}</div>`);
+  document.querySelectorAll('#modal-body .attach-item').forEach((el) => {
+    el.addEventListener('click', () => {
+      closeModal();
+      handleAttach(el.dataset.act);
+    });
+  });
+}
+
+function handleAttach(act) {
+  switch (act) {
+    case 'gallery': return pickFile('image/*', 'image');
+    case 'camera': return openCamera();
+    case 'location': return shareLocation();
+    case 'contact': return shareContact();
+    case 'document': return pickFile('*/*', 'document');
+    case 'poll': return askPoll();
+    case 'event': return askEvent();
+    default: break;
+  }
+}
+
+// Lee un archivo local y lo envía cifrado (imagen o documento).
+function pickFile(accept, kind) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = accept;
+  input.addEventListener('change', () => {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    if (kind === 'document') {
+      const size = file.size > 1024 * 1024
+        ? `${(file.size / 1048576).toFixed(1)} MB`
+        : `${Math.max(1, Math.round(file.size / 1024))} KB`;
+      sendAttachment('document', { name: file.name, size });
+      return;
+    }
+    compressImage(file, 1080, 0.7).then((dataUrl) => {
+      if (dataUrl.length > MEDIA_MAX) {
+        toast('Imagen demasiado grande para el relé');
+        return;
+      }
+      sendAttachment('image', dataUrl);
+    }).catch(() => toast('No se pudo procesar la imagen'));
+  });
+  input.click();
+}
+
+function openCamera() {
+  openModal('Cámara', `
+    <p>Toma una foto con la cámara del dispositivo.</p>
+    <input type="file" id="cam-input" accept="image/*" capture="environment" class="modal-input">
+    <div class="modal-btn-row"><button class="ghost-btn" id="cam-cancel">Cerrar</button></div>`);
+  $('#cam-cancel').addEventListener('click', closeModal);
+  $('#cam-input').addEventListener('change', () => {
+    const file = $('#cam-input').files && $('#cam-input').files[0];
+    if (!file) return;
+    compressImage(file, 1080, 0.7).then((dataUrl) => {
+      closeModal();
+      if (dataUrl.length > MEDIA_MAX) { toast('Imagen demasiado grande'); return; }
+      sendAttachment('image', dataUrl);
+    }).catch(() => toast('No se pudo procesar la imagen'));
+  });
+}
+
+// Redimensiona y comprime una imagen a un dataURL JPEG.
+function compressImage(file, maxSide, quality) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('imagen inválida')); };
+    img.src = url;
+  });
+}
+
+function shareLocation() {
+  if (!navigator.geolocation) { toast('Ubicación no disponible'); return; }
+  toast('Obteniendo ubicación…');
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const { latitude, longitude } = pos.coords;
+      const text = `Lat ${latitude.toFixed(5)}, Lng ${longitude.toFixed(5)}\nhttps://maps.google.com/?q=${latitude},${longitude}`;
+      sendAttachment('location', text);
+    },
+    () => toast('No se pudo obtener la ubicación'),
+    { enableHighAccuracy: true, timeout: 8000 },
+  );
+}
+
+function shareContact() {
+  const peers = Object.keys(state.peers);
+  if (!peers.length) { toast('No tienes contactos que compartir'); return; }
+  const opts = peers.map((id) => {
+    const p = state.peers[id] || {};
+    const name = p.name || `Peer ${shortPeer(id, 8, 4)}`;
+    return `<button class="contact-pick primary-btn" data-peer="${escapeHtml(id)}" style="width:100%;margin-bottom:8px">${escapeHtml(name)}</button>`;
+  }).join('');
+  openModal('Compartir contacto', `<div>${opts}</div>`);
+  document.querySelectorAll('.contact-pick').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.peer;
+      const p = state.peers[id] || {};
+      closeModal();
+      sendAttachment('contact', { name: p.name || shortPeer(id, 8, 4), peerId: id });
+    });
+  });
+}
+
+function askPoll() {
+  openModal('Crear encuesta', `
+    <input class="modal-input" id="poll-q" placeholder="Pregunta">
+    <input class="modal-input" id="poll-a" placeholder="Opción 1">
+    <input class="modal-input" id="poll-b" placeholder="Opción 2">
+    <input class="modal-input" id="poll-c" placeholder="Opción 3 (opcional)">
+    <div class="modal-btn-row">
+      <button class="ghost-btn" id="poll-cancel">Cancelar</button>
+      <button class="primary-btn" id="poll-ok">Enviar</button>
+    </div>`);
+  $('#poll-cancel').addEventListener('click', closeModal);
+  $('#poll-ok').addEventListener('click', () => {
+    const q = $('#poll-q').value.trim();
+    const options = ['#poll-a', '#poll-b', '#poll-c'].map((s) => $(s).value.trim()).filter(Boolean);
+    if (!q || options.length < 2) { toast('Pregunta y al menos 2 opciones'); return; }
+    closeModal();
+    sendAttachment('poll', { question: q, options });
+  });
+}
+
+function askEvent() {
+  openModal('Crear evento', `
+    <input class="modal-input" id="ev-title" placeholder="Título del evento">
+    <input class="modal-input" id="ev-date" type="date">
+    <input class="modal-input" id="ev-time" type="time">
+    <div class="modal-btn-row">
+      <button class="ghost-btn" id="ev-cancel">Cancelar</button>
+      <button class="primary-btn" id="ev-ok">Enviar</button>
+    </div>`);
+  $('#ev-cancel').addEventListener('click', closeModal);
+  $('#ev-ok').addEventListener('click', () => {
+    const title = $('#ev-title').value.trim();
+    const date = $('#ev-date').value;
+    const time = $('#ev-time').value;
+    if (!title || !date) { toast('Título y fecha obligatorios'); return; }
+    closeModal();
+    sendAttachment('event', { title, date, time });
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// Notas de voz
+// ─────────────────────────────────────────────────────────────
+
+let recorder = null;
+let recChunks = [];
+let recTimer = null;
+let recStart = 0;
+let recStream = null;
+
+async function toggleRecording() {
+  if (recorder && recorder.state === 'recording') { stopRecording(true); return; }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    toast('Micrófono no disponible (requiere HTTPS)');
+    return;
+  }
+  try {
+    recStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch {
+    toast('Permiso de micrófono denegado');
+    return;
+  }
+  recorder = new MediaRecorder(recStream, { audioBitsPerSecond: 16000 });
+  recChunks = [];
+  recorder.addEventListener('dataavailable', (e) => { if (e.data.size) recChunks.push(e.data); });
+  recorder.addEventListener('stop', onRecordingStop);
+  recorder.start();
+  recStart = Date.now();
+  showRecordingUI();
+}
+
+function showRecordingUI() {
+  const bar = $('#input-bar');
+  bar.dataset.prev = bar.innerHTML;
+  bar.innerHTML = `
+    <div class="rec-bar">
+      <span class="rec-dot"></span>
+      <span class="rec-time" id="rec-time">0:00</span>
+      <span class="rec-hint">Grabando… toca ✓ para enviar</span>
+    </div>
+    <button class="icon-btn" id="rec-cancel" title="Cancelar"><i class="fa-solid fa-trash"></i></button>
+    <button class="send-circle" id="rec-send" title="Enviar"><i class="fa-solid fa-check"></i></button>`;
+  $('#rec-cancel').addEventListener('click', () => stopRecording(false));
+  $('#rec-send').addEventListener('click', () => stopRecording(true));
+  recTimer = setInterval(() => {
+    const s = Math.floor((Date.now() - recStart) / 1000);
+    const el = $('#rec-time');
+    if (el) el.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    if (s >= 60) stopRecording(true);
+  }, 500);
+}
+
+function stopRecording(send) {
+  if (!recorder) return;
+  recorder._send = send;
+  if (recorder.state !== 'inactive') recorder.stop();
+}
+
+function onRecordingStop() {
+  clearInterval(recTimer);
+  recTimer = null;
+  const send = recorder && recorder._send;
+  if (recStream) recStream.getTracks().forEach((t) => t.stop());
+  recStream = null;
+  const blob = new Blob(recChunks, { type: recChunks[0] ? recChunks[0].type : 'audio/webm' });
+  recChunks = [];
+  restoreComposer();
+  if (!send || !blob.size) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const dataUrl = reader.result;
+    if (String(dataUrl).length > MEDIA_MAX) { toast('Nota de voz demasiado larga'); return; }
+    sendAttachment('audio', dataUrl);
+  };
+  reader.readAsDataURL(blob);
+}
+
+function restoreComposer() {
+  const bar = $('#input-bar');
+  if (bar.dataset.prev) {
+    bar.innerHTML = bar.dataset.prev;
+    delete bar.dataset.prev;
+    bindComposer();
+    toggleComposerState();
   }
 }
 
@@ -936,7 +1412,11 @@ async function receiveMessage(msg) {
 
   rememberPeer(from, data.name, agreePub, data.photo);
   (state.messages[from] = state.messages[from] || []).push({
-    from, text: data.text, ts: data.ts || Date.now(),
+    from,
+    text: data.text || '',
+    kind: data.kind || null,
+    data: data.data || null,
+    ts: data.ts || Date.now(),
   });
   writeStore(STORE.messages, state.messages);
   state.relayUnits += 1;
@@ -1190,11 +1670,23 @@ function askStatus() {
   });
 }
 
-function voiceCall() {
-  openModal('Llamada P2P', `
+function voiceCall(video = false) {
+  const peerId = state.activePeer;
+  const peer = (peerId && state.peers[peerId]) || {};
+  const name = peer.name || (peerId ? `Peer ${shortPeer(peerId, 8, 4)}` : 'tu contacto');
+  const kind = video ? 'Videollamada P2P' : 'Llamada P2P';
+  if (peerId) logCall(peerId, video);
+  openModal(kind, `
+    <div style="text-align:center;padding:6px 0 2px">
+      <div class="avatar purple-bg" style="width:74px;height:74px;font-size:32px;margin:0 auto 12px">${avatarInner(peer.photo)}</div>
+      <h4 style="font-size:17px;color:var(--text-strong);font-weight:500">${escapeHtml(name)}</h4>
+      <p style="color:var(--text-muted);font-size:13px;margin-top:4px">
+        ${video ? '<i class="fa-solid fa-video"></i> ' : '<i class="fa-solid fa-phone"></i> '}cifrado de extremo a extremo
+      </p>
+    </div>
     <p>Las llamadas P2P cifradas necesitan el canal de señalización WebRTC.</p>
-    <p>Esta versión incluye el transporte y el cifrado de mensajes; la capa de audio se conecta al mismo relé.</p>
-    <p class="hint-text">Próximamente: audio directo entre pares.</p>`);
+    <p>Esta versión incluye el transporte y el cifrado de mensajes; la capa de audio y vídeo se conecta al mismo relé.</p>
+    <p class="hint-text">Próximamente: audio y vídeo directos entre pares.</p>`);
 }
 
 async function sendMiningReport() {
@@ -1334,17 +1826,15 @@ function bindEvents() {
     window.open(new URL('deploy.html', location.href).href, '_blank');
   });
   $('#btn-add-status').addEventListener('click', askStatus);
-  $('#btn-voice-call').addEventListener('click', voiceCall);
+  $('#btn-voice-call').addEventListener('click', () => voiceCall(false));
+  $('#btn-video-call').addEventListener('click', () => voiceCall(true));
   $('#btn-verify-keys').addEventListener('click', showPeerSecurity);
   $('#btn-peer-security').addEventListener('click', showPeerSecurity);
   $('#btn-back-chats').addEventListener('click', () => {
     showScreen('home-screen');
     renderChats();
   });
-  $('#btn-send-msg').addEventListener('click', sendMessage);
-  $('#msg-input').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') sendMessage();
-  });
+  bindComposer();
   $('#search-input').addEventListener('input', renderChats);
   $('#modal-close').addEventListener('click', closeModal);
   $('#modal-overlay').addEventListener('click', (e) => {
@@ -1378,6 +1868,7 @@ async function boot() {
   renderProfile();
   renderChats();
   renderStatus();
+  renderCalls();
   renderMining();
   updateWalletUI();
   bindEvents();
@@ -1392,10 +1883,21 @@ async function boot() {
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
     navigator.serviceWorker.register('./sw.js').catch((err) => console.warn('SW', err));
   }
+
+  hideSplash();
+}
+
+function hideSplash() {
+  const splash = document.getElementById('splash-screen');
+  if (!splash) return;
+  const elapsed = Date.now() - (window.__wtBootAt || Date.now());
+  const wait = Math.max(0, 900 - elapsed);
+  setTimeout(() => splash.classList.add('hide'), wait);
 }
 
 boot().catch((err) => {
   console.error('Fallo al iniciar WhaTaka', err);
+  hideSplash();
   document.body.insertAdjacentHTML(
     'beforeend',
     '<div class="toast show">No se pudo iniciar el almacén criptográfico. Abre la app por HTTPS.</div>',
