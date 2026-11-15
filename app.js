@@ -30,6 +30,7 @@ const STORE = {
   avatar: 'whataka.avatar',
   wallet: 'whataka.wallet',
   wc: 'whataka.wcProjectId',
+  calls: 'whataka.calls',
 };
 
 // Pesos de minería: idénticos a los del contrato WhaTakaMiningRewards.
@@ -142,6 +143,17 @@ function timeLabel(ts) {
   const hhmm = d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
   if (sameDay) return hhmm;
   return `${d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })} ${hhmm}`;
+}
+
+// Etiqueta de fecha estilo WhatsApp para los separadores del chat.
+function dayLabel(ts) {
+  const d = new Date(ts);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  if (d.toDateString() === today.toDateString()) return 'HOY';
+  if (d.toDateString() === yesterday.toDateString()) return 'AYER';
+  return d.toLocaleDateString('es-ES', { day: '2-digit', month: 'long' }).toUpperCase();
 }
 
 function escapeHtml(str) {
@@ -610,6 +622,8 @@ function switchTab(target) {
   document.querySelectorAll('.nav-item').forEach((b) => {
     b.classList.toggle('active', b.dataset.target === target);
   });
+  if (target === 'tab-calls') renderCalls();
+  if (target === 'tab-status') renderStatus();
 }
 
 function showScreen(id) {
@@ -683,14 +697,26 @@ function renderChat() {
     return;
   }
 
-  area.innerHTML = msgs.map((m) => {
+  let lastDay = '';
+  const bubbles = msgs.map((m) => {
     const out = m.from === state.identity.peerId;
-    return `
+    const day = new Date(m.ts).toDateString();
+    let chip = '';
+    if (day !== lastDay) {
+      lastDay = day;
+      chip = `<span class="date-chip">${dayLabel(m.ts)}</span>`;
+    }
+    // Ticks estilo WhatsApp: enviado (✓) o leído (✓✓) si el peer ya tiene clave.
+    const tick = out
+      ? `<span class="tick${state.online.has(peerId) ? ' read' : ''}"><i class="fa-solid fa-check${state.online.has(peerId) ? '-double' : ''}"></i></span>`
+      : '';
+    return `${chip}
       <div class="msg-bubble ${out ? 'out' : 'in'}">
         ${escapeHtml(m.text)}
-        <span class="msg-time">${timeLabel(m.ts)}${out ? ' <i class="fa-solid fa-check"></i>' : ''}</span>
+        <span class="msg-time">${timeLabel(m.ts)}${tick}</span>
       </div>`;
   }).join('');
+  area.innerHTML = bubbles;
   area.scrollTop = area.scrollHeight;
 }
 
@@ -730,7 +756,72 @@ function renderStatus() {
     </div>`).join('');
 }
 
-// Unidades actuales del nodo (mismas que espera el contrato).
+// Registro local de llamadas (solo diseño: refleja el historial P2P).
+function renderCalls() {
+  const list = $('#calls-list');
+  if (!list) return;
+  const calls = readStore(STORE.calls, []);
+  if (!calls.length) {
+    const ids = Object.keys(state.peers);
+    list.innerHTML = `
+      <div class="empty-state">
+        <i class="fa-solid fa-phone-volume"></i>
+        Aún no hay llamadas.<br>Abre un chat y toca <strong>📞</strong> o <strong>🎥</strong>.
+      </div>` +
+      ids.map((id) => {
+        const peer = state.peers[id] || {};
+        const name = peer.name || `Peer ${shortPeer(id, 8, 4)}`;
+        return `
+          <div class="call-row" data-peer="${escapeHtml(id)}">
+            <div class="avatar purple-bg">${avatarInner(peer.photo)}</div>
+            <div class="call-info">
+              <h4>${escapeHtml(name)}</h4>
+              <p><i class="fa-solid fa-phone"></i> Llamada P2P cifrada</p>
+            </div>
+            <button class="call-action" title="Llamar"><i class="fa-solid fa-phone"></i></button>
+          </div>`;
+      }).join('');
+    bindCallRows();
+    return;
+  }
+  list.innerHTML = calls.map((c) => `
+    <div class="call-row" data-peer="${escapeHtml(c.peerId)}">
+      <div class="avatar purple-bg">${avatarInner(c.photo)}</div>
+      <div class="call-info">
+        <h4>${escapeHtml(c.name)}</h4>
+        <p class="${c.missed ? 'missed' : ''}">
+          <i class="fa-solid fa-${c.video ? 'video' : 'phone'}${c.missed ? '-slash' : ''}"></i>
+          ${timeLabel(c.ts)}
+        </p>
+      </div>
+      <button class="call-action" title="Llamar"><i class="fa-solid fa-phone"></i></button>
+    </div>`).join('');
+  bindCallRows();
+}
+
+function bindCallRows() {
+  document.querySelectorAll('#calls-list .call-row').forEach((row) => {
+    row.addEventListener('click', () => {
+      const id = row.dataset.peer;
+      if (id) openChat(id);
+    });
+  });
+}
+
+function logCall(peerId, video) {
+  const peer = state.peers[peerId] || {};
+  const calls = readStore(STORE.calls, []);
+  calls.unshift({
+    peerId,
+    name: peer.name || `Peer ${shortPeer(peerId, 8, 4)}`,
+    photo: peer.photo,
+    video: !!video,
+    missed: false,
+    ts: Date.now(),
+  });
+  writeStore(STORE.calls, calls.slice(0, 60));
+  renderCalls();
+}
 function miningUnits() {
   const uptime = BigInt(Math.floor((Date.now() - state.startedAt) / 60000));
   const store = BigInt(Object.values(state.messages).reduce((n, arr) => n + arr.length, 0));
@@ -1190,11 +1281,23 @@ function askStatus() {
   });
 }
 
-function voiceCall() {
-  openModal('Llamada P2P', `
+function voiceCall(video = false) {
+  const peerId = state.activePeer;
+  const peer = (peerId && state.peers[peerId]) || {};
+  const name = peer.name || (peerId ? `Peer ${shortPeer(peerId, 8, 4)}` : 'tu contacto');
+  const kind = video ? 'Videollamada P2P' : 'Llamada P2P';
+  if (peerId) logCall(peerId, video);
+  openModal(kind, `
+    <div style="text-align:center;padding:6px 0 2px">
+      <div class="avatar purple-bg" style="width:74px;height:74px;font-size:32px;margin:0 auto 12px">${avatarInner(peer.photo)}</div>
+      <h4 style="font-size:17px;color:var(--text-strong);font-weight:500">${escapeHtml(name)}</h4>
+      <p style="color:var(--text-muted);font-size:13px;margin-top:4px">
+        ${video ? '<i class="fa-solid fa-video"></i> ' : '<i class="fa-solid fa-phone"></i> '}cifrado de extremo a extremo
+      </p>
+    </div>
     <p>Las llamadas P2P cifradas necesitan el canal de señalización WebRTC.</p>
-    <p>Esta versión incluye el transporte y el cifrado de mensajes; la capa de audio se conecta al mismo relé.</p>
-    <p class="hint-text">Próximamente: audio directo entre pares.</p>`);
+    <p>Esta versión incluye el transporte y el cifrado de mensajes; la capa de audio y vídeo se conecta al mismo relé.</p>
+    <p class="hint-text">Próximamente: audio y vídeo directos entre pares.</p>`);
 }
 
 async function sendMiningReport() {
@@ -1334,7 +1437,8 @@ function bindEvents() {
     window.open(new URL('deploy.html', location.href).href, '_blank');
   });
   $('#btn-add-status').addEventListener('click', askStatus);
-  $('#btn-voice-call').addEventListener('click', voiceCall);
+  $('#btn-voice-call').addEventListener('click', () => voiceCall(false));
+  $('#btn-video-call').addEventListener('click', () => voiceCall(true));
   $('#btn-verify-keys').addEventListener('click', showPeerSecurity);
   $('#btn-peer-security').addEventListener('click', showPeerSecurity);
   $('#btn-back-chats').addEventListener('click', () => {
@@ -1378,6 +1482,7 @@ async function boot() {
   renderProfile();
   renderChats();
   renderStatus();
+  renderCalls();
   renderMining();
   updateWalletUI();
   bindEvents();
