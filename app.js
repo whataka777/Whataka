@@ -3,6 +3,8 @@
 
 'use strict';
 
+window.__wtBootAt = Date.now();
+
 // ─────────────────────────────────────────────────────────────
 // Configuración
 // ─────────────────────────────────────────────────────────────
@@ -1497,10 +1499,21 @@ async function boot() {
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
     navigator.serviceWorker.register('./sw.js').catch((err) => console.warn('SW', err));
   }
+
+  hideSplash();
+}
+
+function hideSplash() {
+  const splash = document.getElementById('splash-screen');
+  if (!splash) return;
+  const elapsed = Date.now() - (window.__wtBootAt || Date.now());
+  const wait = Math.max(0, 900 - elapsed);
+  setTimeout(() => splash.classList.add('hide'), wait);
 }
 
 boot().catch((err) => {
   console.error('Fallo al iniciar WhaTaka', err);
+  hideSplash();
   document.body.insertAdjacentHTML(
     'beforeend',
     '<div class="toast show">No se pudo iniciar el almacén criptográfico. Abre la app por HTTPS.</div>',
