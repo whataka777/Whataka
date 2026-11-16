@@ -15,6 +15,7 @@ const WS_URL = `ws://127.0.0.1:${PORT}/relay`;
 const TEST_SIGNER_KEY = '0x' + '11'.repeat(32);
 const TEST_CHAIN_ID = 80002;
 const TEST_CONTRACT = '0x' + 'ab'.repeat(20);
+const TEST_DONATION_WALLET = '0x' + 'de'.repeat(20);
 
 let child;
 
@@ -79,6 +80,7 @@ test.before(async () => {
       CHAIN_ID: String(TEST_CHAIN_ID),
       MINING_CONTRACT: TEST_CONTRACT,
       REPORT_SIGNER_KEY: TEST_SIGNER_KEY,
+      DONATION_WALLET: TEST_DONATION_WALLET,
     },
     stdio: 'ignore',
   });
@@ -341,4 +343,101 @@ test('el vale rechaza un score cero', async () => {
     body: JSON.stringify({ user: '0x' + 'cd'.repeat(20) }),
   });
   assert.equal(res.status, 400);
+});
+
+// ── Donaciones: destino y registro de carteras ──────────────────────────────
+
+test('GET /api/donations/config publica la cartera de donaciones', async () => {
+  const res = await fetch(`${BASE}/api/donations/config`);
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.wallet, TEST_DONATION_WALLET);
+  assert.equal(body.configured, true);
+  assert.equal(body.chainId, TEST_CHAIN_ID);
+});
+
+test('el registro de cartera acepta una firma válida del dueño', async () => {
+  const { ethers } = require('ethers');
+  const donaciones = require('../lib/donaciones');
+  const wallet = ethers.Wallet.createRandom();
+  const peerId = makePeerId('cartera-valida');
+
+  const signature = await wallet.signMessage(
+    donaciones.mensajeRegistroCartera(peerId, wallet.address),
+  );
+
+  const res = await fetch(`${BASE}/api/wallets`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ peerId, address: wallet.address, signature }),
+  });
+  assert.equal(res.status, 200);
+  const data = await res.json();
+  assert.equal(data.ok, true);
+  assert.equal(data.wallet.address, wallet.address);
+
+  // Y queda consultable por Peer ID.
+  const got = await fetch(`${BASE}/api/wallets/${peerId}`);
+  assert.equal(got.status, 200);
+  const stored = await got.json();
+  assert.equal(stored.wallet.address, wallet.address);
+});
+
+test('el registro rechaza una firma que no corresponde a la cartera', async () => {
+  const { ethers } = require('ethers');
+  const donaciones = require('../lib/donaciones');
+  const dueño = ethers.Wallet.createRandom();
+  const otro = ethers.Wallet.createRandom();
+  const peerId = makePeerId('cartera-ajena');
+
+  // `otro` firma el mensaje, pero decimos que la cartera es la de `dueño`.
+  const signature = await otro.signMessage(
+    donaciones.mensajeRegistroCartera(peerId, dueño.address),
+  );
+
+  const res = await fetch(`${BASE}/api/wallets`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ peerId, address: dueño.address, signature }),
+  });
+  assert.equal(res.status, 400);
+});
+
+test('el registro rechaza una firma que apunta a otro Peer ID', async () => {
+  const { ethers } = require('ethers');
+  const donaciones = require('../lib/donaciones');
+  const wallet = ethers.Wallet.createRandom();
+
+  // La firma vale para otro Peer ID, así que no debe valer aquí.
+  const signature = await wallet.signMessage(
+    donaciones.mensajeRegistroCartera(makePeerId('otro-peer'), wallet.address),
+  );
+
+  const res = await fetch(`${BASE}/api/wallets`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ peerId: makePeerId('cartera-cross'), address: wallet.address, signature }),
+  });
+  assert.equal(res.status, 400);
+});
+
+test('el registro rechaza Peer ID, cartera o firma mal formados', async () => {
+  const bad = [
+    { peerId: 'no-es-peer', address: '0x' + 'aa'.repeat(20), signature: '0x' + 'bb'.repeat(65) },
+    { peerId: makePeerId('malo-addr'), address: 'no-es-cartera', signature: '0x' + 'bb'.repeat(65) },
+    { peerId: makePeerId('mala-firma'), address: '0x' + 'aa'.repeat(20), signature: 'xyz' },
+  ];
+  for (const body of bad) {
+    const res = await fetch(`${BASE}/api/wallets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    assert.equal(res.status, 400, JSON.stringify(body));
+  }
+});
+
+test('consultar una cartera no registrada responde 404', async () => {
+  const res = await fetch(`${BASE}/api/wallets/${makePeerId('sin-cartera')}`);
+  assert.equal(res.status, 404);
 });

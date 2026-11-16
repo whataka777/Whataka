@@ -508,6 +508,9 @@ async function connectWallet() {
     state.wallet = address;
     writeStore(STORE.wallet, address);
     updateWalletUI();
+    // Registramos la cartera en el relé (firma del dueño) para que quede
+    // asociada a este Peer ID. Si el usuario no firma, seguimos igual.
+    registrarCartera(address).then((ok) => { if (ok) console.info('Cartera registrada en el relé'); });
     toast(`Wallet conectada (${walletName(wallet)})`);
     return address;
   } catch (err) {
@@ -1114,7 +1117,62 @@ const DONACION_PAYPAL = 'https://www.paypal.me/whataka';
 // Donaciones en WTK: transferencia ERC-20 directa, sin custodia.
 // El token WTK vive en Polygon Amoy y su dueño es la cartera que recibe.
 const WTK_CONTRACT = '0x4b0C9d8233DeFa8EcDF28D7a2bAa3EDaa4C8252B';
-const DONACION_CARTERA = '0xAdd0f33B4680289892F001BAC049b9579548b5d9';
+// Respaldo por si el relé no publica cartera de donaciones. El destino real lo
+// fija el relé con la variable DONATION_WALLET (ver /api/donations/config).
+const DONACION_CARTERA_RESPALDO = '0xAdd0f33B4680289892F001BAC049b9579548b5d9';
+
+let donacionConfigCache = null;
+async function loadDonationConfig() {
+  if (donacionConfigCache) return donacionConfigCache;
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 6000);
+    const res = await fetch(`${RELAY_HTTP}/api/donations/config`, { signal: ctrl.signal });
+    clearTimeout(t);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    donacionConfigCache = await res.json();
+  } catch (err) {
+    console.warn('Donaciones: no se pudo leer la config del relé', err);
+    donacionConfigCache = { wallet: null, configured: false };
+  }
+  return donacionConfigCache;
+}
+
+// Dirección a la que van las donaciones (la del administrador).
+async function destinoDonaciones() {
+  const cfg = await loadDonationConfig();
+  return (cfg && cfg.wallet) || DONACION_CARTERA_RESPALDO;
+}
+
+// Registra en el relé la cartera del usuario, firmando con su wallet para
+// demostrar que es suya. No es obligatorio: si el usuario cancela, no pasa nada.
+async function registrarCartera(address) {
+  try {
+    const api = window.WhaTakaDonaciones;
+    if (!api || !api.mensajeRegistroCartera) return false;
+    const wallet = getWalletProvider();
+    if (!wallet) return false;
+    const provider = new ethers.BrowserProvider(wallet);
+    const signer = await provider.getSigner();
+    const mensaje = api.mensajeRegistroCartera(state.identity.peerId, address);
+    const signature = await signer.signMessage(mensaje);
+    const res = await fetch(`${RELAY_HTTP}/api/wallets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ peerId: state.identity.peerId, address, signature }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.warn('Registro de cartera', err.error || res.status);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    // El usuario puede rechazar la firma (4001): no es un error que deba molestar.
+    if (!err || err.code !== 4001) console.warn('Registro de cartera', err);
+    return false;
+  }
+}
 const ERC20_ABI = [
   'function transfer(address to, uint256 amount) returns (bool)',
   'function balanceOf(address account) view returns (uint256)',
@@ -1153,7 +1211,8 @@ async function donarEnWtk(wtk) {
       return;
     }
     toast(`Enviando ${api.formatearWtk(wtk)}… confirma en tu wallet`);
-    const tx = await token.transfer(DONACION_CARTERA, unidades);
+    const destino = await destinoDonaciones();
+    const tx = await token.transfer(destino, unidades);
     toast(`Donación enviada ${tx.hash.slice(0, 12)}… esperando confirmación`);
     await tx.wait();
     toast(`¡Gracias! Donaste ${api.formatearWtk(wtk)} 💚`);
@@ -1232,7 +1291,16 @@ function verDonaciones() {
 
 function abrirSala() {
   renderSala();
+  pintaDestinoDonaciones();
   showScreen('sala-screen');
+}
+
+// Muestra a qué cartera van las donaciones (la del administrador).
+async function pintaDestinoDonaciones() {
+  const el = $('#sala-destino');
+  if (!el) return;
+  const dir = await destinoDonaciones();
+  el.textContent = `Destino de las donaciones: ${dir}`;
 }
 
 function renderSala() {

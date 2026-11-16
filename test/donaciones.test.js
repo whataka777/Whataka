@@ -180,3 +180,12 @@ test('la guía de cambiar deja claro que la app NO hace el cambio', () => {
   assert.ok(d.GUIA_CAMBIAR.some((p) => /t[uú] en el DEX/i.test(p)));
   assert.ok(d.GUIA_CAMBIAR.some((p) => /no lo hace|no necesita licencia/i.test(p)));
 });
+
+test('el mensaje de registro ata la cartera al Peer ID', () => {
+  const m = d.mensajeRegistroCartera('wt1abc', '0xAbC123');
+  assert.ok(m.includes('wt1abc'));
+  assert.ok(m.includes('0xAbC123'));
+  // El mensaje cambia si cambia cualquiera de los dos datos.
+  assert.notEqual(m, d.mensajeRegistroCartera('wt1otro', '0xAbC123'));
+  assert.notEqual(m, d.mensajeRegistroCartera('wt1abc', '0xOtro'));
+});

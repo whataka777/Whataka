@@ -10,8 +10,10 @@
 const http = require('http');
 const crypto = require('crypto');
 const express = require('express');
+const { ethers } = require('ethers');
 const { WebSocketServer } = require('ws');
 const voucher = require('./lib/voucher');
+const donaciones = require('./lib/donaciones');
 
 const PORT = Number(process.env.PORT) || 10000;
 const MAX_FRAME = 512 * 1024;
@@ -23,6 +25,11 @@ const CHAIN_ID = Number(process.env.CHAIN_ID) || 80002; // Polygon Amoy por defe
 const MINING_CONTRACT = (process.env.MINING_CONTRACT || '').trim();
 const REPORT_SIGNER_KEY = (process.env.REPORT_SIGNER_KEY || '').trim();
 const VOUCHER_TTL_SECONDS = Number(process.env.VOUCHER_TTL_SECONDS) || 600;
+
+// Cartera de donaciones (la del administrador). Se configura por variable de
+// entorno para NO incrustarla en el código: al pasar a Polygon real solo hay
+// que cambiar este valor en Render y volver a desplegar.
+const DONATION_WALLET = (process.env.DONATION_WALLET || '').trim();
 
 const app = express();
 app.disable('x-powered-by');
@@ -47,6 +54,7 @@ app.use((req, res, next) => {
 // ── Estado en memoria ────────────────────────────────────────────────────────
 const peers = new Map();          // peerId -> { name, signPub, agreePub, sockets:Set, connectedAt }
 const ledger = new Map();         // peerId -> { score, reports, lastReportAt }
+const wallets = new Map();        // peerId -> { address, peerId, registeredAt }
 const startedAt = Date.now();
 
 function peerList() {
@@ -195,6 +203,61 @@ function readUnits(value) {
 function isAddress(value) {
   return typeof value === 'string' && /^0x[0-9a-fA-F]{40}$/.test(value);
 }
+
+// ── Donaciones: destino y registro de carteras ──────────────────────────────
+// El registro guarda, por Peer ID, la cartera que el usuario demuestra poseer.
+// La prueba es una firma de esa cartera (personal_sign) sobre un mensaje que
+// incluye su Peer ID: así nadie puede registrar una cartera que no es suya.
+
+app.get('/api/donations/config', (req, res) => {
+  res.json({
+    chainId: CHAIN_ID,
+    // Si no hay variable configurada, el frontend usa su respaldo.
+    wallet: DONATION_WALLET || null,
+    configured: Boolean(DONATION_WALLET),
+  });
+});
+
+app.post('/api/wallets', async (req, res) => {
+  const body = req.body || {};
+  const { peerId, address, signature } = body;
+
+  if (!validatePeerId(peerId)) {
+    return res.status(400).json({ error: 'peerId inválido' });
+  }
+  if (!isAddress(address)) {
+    return res.status(400).json({ error: 'dirección de cartera inválida' });
+  }
+  if (typeof signature !== 'string' || !/^0x[0-9a-fA-F]{130}$/.test(signature)) {
+    return res.status(400).json({ error: 'firma inválida' });
+  }
+
+  const message = donaciones.mensajeRegistroCartera(peerId, address);
+
+  let recovered;
+  try {
+    recovered = ethers.verifyMessage(message, signature);
+  } catch {
+    return res.status(400).json({ error: 'no se pudo verificar la firma' });
+  }
+  if (recovered.toLowerCase() !== address.toLowerCase()) {
+    return res.status(400).json({ error: 'la firma no corresponde a esa cartera' });
+  }
+
+  const entry = {
+    address: recovered, // con las mayúsculas de comprobación de ethers
+    peerId,
+    registeredAt: new Date().toISOString(),
+  };
+  wallets.set(peerId, entry);
+  res.json({ ok: true, wallet: entry });
+});
+
+app.get('/api/wallets/:peerId', (req, res) => {
+  const entry = wallets.get(req.params.peerId);
+  if (!entry) return res.status(404).json({ error: 'no hay cartera registrada' });
+  res.json({ ok: true, wallet: entry });
+});
 
 app.post('/api/mining/voucher', (req, res) => {
   if (!MINING_CONTRACT || !REPORT_SIGNER_KEY) {

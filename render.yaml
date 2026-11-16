@@ -21,3 +21,8 @@ services:
         sync: false
       - key: REPORT_SIGNER_KEY
         sync: false
+      # Cartera de donaciones (la del administrador). No se incrusta en el
+      # código: se define aquí o en el panel de Render y se cambia al pasar a
+      # Polygon real. Mientras esté vacía, la app usa su valor de respaldo.
+      - key: DONATION_WALLET
+        sync: false

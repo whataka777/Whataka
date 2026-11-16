@@ -222,6 +222,32 @@ de donaciones. Tiene cuatro partes:
 
 ---
 
+## 6.quater Destino de las donaciones y registro de carteras
+
+**A qué cartera van las donaciones.** La dirección del creador **no está
+incrustada en el código**: el relé la publica en `GET /api/donations/config`
+desde la variable de entorno **`DONATION_WALLET`**. Al pasar a Polygon real solo
+hay que cambiar ese valor en Render y volver a desplegar. Si la variable está
+vacía, la app usa un respaldo interno.
+
+**Registro de carteras.** Cada usuario puede registrar su cartera para que quede
+asociada a su Peer ID. La prueba de que la cartera es suya es una **firma de su
+propia wallet** (personal_sign) sobre un mensaje que incluye su Peer ID y la
+dirección. El relé verifica la firma y solo entonces guarda la relación:
+
+- `POST /api/wallets` `{ peerId, address, signature }` → registra.
+- `GET /api/wallets/:peerId` → consulta la cartera de un Peer ID.
+
+El mensaje firmado lo genera `mensajeRegistroCartera(peerId, address)` en
+`lib/donaciones.js`, compartido por el navegador y el relé para que sea idéntico.
+Sin firma válida no hay registro: nadie puede apuntar la cartera de otro.
+
+> Nota: el registro vive en memoria del relé (se pierde al reiniciar el
+> servicio, que en Render ocurre en cada deploy). Es un directorio de cortesía,
+> no un libro de cuentas. Para que sea permanente hace falta una base de datos.
+
+---
+
 ## 7. Resumen en una frase
 
 Las **donaciones sin custodia** son **legales y no necesitan licencia** (regalar
