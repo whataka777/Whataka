@@ -2101,6 +2101,7 @@ const call = {
   camaraApagada: false,
   mediosListos: false, // llegó al menos una pista remota
   descripcionRemota: false, // ya aplicamos offer/answer
+  icePendientes: [], // candidatos ICE que llegaron antes de tener la conexión
 };
 
 const CALL_RING_SECONDS = 45;
@@ -2221,6 +2222,15 @@ function creaPeerConnection(peerId) {
   return pc;
 }
 
+// Aplica los candidatos ICE que llegaron antes de estar lista la conexión.
+// Debe llamarse después de aplicar la descripción remota.
+function aplicarIcePendientes() {
+  if (!call.pc || !call.descripcionRemota || !call.icePendientes.length) return;
+  const pendientes = call.icePendientes;
+  call.icePendientes = [];
+  pendientes.forEach((c) => { call.pc.addIceCandidate(new RTCIceCandidate(c)).catch(() => {}); });
+}
+
 async function iniciarLlamada(video) {
   const peerId = state.activePeer;
   if (!peerId) { toast('Abre un chat para llamar a alguien'); return; }
@@ -2246,6 +2256,7 @@ async function iniciarLlamada(video) {
   call.camaraApagada = false;
   call.mediosListos = false;
   call.descripcionRemota = false;
+  call.icePendientes = [];
   call.maquina.iniciar({ callId: LL.nuevoCallId(), peer: peerId, video });
   if (peerId) logCall(peerId, video);
 
@@ -2290,6 +2301,7 @@ async function aceptarLlamada() {
   if (call._offerSdp) {
     await pc.setRemoteDescription(new RTCSessionDescription(call._offerSdp));
     call.descripcionRemota = true;
+    aplicarIcePendientes();
   }
   const answer = await pc.createAnswer();
   await pc.setLocalDescription(answer);
@@ -2322,6 +2334,7 @@ async function recibirSenal(msg) {
     call.camaraApagada = false;
     call.mediosListos = false;
     call.descripcionRemota = false;
+    call.icePendientes = [];
     call._offerSdp = msg.payload && msg.payload.sdp;
     call.maquina.recibir({ callId: msg.callId, peer: msg.from, video: msg.video });
     pintaCabeceraLlamada(msg.from);
@@ -2341,14 +2354,19 @@ async function recibirSenal(msg) {
     if (!call.pc || !call.maquina) return;
     await call.pc.setRemoteDescription(new RTCSessionDescription(msg.payload.sdp));
     call.descripcionRemota = true;
+    aplicarIcePendientes();
     call.maquina.conectar();
     setEstadoLlamada('Conectando…');
     quizasActivarLlamada();
     return;
   }
   if (kind === 'ice') {
-    if (!call.pc || !msg.payload || !msg.payload.candidate) return;
-    try { await call.pc.addIceCandidate(new RTCIceCandidate(msg.payload.candidate)); } catch {}
+    if (!msg.payload || !msg.payload.candidate) return;
+    const cand = msg.payload.candidate;
+    // Sin conexión, o con la descripción remota aún sin aplicar, no se puede
+    // añadir el candidato todavía: se guarda para aplicarlo en cuanto se pueda.
+    if (!call.pc || !call.descripcionRemota) { call.icePendientes.push(cand); return; }
+    try { await call.pc.addIceCandidate(new RTCIceCandidate(cand)); } catch {}
     return;
   }
   if (kind === 'reject') { terminaLlamada('rechazada', 'El contacto rechazó la llamada'); return; }
@@ -2415,6 +2433,7 @@ function terminaLlamada(motivo, aviso) {
   call._offerSdp = null;
   call.mediosListos = false;
   call.descripcionRemota = false;
+  call.icePendientes = [];
   const rv = callEl('call-remote-video'); if (rv) rv.srcObject = null;
   const lv = callEl('call-local-video'); if (lv) lv.srcObject = null;
   const inc = callEl('call-incoming'); if (inc) inc.hidden = true;
