@@ -552,11 +552,14 @@ const KNOWN_CHAINS = {
   80002: {
     name: 'Polygon Amoy',
     rpc: 'https://polygon-amoy-bor-rpc.publicnode.com',
-    // Varios RPC: el oficial (rpc-amoy.polygon.technology) cae a menudo y deja
-    // la wallet colgada al importar tokens. La wallet prueba en orden.
+    // El RPC oficial (rpc-amoy.polygon.technology) ya no existe (el dominio no
+    // resuelve) y MetaMask lo trae por defecto, dejando la wallet colgada. Se
+    // listan varios RPC que funcionan; la wallet usa el primero y prueba el resto.
     rpcs: [
       'https://polygon-amoy-bor-rpc.publicnode.com',
       'https://polygon-amoy.drpc.org',
+      'https://polygon-amoy.api.onfinality.io/public',
+      'https://polygon-amoy-public.nodies.app',
       'https://80002.rpc.thirdweb.com',
     ],
     symbol: 'POL',
@@ -619,8 +622,59 @@ async function addTokenToWallet(wallet, { address, symbol, decimals }) {
   }
 }
 
-// Añade los tokens de WhaTaka (BGP777 y WTK) a la wallet conectada. Es la forma
-// cómoda de que el usuario los vea sin escribir direcciones a mano.
+// Comprueba qué RPC de la lista responde de verdad y devuelve el primero válido.
+// Así evitamos configurar la wallet con un RPC caído.
+async function pickWorkingRpc(rpcs) {
+  for (const url of rpcs) {
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 6000);
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_chainId', params: [] }),
+        signal: ctrl.signal,
+      });
+      clearTimeout(t);
+      const j = await res.json();
+      if (j && j.result) return url;
+    } catch {
+      /* probamos el siguiente */
+    }
+  }
+  return null;
+}
+
+// Repara la red en la wallet: si "Polygon Amoy" ya existe apuntando a un RPC
+// muerto (el caso habitual), wallet_addEthereumChain con los mismos datos y otro
+// rpcUrls hace que MetaMask ofrezca actualizarla. También la añade si no existe.
+async function repairNetwork(wallet, chainId) {
+  const meta = KNOWN_CHAINS[Number(chainId)];
+  if (!meta) return true;
+  const hex = '0x' + Number(chainId).toString(16);
+  const rpcs = meta.rpcs || [meta.rpc];
+  const working = (await pickWorkingRpc(rpcs)) || meta.rpc;
+  try {
+    await wallet.request({
+      method: 'wallet_addEthereumChain',
+      params: [{
+        chainId: hex,
+        chainName: meta.name,
+        nativeCurrency: { name: meta.symbol, symbol: meta.symbol, decimals: 18 },
+        rpcUrls: [working, ...rpcs.filter((u) => u !== working)],
+        blockExplorerUrls: [meta.explorer],
+      }],
+    });
+    return true;
+  } catch (err) {
+    if (err && err.code === 4001) return false; // el usuario canceló
+    console.warn('repairNetwork', err);
+    return false;
+  }
+}
+
+// Añade los tokens de WhaTaka (BGP777 y WTK) a la wallet conectada. Antes repara
+// la red Amoy para que la wallet lea los tokens por un RPC que funciona.
 async function importTokens() {
   let wallet = getWalletProvider();
   if (!wallet) {
@@ -633,6 +687,10 @@ async function importTokens() {
     return;
   }
   const cfg = await loadMiningConfig();
+  const chainId = cfg ? cfg.chainId : 80002;
+  await repairNetwork(wallet, chainId);
+  await ensureChain(wallet, chainId);
+
   const wtk = cfg && cfg.contract ? cfg.contract : null;
   const tokens = [
     { address: '0x325438A3E8F31B21D3b12fD61D8Ed22653F35C61', symbol: 'BGP777' },

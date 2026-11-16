@@ -3,7 +3,7 @@
 /* Despliega el contrato de minería de WhaTaka sin depender de Remix.
  *
  * Uso:
- *   RPC_URL="https://rpc-amoy.polygon.technology" \
+ *   RPC_URL="https://polygon-amoy-bor-rpc.publicnode.com" \
  *   DEPLOYER_KEY="0x..." \
  *   REPORT_SIGNER_ADDRESS="0x..." \
  *   node scripts/deploy.js

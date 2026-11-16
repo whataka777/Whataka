@@ -72,7 +72,7 @@ node -e "const {Wallet}=require('ethers');const w=Wallet.createRandom();console.
 
 # 2) Compila y despliega (ejemplo: Polygon Amoy)
 npm run compile
-RPC_URL="https://rpc-amoy.polygon.technology" \
+RPC_URL="https://polygon-amoy-bor-rpc.publicnode.com" \
 DEPLOYER_KEY="0x<clave de la wallet que paga el gas>" \
 REPORT_SIGNER_ADDRESS="0x<ADDR del paso 1>" \
 CONTRACT=ttc \
