@@ -1272,12 +1272,15 @@ function renderSala() {
 function pintaMiDireccion() {
   const el = $('#sala-mi-dir');
   if (!el) return;
+  const btn = $('#sala-conectar');
   if (state.wallet) {
     el.textContent = state.wallet;
     el.style.color = 'var(--purple-glow)';
+    if (btn) btn.innerHTML = '✅ Cartera conectada';
   } else {
     el.textContent = 'Conecta tu cartera para ver tu dirección';
     el.style.color = 'var(--text-dim)';
+    if (btn) btn.innerHTML = '🦊 Conectar cartera';
   }
 }
 
@@ -2865,6 +2868,7 @@ function bindEvents() {
   $('#btn-import-tokens').addEventListener('click', importTokens);
   $('#btn-ver-niveles').addEventListener('click', verNiveles);
   $('#btn-sala').addEventListener('click', abrirSala);
+  $('#btn-sala-mining').addEventListener('click', abrirSala);
   $('#btn-back-sala').addEventListener('click', () => showScreen('home-screen'));
   $('#sala-cafe').addEventListener('click', verCafe);
   $('#sala-donar').addEventListener('click', verDonaciones);

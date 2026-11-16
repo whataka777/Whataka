@@ -8,6 +8,15 @@ const ctx = await browser.newContext({ viewport: { width: 412, height: 892 }, pe
 const p = await ctx.newPage();
 await p.goto(`${BASE}/index.html?relay=${encodeURIComponent(RELAY)}`, { waitUntil: 'domcontentloaded' });
 await p.waitForFunction(() => typeof abrirSala === 'function', null, { timeout: 20000 });
+
+// También debe abrirse desde la tarjeta de la pestaña Minería.
+await p.click('.nav-item[data-target="tab-mining"]');
+await p.waitForSelector('#btn-sala-mining', { timeout: 5000 });
+await p.click('#btn-sala-mining');
+await p.waitForSelector('#sala-screen.active', { timeout: 5000 });
+await p.click('#btn-back-sala');
+await p.waitForFunction(() => !document.getElementById('sala-screen').classList.contains('active'));
+
 await p.click('#btn-sala');
 await p.waitForSelector('#sala-screen.active', { timeout: 5000 });
 
