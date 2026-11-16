@@ -182,6 +182,31 @@ fijo, **Hacienda y MiCA la tratarán como compra-venta**, se llame como se llame
 
 ---
 
+## 6.bis Donaciones en WTK (ya implementado)
+
+La app permite donar **en WTK** además de en dinero (PayPal). El flujo es una
+**transferencia ERC-20 directa** del usuario al creador:
+
+- El usuario firma en su propia cartera una `transfer(destino, importe)`.
+- El token va **de su cartera a la del creador** en una sola transacción.
+- La app **nunca toca el token**: no hay custodia, no hay dirección intermedia.
+
+Esto cumple la regla de oro (§2) y evita la trampa 3 (§3): al no haber custodia
+no hay licencia MiCA. Como no se promete nada a cambio, tampoco cae en la trampa 2.
+
+Datos on-chain usados (Polygon Amoy, cadena 80002):
+
+| Dato | Valor |
+| --- | --- |
+| Token WTK (`WhaTaka Coin`) | `0x4b0C9d8233DeFa8EcDF28D7a2bAa3EDaa4C8252B` |
+| Decimales | 18 |
+| Cartera que recibe (dueño del contrato) | `0xAdd0f33B4680289892F001BAC049b9579548b5d9` |
+
+> Aviso fiscal: **recibir** WTK puede ser un ingreso/ganancia patrimonial según
+> su valor en el momento de recibirlo (ver §5). Guarda el registro de cada donación.
+
+---
+
 ## 7. Resumen en una frase
 
 Las **donaciones sin custodia** son **legales y no necesitan licencia** (regalar

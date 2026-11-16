@@ -1004,6 +1004,7 @@ function renderMining() {
   }
 
   renderNivel();
+  renderDonaciones();
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -1064,6 +1065,125 @@ function verNiveles() {
     <p style="font-size:12px; opacity:.7; margin-top:10px;">
       Los niveles no son una inversión ni prometen ganancias: son ventajas dentro de la app.
     </p>`);
+}
+
+// ─────────────────────────────────────────────────────────────
+// Donaciones finalistas (pagar Render + Porkbun)
+// ─────────────────────────────────────────────────────────────
+
+// Enlace de cobro. Cámbialo por tu PayPal.me real (o deja el de Stripe).
+const DONACION_PAYPAL = 'https://www.paypal.me/tu-usuario';
+
+// Donaciones en WTK: transferencia ERC-20 directa, sin custodia.
+// El token WTK vive en Polygon Amoy y su dueño es la cartera que recibe.
+const WTK_CONTRACT = '0x4b0C9d8233DeFa8EcDF28D7a2bAa3EDaa4C8252B';
+const DONACION_CARTERA = '0xAdd0f33B4680289892F001BAC049b9579548b5d9';
+const ERC20_ABI = [
+  'function transfer(address to, uint256 amount) returns (bool)',
+  'function balanceOf(address account) view returns (uint256)',
+  'function decimals() view returns (uint8)',
+];
+
+// Envía una donación en WTK desde la wallet del usuario a la cartera del creador.
+async function donarEnWtk(wtk) {
+  const api = window.WhaTakaDonaciones;
+  if (!api) return;
+  let wallet = getWalletProvider();
+  if (!wallet) {
+    const addr = await connectWallet();
+    if (!addr) return;
+    wallet = getWalletProvider();
+  }
+  if (!wallet) {
+    toast('Necesitas una wallet para donar en WTK');
+    return;
+  }
+  try {
+    const cfg = await loadMiningConfig();
+    const chainId = cfg ? cfg.chainId : 80002;
+    const provider = new ethers.BrowserProvider(wallet);
+    const onChain = Number(await provider.send('eth_chainId', []));
+    if (onChain !== Number(chainId)) {
+      const ok = await ensureChain(wallet, chainId);
+      if (!ok) throw new Error('cambia la wallet a Polygon Amoy');
+    }
+    const signer = await provider.getSigner();
+    const token = new ethers.Contract(WTK_CONTRACT, ERC20_ABI, signer);
+    const unidades = api.aUnidadesWtk(wtk);
+    const saldo = await token.balanceOf(await signer.getAddress());
+    if (saldo < unidades) {
+      toast(`No tienes ${api.formatearWtk(wtk)} (tienes ${ethers.formatUnits(saldo, 18)})`);
+      return;
+    }
+    toast(`Enviando ${api.formatearWtk(wtk)}… confirma en tu wallet`);
+    const tx = await token.transfer(DONACION_CARTERA, unidades);
+    toast(`Donación enviada ${tx.hash.slice(0, 12)}… esperando confirmación`);
+    await tx.wait();
+    toast(`¡Gracias! Donaste ${api.formatearWtk(wtk)} 💚`);
+    closeModal();
+  } catch (err) {
+    console.warn('Donación WTK', err);
+    if (err && err.code === 4001) toast('Donación cancelada');
+    else toast(`No se pudo donar: ${err.shortMessage || err.message || 'error'}`);
+  }
+}
+
+function renderDonaciones() {
+  const api = window.WhaTakaDonaciones;
+  const lbl = $('#donaciones-coste');
+  if (!api || !lbl) return;
+  const costes = api.todosLosCostes().map((c) => `${c.emoji} ${c.nombre.split(' ')[0]}`).join(' + ');
+  lbl.textContent = `${costes}: ${api.formatearUsd(api.costeMensual())}/mes`;
+}
+
+function verDonaciones() {
+  const api = window.WhaTakaDonaciones;
+  if (!api) return;
+  const costes = api.todosLosCostes().map((c) => `
+    <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid rgba(255,255,255,.1);">
+      <span>${c.emoji} ${c.nombre}</span>
+      <strong>${api.formatearUsd(c.usdMes)}/mes</strong>
+    </div>`).join('');
+  const botones = api.IMPORTES_SUGERIDOS.map((imp) => `
+    <a href="${DONACION_PAYPAL}/${imp}" target="_blank" rel="noopener"
+       style="display:block; text-align:center; padding:10px; margin:6px 0; border-radius:8px;
+              background:linear-gradient(90deg,#1dcb5d,#15be1c); color:#fff; font-weight:700; text-decoration:none;">
+      Donar ${api.formatearUsd(imp)} — ${api.textoMeses(imp)}
+    </a>`).join('');
+  const botonesWtk = api.IMPORTES_WTK.map((imp) => `
+    <button class="btn-donar-wtk" data-wtk="${imp}"
+       style="display:block; width:100%; text-align:center; padding:10px; margin:6px 0; border-radius:8px;
+              border:none; cursor:pointer; background:linear-gradient(90deg,#8247e5,#6a2fd8); color:#fff; font-weight:700;">
+      Donar ${api.formatearWtk(imp)} (on-chain)
+    </button>`).join('');
+  openModal('💚 Mantén WhaTaka viva', `
+    <p style="font-size:13px; opacity:.9; margin-bottom:10px;">
+      WhaTaka es gratis. Si quieres, puedes ayudar a pagar lo que cuesta mantenerla
+      en marcha. <strong>Es 100% voluntario</strong>: si no donas, la app sigue igual.
+    </p>
+    <div style="background:rgba(255,255,255,.05); border-radius:8px; padding:10px; margin-bottom:12px;">
+      ${costes}
+      <div style="display:flex; justify-content:space-between; padding-top:8px;">
+        <strong>Total para mantenerla</strong>
+        <strong style="color:#1dcb5d;">${api.formatearUsd(api.costeMensual())}/mes</strong>
+      </div>
+    </div>
+    <p style="font-size:12px; opacity:.8; margin-bottom:6px;">
+      Tu donación va <strong>directa</strong> a pagar Render (el servidor) y Porkbun
+      (el dominio). No hay intermediarios ni se queda nadie con una comisión.
+    </p>
+    ${botones}
+    <p style="font-size:12px; opacity:.85; margin:14px 0 4px;">
+      ¿Tienes WTK? Puedes donar en WTK (Polygon). Es una transferencia directa
+      a la cartera del creador: la app no toca el token.
+    </p>
+    ${botonesWtk}
+    <p style="font-size:11px; opacity:.65; margin-top:12px;">
+      Donación voluntaria, no es una inversión ni da ventajas ni promete ganancias.
+    </p>`);
+  document.querySelectorAll('#modal-body .btn-donar-wtk').forEach((b) => {
+    b.addEventListener('click', () => donarEnWtk(Number(b.dataset.wtk)));
+  });
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -2149,6 +2269,7 @@ function bindEvents() {
   $('#btn-connect-wallet').addEventListener('click', connectWallet);
   $('#btn-import-tokens').addEventListener('click', importTokens);
   $('#btn-ver-niveles').addEventListener('click', verNiveles);
+  $('#btn-donar').addEventListener('click', verDonaciones);
   $('#btn-walletconnect').addEventListener('click', askWalletConnect);
   $('#btn-permissions').addEventListener('click', showPermissions);
 }

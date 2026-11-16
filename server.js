@@ -262,7 +262,7 @@ const PUBLIC_FILES = new Set([
   '/', '/index.html', '/app.js', '/sw.js', '/manifest.webmanifest',
   '/deploy.html', '/contract-artifact.js',
 ]);
-const PUBLIC_DIRS = ['/vendor/', '/icons/'];
+const PUBLIC_DIRS = ['/vendor/', '/icons/', '/lib/'];
 app.use((req, res, next) => {
   if (req.method !== 'GET') return next();
   const p = req.path;

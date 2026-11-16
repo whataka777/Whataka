@@ -816,6 +816,14 @@
             <i class="fa-solid fa-crown"></i> Ver niveles y ventajas
           </button>
 
+          <div class="stat-box highlight" id="donaciones-card" style="margin-bottom: 12px;">
+            <span class="stat-val" id="donaciones-titulo" style="font-size: 16px;">💚 Mantén WhaTaka viva</span>
+            <span class="stat-lbl" id="donaciones-coste">Servidor (Render) + dominio (Porkbun): $7.92/mes</span>
+            <button class="primary-btn" id="btn-donar" style="margin-top: 10px;">
+              <i class="fa-solid fa-hand-holding-heart"></i> Donar (voluntario)
+            </button>
+          </div>
+
           <div class="stat-box highlight" id="connect-wallet-box" style="margin-bottom: 12px; cursor: pointer;">
             <span class="stat-val" id="wallet-status-text" style="font-size: 15px;">🦊 Conectar wallet</span>
             <span class="stat-lbl" id="wallet-address-sub">Vincular wallet para cobrar WTK on-chain</span>
@@ -1028,7 +1036,8 @@
   </div>
 
   <script src="./vendor/ethers.umd.min.js"></script>
-  <script src="./lib/niveles.js"></script>
-  <script src="./app.js"></script>
+  <script src="./lib/niveles.js?v=4"></script>
+  <script src="./lib/donaciones.js?v=4"></script>
+  <script src="./app.js?v=4"></script>
 </body>
 </html>
