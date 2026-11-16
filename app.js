@@ -719,7 +719,11 @@ function toast(msg) {
 }
 
 function openModal(title, html) {
-  $('#modal-title').textContent = title;
+  // Agranda el emoji inicial del titulo (p. ej. "🤲🏽") sin tocar el resto.
+  const el = $('#modal-title');
+  const m = String(title).match(/^(\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic}|[\u{1F3FB}-\u{1F3FF}])*)\s+([\s\S]*)$/u);
+  if (m) el.innerHTML = `<span class="emoji-big">${m[1]}</span> ${escapeHtml(m[2])}`;
+  else el.textContent = title;
   $('#modal-body').innerHTML = html;
   $('#modal-overlay').classList.add('open');
 }
@@ -1156,7 +1160,7 @@ function verDonaciones() {
               border:none; cursor:pointer; background:linear-gradient(90deg,#8247e5,#6a2fd8); color:#fff; font-weight:700;">
       Donar ${api.formatearWtk(imp)} (on-chain)
     </button>`).join('');
-  openModal('🤲 Mantén WhaTaka viva', `
+  openModal('🤲🏽 Mantén WhaTaka viva', `
     <p style="font-size:13px; opacity:.9; margin-bottom:10px;">
       WhaTaka es gratis. Si quieres, puedes ayudar a pagar lo que cuesta mantenerla
       en marcha. <strong>Es 100% voluntario</strong>: si no donas, la app sigue igual.

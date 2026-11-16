@@ -629,6 +629,10 @@
       padding: 6px 12px; border-radius: 20px; white-space: nowrap;
     }
 
+    /* Emoji de donaciones: un poco mas grande y con tono de piel */
+    .don-emoji { font-size: 1.55em; line-height: 1; vertical-align: -0.18em; }
+    .modal-top h3 .emoji-big { font-size: 1.5em; line-height: 1; vertical-align: -0.15em; }
+
     /* ============ NOVEDADES / ESTADOS ============ */
     .my-status-card, .status-item {
       display: flex; align-items: center; gap: 14px;
@@ -886,10 +890,10 @@
           </div>
 
           <div class="stat-box highlight" id="donaciones-card" style="margin-bottom: 12px;">
-            <span class="stat-val" id="donaciones-titulo" style="font-size: 16px;">🤲 Mantén WhaTaka viva</span>
+            <span class="stat-val" id="donaciones-titulo" style="font-size: 16px;"><span class="don-emoji">🤲🏽</span> Mantén WhaTaka viva</span>
             <span class="stat-lbl" id="donaciones-coste">Servidor (Render) + dominio (Porkbun): $7.92/mes</span>
             <button class="primary-btn" id="btn-donar" style="margin-top: 10px;">
-              🤲 Donar (voluntario)
+              <span class="don-emoji">🤲🏽</span> Donar (voluntario)
             </button>
           </div>
 
@@ -1105,9 +1109,9 @@
   </div>
 
   <script src="./vendor/ethers.umd.min.js"></script>
-  <script src="./lib/niveles.js?v=7"></script>
-  <script src="./lib/donaciones.js?v=7"></script>
-  <script src="./lib/stickers.js?v=7"></script>
-  <script src="./app.js?v=7"></script>
+  <script src="./lib/niveles.js?v=9"></script>
+  <script src="./lib/donaciones.js?v=9"></script>
+  <script src="./lib/stickers.js?v=9"></script>
+  <script src="./app.js?v=9"></script>
 </body>
 </html>
