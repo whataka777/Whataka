@@ -667,6 +667,12 @@
     .sala-pasos { margin: 0 0 10px 18px; }
     .sala-pasos li { font-size: 13px; color: var(--text-main); margin-bottom: 6px; line-height: 1.45; }
     .sala-aviso { font-size: 11.5px; color: var(--text-dim); margin-top: 8px; line-height: 1.45; }
+    .sala-badge {
+      display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .02em;
+      padding: 3px 9px; border-radius: 999px; margin-left: 6px; vertical-align: middle;
+    }
+    .sala-badge.paypal { background: rgba(0,112,186,.22); color: #7cc0f0; border: 1px solid rgba(124,192,240,.4); }
+    .sala-badge.cripto { background: rgba(130,71,229,.22); color: #c9a9ff; border: 1px solid rgba(201,169,255,.4); }
     .primary-btn.sala-verde { background: linear-gradient(90deg,#1dcb5d,#15be1c); color: #fff; }
     .primary-btn.sala-morado { background: linear-gradient(90deg,#8247e5,#6a2fd8); color: #fff; }
     .sala-fila { display: flex; gap: 8px; }
@@ -1213,23 +1219,23 @@
 
         <!-- Taza de café: donación de $1 -->
         <div class="sala-card">
-          <h3><span class="sala-emoji">☕</span> Invítame un café</h3>
-          <p class="sala-sub">Donación de $1 con PayPal. Al terminar, elige un sticker para enviar.</p>
+          <h3><span class="sala-emoji">☕</span> Invítame un café <span class="sala-badge paypal">PayPal</span></h3>
+          <p class="sala-sub">Donación de $1 con PayPal.me. Al terminar, elige un sticker para enviar.</p>
           <button class="primary-btn sala-verde" id="sala-cafe">☕ Invítame un café ($1)</button>
         </div>
 
         <!-- Dos manitas: mantener la app viva -->
         <div class="sala-card">
-          <h3><span class="sala-emoji">🤲🏽</span> Mantén WhaTaka viva</h3>
-          <p class="sala-sub">Donación voluntaria para pagar el servidor y el dominio.</p>
+          <h3><span class="sala-emoji">🤲🏽</span> Mantén WhaTaka viva <span class="sala-badge paypal">PayPal</span></h3>
+          <p class="sala-sub">Donación voluntaria con PayPal.me para pagar el servidor y el dominio.</p>
           <div class="sala-costes" id="sala-costes"></div>
           <button class="primary-btn" id="sala-donar">🤲🏽 Donar (voluntario)</button>
         </div>
 
         <!-- Enviar y recibir donaciones en WTK -->
         <div class="sala-card">
-          <h3><span class="sala-emoji">💜</span> Enviar y recibir donaciones</h3>
-          <p class="sala-sub">Las donaciones son en WTK (WhaTaka Coin, Polygon). Transferencia directa, sin custodia: la app nunca toca el token.</p>
+          <h3><span class="sala-emoji">💜</span> Enviar y recibir donaciones <span class="sala-badge cripto">Cripto · WTK</span></h3>
+          <p class="sala-sub">Las donaciones en cripto son en WTK (WhaTaka Coin, Polygon). Transferencia directa, sin custodia: la app nunca toca el token.</p>
 
           <p class="sala-sub" style="color:var(--text-main);font-weight:600;margin-bottom:6px;">Tu dirección para recibir</p>
           <div class="sala-dir" id="sala-mi-dir">Conecta tu cartera para ver tu dirección</div>
@@ -1251,7 +1257,7 @@
 
         <!-- Cambiar WTK por otro token en un DEX -->
         <div class="sala-card">
-          <h3><span class="sala-emoji">🔄</span> Cambiar WTK en un DEX</h3>
+          <h3><span class="sala-emoji">🔄</span> Cambiar WTK en un DEX <span class="sala-badge cripto">Cripto</span></h3>
           <p class="sala-sub">Si quieres convertir tus WTK en otro token, el cambio lo haces tú en un DEX. La app solo te lleva.</p>
           <ol class="sala-pasos" id="sala-guia-cambiar"></ol>
           <button class="primary-btn" id="sala-dex">🔄 Abrir el DEX</button>
@@ -1298,10 +1304,10 @@
   </div>
 
   <script src="./vendor/ethers.umd.min.js"></script>
-  <script src="./lib/niveles.js?v=16"></script>
-  <script src="./lib/donaciones.js?v=16"></script>
-  <script src="./lib/stickers.js?v=16"></script>
-  <script src="./lib/llamadas.js?v=16"></script>
-  <script src="./app.js?v=16"></script>
+  <script src="./lib/niveles.js?v=17"></script>
+  <script src="./lib/donaciones.js?v=17"></script>
+  <script src="./lib/stickers.js?v=17"></script>
+  <script src="./lib/llamadas.js?v=17"></script>
+  <script src="./app.js?v=17"></script>
 </body>
 </html>

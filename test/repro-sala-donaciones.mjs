@@ -23,6 +23,7 @@ await p.waitForSelector('#sala-screen.active', { timeout: 5000 });
 const r = await p.evaluate(() => {
   const txt = document.getElementById('sala-body').innerText;
   const pasos = (id) => document.querySelectorAll(`#${id} li`).length;
+  const badges = [...document.querySelectorAll('#sala-body .sala-badge')].map((b) => b.textContent.trim());
   return {
     titulo: document.querySelector('#sala-screen h4').textContent.trim(),
     cafe: !!document.getElementById('sala-cafe') && /café|\$1/i.test(txt),
@@ -33,11 +34,15 @@ const r = await p.evaluate(() => {
     wtk: /WTK/.test(txt),
     dex: document.getElementById('sala-dex-aviso').textContent.length > 0,
     diceBilletera: /billetera|wallet/i.test(txt),
+    // Café y donación llevan PayPal; el envío/recepción y el DEX, cripto.
+    paypal: badges.filter((b) => /paypal/i.test(b)).length,
+    cripto: badges.filter((b) => /cripto/i.test(b)).length,
   };
 });
 console.log(JSON.stringify(r, null, 2));
 const ok = r.titulo.includes('Sala de donaciones') && r.cafe && r.manitas
-  && r.enviar >= 3 && r.recibir >= 3 && r.cambiar >= 3 && r.wtk && r.dex && !r.diceBilletera;
+  && r.enviar >= 3 && r.recibir >= 3 && r.cambiar >= 3 && r.wtk && r.dex && !r.diceBilletera
+  && r.paypal === 2 && r.cripto >= 2;
 console.log(ok ? '✅ Sala de donaciones OK' : '❌ Falta algo en la sala');
 await browser.close();
 process.exit(ok ? 0 : 1);

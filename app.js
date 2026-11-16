@@ -1244,14 +1244,8 @@ function verDonaciones() {
     <a href="${DONACION_PAYPAL}/${imp}" target="_blank" rel="noopener"
        style="display:block; text-align:center; padding:10px; margin:6px 0; border-radius:8px;
               background:linear-gradient(90deg,#1dcb5d,#15be1c); color:#fff; font-weight:700; text-decoration:none;">
-      Donar ${api.formatearUsd(imp)} — ${api.textoMeses(imp)}
+      Donar ${api.formatearUsd(imp)} con PayPal — ${api.textoMeses(imp)}
     </a>`).join('');
-  const botonesWtk = api.IMPORTES_WTK.map((imp) => `
-    <button class="btn-donar-wtk" data-wtk="${imp}"
-       style="display:block; width:100%; text-align:center; padding:10px; margin:6px 0; border-radius:8px;
-              border:none; cursor:pointer; background:linear-gradient(90deg,#8247e5,#6a2fd8); color:#fff; font-weight:700;">
-      Donar ${api.formatearWtk(imp)} (on-chain)
-    </button>`).join('');
   openModal('🤲🏽 Mantén WhaTaka viva', `
     <p style="font-size:13px; opacity:.9; margin-bottom:10px;">
       WhaTaka es gratis. Si quieres, puedes ayudar a pagar lo que cuesta mantenerla
@@ -1265,21 +1259,19 @@ function verDonaciones() {
       </div>
     </div>
     <p style="font-size:12px; opacity:.8; margin-bottom:6px;">
-      Tu donación va <strong>directa</strong> a pagar Render (el servidor) y Porkbun
-      (el dominio). No hay intermediarios ni se queda nadie con una comisión.
+      Donación con <strong>PayPal</strong>. Va <strong>directa</strong> a pagar Render (el
+      servidor) y Porkbun (el dominio). Sin intermediarios ni comisiones.
     </p>
     ${botones}
     <p style="font-size:12px; opacity:.85; margin:14px 0 4px;">
-      ¿Tienes WTK? Puedes donar en WTK (Polygon). Es una transferencia directa
-      a la cartera del creador: la app no toca el token.
+      ¿Prefieres donar en cripto? La donación en WTK (Polygon) se hace desde la
+      cartera, sin custodia, en la Sala de donaciones.
     </p>
-    ${botonesWtk}
+    <button class="primary-btn sala-morado" id="donar-ir-sala" style="width:100%;">💜 Donar en WTK (cripto)</button>
     <p style="font-size:11px; opacity:.65; margin-top:12px;">
       Donación voluntaria, no es una inversión ni da ventajas ni promete ganancias.
     </p>`);
-  document.querySelectorAll('#modal-body .btn-donar-wtk').forEach((b) => {
-    b.addEventListener('click', () => donarEnWtk(Number(b.dataset.wtk)));
-  });
+  $('#donar-ir-sala').addEventListener('click', () => { closeModal(); abrirSala(); });
 }
 
 // ─────────────────────────────────────────────────────────────
