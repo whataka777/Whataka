@@ -1221,8 +1221,8 @@ function renderSticker(data) {
 }
 
 // Muestra el selector de stickers (reutiliza el modal) y, al elegir uno,
-// lo envía al chat abierto.
-function elegirSticker() {
+// lo envía al chat abierto. `intro` permite añadir un texto arriba.
+function elegirSticker(intro) {
   const api = window.WhaTakaStickers;
   if (!api) return;
   const secciones = api.porCategorias().map((c) => `
@@ -1234,7 +1234,7 @@ function elegirSticker() {
     </div>`).join('');
   openModal('Elige un sticker', `
     <p style="font-size:12.5px;color:var(--text-muted);margin-bottom:10px">
-      Toca uno para enviarlo al chat abierto.
+      ${intro || 'Toca uno para enviarlo al chat abierto.'}
     </p>
     ${secciones}`);
   document.querySelectorAll('#modal-body .pick-sticker').forEach((b) => {
@@ -1250,30 +1250,14 @@ function elegirSticker() {
   });
 }
 
-// Flujo del café: agradece, abre el pago de $1 en PayPal y luego ofrece
-// elegir un sticker para enviar. La donación es voluntaria.
+// Café ☕: un solo toque. Abre el pago de $1 en PayPal y, a la vez, el selector
+// de stickers. Nota: PayPal SIEMPRE pide al usuario autorizar el pago; un enlace
+// paypal.me no puede debitar sin esa confirmación (eso solo lo permite la API
+// de PayPal Business con un acuerdo de facturación previo).
 function verCafe() {
-  openModal('☕ ¡Gracias por el café!', `
-    <p style="font-size:13.5px;margin-bottom:10px">
-      Tu dólar ayuda a pagar el servidor y el dominio. <strong>Es voluntario</strong>:
-      si no quieres, puedes elegir el sticker igual.
-    </p>
-    <a href="${COFFEE_URL}" target="_blank" rel="noopener"
-       style="display:block;text-align:center;padding:12px;border-radius:10px;margin-bottom:8px;
-              background:linear-gradient(90deg,#ffb300,#ff8f00);color:#3a2a00;font-weight:800;text-decoration:none;">
-      ☕ Pagar $1 con PayPal
-    </a>
-    <button id="btn-cafe-sticker" style="display:block;width:100%;padding:12px;border-radius:10px;border:none;
-            cursor:pointer;background:linear-gradient(90deg,#8247e5,#6a2fd8);color:#fff;font-weight:700;">
-      🎉 Elegir un sticker para enviar
-    </button>
-    <p style="font-size:11px;opacity:.65;margin-top:12px">
-      Donación voluntaria, no es una inversión ni da ventajas ni promete ganancias.
-    </p>`);
-  const b = $('#btn-cafe-sticker');
-  if (b) b.addEventListener('click', () => elegirSticker());
-  // Abre el pago y, al volver, ofrece el selector de stickers.
-  try { window.open(COFFEE_URL, '_blank', 'noopener'); } catch { /* bloqueado: el botón queda arriba */ }
+  try { window.open(COFFEE_URL, '_blank', 'noopener'); } catch { /* bloqueado */ }
+  toast('☕ Abriendo el pago de $1…');
+  elegirSticker('¡Gracias por el café! Mientras se abre PayPal, elige un sticker para enviar.');
 }
 
 // ─────────────────────────────────────────────────────────────
