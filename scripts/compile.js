@@ -19,6 +19,8 @@ const SOURCES = [
   path.join(CONTRACTS, 'WhaTakaMiningRewards.sol'),
   path.join(CONTRACTS, 'WhaTakaTTC.sol'),
   path.join(CONTRACTS, 'test', 'TestTTC.sol'),
+  path.join(CONTRACTS, 'test', 'TestPool.sol'),
+  path.join(CONTRACTS, 'test', 'TestUSD.sol'),
 ];
 
 fs.mkdirSync(OUT, { recursive: true });
@@ -36,6 +38,9 @@ function compileWithNodeSolc() {
     sources: {},
     settings: {
       optimizer: { enabled: true, runs: 200 },
+      // 'paris' evita el opcode PUSH0 (Cancun/Shanghai), que algunos nodos y
+      // herramientas todavía no aceptan y hace fallar los getters de strings.
+      evmVersion: 'paris',
       outputSelection: { '*': { '*': ['abi', 'evm.bytecode.object'] } },
     },
   };
@@ -52,7 +57,7 @@ function compileWithNodeSolc() {
 
 function compileWithCli() {
   const tmp = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'solc-'));
-  execFileSync('npx', ['--yes', 'solc', '--bin', '--abi', '--optimize', '-o', tmp, ...SOURCES], {
+  execFileSync('npx', ['--yes', 'solc', '--bin', '--abi', '--optimize', '--evm-version', 'paris', '-o', tmp, ...SOURCES], {
     stdio: 'inherit',
   });
   const contracts = {};
