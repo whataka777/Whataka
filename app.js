@@ -1224,6 +1224,116 @@ function verDonaciones() {
 }
 
 // ─────────────────────────────────────────────────────────────
+// Sala de donaciones (pantalla propia)
+// ─────────────────────────────────────────────────────────────
+// No se llama "billetera" a propósito: es una sala de donaciones. El envío y la
+// recepción son donaciones en WTK (transferencia directa, sin custodia) y el
+// cambio a otro token lo hace el usuario en un DEX, nunca la app.
+
+function abrirSala() {
+  renderSala();
+  showScreen('sala-screen');
+}
+
+function renderSala() {
+  const api = window.WhaTakaDonaciones;
+  if (!api) return;
+
+  const set = (id, txt) => { const el = $('#' + id); if (el) el.textContent = txt; };
+  const lista = (id, pasos) => {
+    const el = $('#' + id);
+    if (el) el.innerHTML = pasos.map((p) => `<li>${escapeHtml(p)}</li>`).join('');
+  };
+
+  set('sala-intro', api.SALA_TEXTO.intro);
+  set('sala-legal', api.SALA_TEXTO.avisoLegal);
+  set('sala-dex-aviso', api.DEX.aviso);
+
+  const costes = api.todosLosCostes().map((c) => `
+    <div class="sala-coste-row">
+      <span>${c.emoji} ${c.nombre}</span>
+      <strong>${api.formatearUsd(c.usdMes)}/mes</strong>
+    </div>`).join('') + `
+    <div class="sala-coste-row">
+      <strong>Total para mantenerla</strong>
+      <strong style="color:#1dcb5d;">${api.formatearUsd(api.costeMensual())}/mes</strong>
+    </div>`;
+  const box = $('#sala-costes');
+  if (box) box.innerHTML = costes;
+
+  lista('sala-guia-enviar', api.GUIA_ENVIAR);
+  lista('sala-guia-recibir', api.GUIA_RECIBIR);
+  lista('sala-guia-cambiar', api.GUIA_CAMBIAR);
+
+  pintaMiDireccion();
+}
+
+// Muestra la dirección de la cartera conectada (para RECIBIR donaciones).
+function pintaMiDireccion() {
+  const el = $('#sala-mi-dir');
+  if (!el) return;
+  if (state.wallet) {
+    el.textContent = state.wallet;
+    el.style.color = 'var(--purple-glow)';
+  } else {
+    el.textContent = 'Conecta tu cartera para ver tu dirección';
+    el.style.color = 'var(--text-dim)';
+  }
+}
+
+async function conectarCarteraSala() {
+  const addr = state.wallet || (await connectWallet());
+  pintaMiDireccion();
+  if (addr) toast('Cartera lista para recibir donaciones');
+}
+
+// Modal propio de la sala para ENVIAR una donación en WTK (solo WTK).
+function verEnviarWtk() {
+  const api = window.WhaTakaDonaciones;
+  if (!api) return;
+  const botones = api.IMPORTES_WTK.map((imp) => `
+    <button class="btn-donar-wtk" data-wtk="${imp}"
+       style="display:block; width:100%; text-align:center; padding:11px; margin:7px 0; border-radius:10px;
+              border:none; cursor:pointer; background:linear-gradient(90deg,#8247e5,#6a2fd8); color:#fff; font-weight:700;">
+      Donar ${api.formatearWtk(imp)}
+    </button>`).join('');
+  openModal('💜 Enviar donación en WTK', `
+    <p style="font-size:13px; opacity:.9; margin-bottom:10px;">
+      Elige cuántos WTK quieres donar. El token va <strong>directo</strong> de tu
+      cartera a la del creador, en una sola transacción. La app no lo toca.
+    </p>
+    ${botones}
+    <p style="font-size:11.5px; opacity:.7; margin-top:12px;">
+      Necesitas estar en ${api.RED_WTK.nombre} y tener WTK en tu cartera.
+      Donación voluntaria: no es una inversión ni promete ganancias.
+    </p>`);
+  document.querySelectorAll('#modal-body .btn-donar-wtk').forEach((b) => {
+    b.addEventListener('click', () => donarEnWtk(Number(b.dataset.wtk)));
+  });
+}
+
+async function copiarMiDireccion() {
+  if (!state.wallet) {
+    const addr = await connectWallet();
+    pintaMiDireccion();
+    if (!addr) return;
+  }
+  try {
+    await navigator.clipboard.writeText(state.wallet);
+    toast('Dirección copiada 📋');
+  } catch {
+    toast('No se pudo copiar; mantén pulsado para copiarla');
+  }
+}
+
+function abrirDex() {
+  const api = window.WhaTakaDonaciones;
+  if (!api) return;
+  try { window.open(api.DEX.url, '_blank', 'noopener'); } catch { /* bloqueado */ }
+  toast(`Abriendo ${api.DEX.nombre}…`);
+}
+
+// ─────────────────────────────────────────────────────────────
 // Café ☕ ($1) + stickers animados
 // ─────────────────────────────────────────────────────────────
 
@@ -2754,6 +2864,14 @@ function bindEvents() {
   $('#btn-connect-wallet').addEventListener('click', connectWallet);
   $('#btn-import-tokens').addEventListener('click', importTokens);
   $('#btn-ver-niveles').addEventListener('click', verNiveles);
+  $('#btn-sala').addEventListener('click', abrirSala);
+  $('#btn-back-sala').addEventListener('click', () => showScreen('home-screen'));
+  $('#sala-cafe').addEventListener('click', verCafe);
+  $('#sala-donar').addEventListener('click', verDonaciones);
+  $('#sala-conectar').addEventListener('click', conectarCarteraSala);
+  $('#sala-copiar').addEventListener('click', copiarMiDireccion);
+  $('#sala-enviar').addEventListener('click', verEnviarWtk);
+  $('#sala-dex').addEventListener('click', abrirDex);
   $('#btn-donar').addEventListener('click', verDonaciones);
   $('#coffee-card').addEventListener('click', verCafe);
   $('#btn-walletconnect').addEventListener('click', askWalletConnect);

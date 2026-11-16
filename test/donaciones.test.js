@@ -143,3 +143,40 @@ test('los importes WTK sugeridos son crecientes y positivos', () => {
     if (i > 0) assert.ok(d.IMPORTES_WTK[i] > d.IMPORTES_WTK[i - 1]);
   }
 });
+
+// ── Sala de donaciones (envío y recepción en WTK) ──
+
+test('la sala tiene textos de cabecera y aviso legal', () => {
+  assert.ok(d.SALA_TEXTO.titulo.length > 0);
+  assert.ok(d.SALA_TEXTO.intro.length > 0);
+  assert.ok(/voluntaria/i.test(d.SALA_TEXTO.avisoLegal));
+  assert.ok(/no es una inversi[oó]n/i.test(d.SALA_TEXTO.avisoLegal));
+});
+
+test('la red del WTK es Polygon Amoy (cadena 80002)', () => {
+  assert.strictEqual(d.RED_WTK.chainId, 80002);
+  assert.ok(/amoy/i.test(d.RED_WTK.nombre));
+});
+
+test('el DEX apunta a un intercambio y avisa de que lo hace el usuario', () => {
+  assert.ok(/^https:\/\//.test(d.DEX.url));
+  assert.ok(/quickswap/i.test(d.DEX.url));
+  assert.ok(/t[uú] en el DEX/i.test(d.DEX.aviso));
+});
+
+test('las guías de enviar, recibir y cambiar tienen pasos', () => {
+  for (const g of [d.GUIA_ENVIAR, d.GUIA_RECIBIR, d.GUIA_CAMBIAR]) {
+    assert.ok(Array.isArray(g));
+    assert.ok(g.length >= 3);
+    for (const paso of g) assert.ok(typeof paso === 'string' && paso.length > 0);
+  }
+});
+
+test('la guía de recibir avisa del tema fiscal', () => {
+  assert.ok(d.GUIA_RECIBIR.some((p) => /fiscal/i.test(p)));
+});
+
+test('la guía de cambiar deja claro que la app NO hace el cambio', () => {
+  assert.ok(d.GUIA_CAMBIAR.some((p) => /t[uú] en el DEX/i.test(p)));
+  assert.ok(d.GUIA_CAMBIAR.some((p) => /no lo hace|no necesita licencia/i.test(p)));
+});
