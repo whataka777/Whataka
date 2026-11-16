@@ -34,6 +34,10 @@ const STORE = {
   wc: 'whataka.wcProjectId',
   calls: 'whataka.calls',
   nivel: 'whataka.nivel',
+  padrino: 'whataka.padrino',
+  padrinoHecho: 'whataka.padrinoHecho',
+  invitados: 'whataka.invitados',
+  refPuntos: 'whataka.refPuntos',
 };
 
 // Pesos de minería: idénticos a los del contrato WhaTakaMiningRewards.
@@ -47,6 +51,16 @@ const MINING_ABI = [
 ];
 
 const params = new URLSearchParams(location.search);
+
+// Un enlace de invitación (?ref=<Peer ID>) se guarda para registrarlo cuando
+// exista la identidad, y se quita de la barra de direcciones.
+const refParam = params.get('ref');
+if (refParam && /^wt1[1-9A-HJ-NP-Za-km-z]{20,60}$/.test(refParam)) {
+  localStorage.setItem(STORE.padrino, JSON.stringify(refParam));
+  params.delete('ref');
+  const qs = params.toString();
+  history.replaceState(null, '', location.pathname + (qs ? `?${qs}` : ''));
+}
 
 // Un enlace compartido con ?relay=… se adopta y se guarda, y luego se quita de
 // la barra de direcciones para que el ajuste "Nodo relé" pueda cambiarlo.
@@ -299,6 +313,13 @@ async function decryptPayload(key, ivB64, ctB64) {
 async function signPayload(signPriv, obj) {
   const data = enc.encode(JSON.stringify(obj));
   const sig = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, signPriv, data);
+  return toB64(sig);
+}
+
+// Firma un texto tal cual (UTF-8) y devuelve la firma en base64. WebCrypto
+// devuelve la firma en formato IEEE-P1363, que es lo que verifica el relé.
+async function signText(signPriv, text) {
+  const sig = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, signPriv, enc.encode(text));
   return toB64(sig);
 }
 
@@ -948,9 +969,28 @@ function renderMining() {
 // Niveles de estatus
 // ─────────────────────────────────────────────────────────────
 
-// Puntos del usuario: los que ha acumulado pagando o usando la app.
+// Puntos propios (pago/actividad). Los referidos NO se suman aquí porque su
+// escala es distinta; suben el nivel por su cuenta (ver nivelActual()).
 function puntosNivel() {
   return Number(readStore(STORE.nivel, 0)) || 0;
+}
+
+// Nivel efectivo: el MEJOR entre el que dan los puntos (pago/actividad) y el
+// que dan los referidos. Así quien invita sube el MISMO nivel (Bronce, Plata,
+// Oro, Platino, Diamante) sin pagar nada.
+function nivelActual() {
+  const api = window.WhaTakaNiveles;
+  if (!api) return null;
+  let nivel = api.nivelDe(puntosNivel());
+  const ref = apiReferidos();
+  if (ref) {
+    const e = ref.estatusPorInvitados(misInvitados());
+    if (e.nivelId) {
+      const porRef = api.NIVELES.find((n) => n.id === e.nivelId);
+      if (porRef && porRef.puntos > nivel.puntos) nivel = porRef;
+    }
+  }
+  return nivel;
 }
 
 function sumarPuntos(extra) {
@@ -964,16 +1004,37 @@ function renderNivel() {
   const api = window.WhaTakaNiveles;
   const badge = $('#nivel-badge');
   if (!api || !badge) return;
-  const p = api.progreso(puntosNivel());
-  badge.textContent = `${p.actual.emoji} ${p.actual.nombre}`;
-  badge.style.color = p.actual.color;
+
+  const nivel = nivelActual();
+  badge.textContent = `${nivel.emoji} ${nivel.nombre}`;
+  badge.style.color = nivel.color;
+
   const texto = $('#nivel-progreso-texto');
+  const barra = $('#nivel-progreso-barra');
+  const ref = apiReferidos();
+  const nInv = misInvitados();
+  // Si los referidos ya nos dan un nivel, mostramos el progreso por invitados;
+  // si no, el de puntos. Así el aviso coincide con la vía que manda.
+  const viaRef = ref && ref.estatusPorInvitados(nInv).nivelId
+    && api.NIVELES.find((x) => x.id === ref.estatusPorInvitados(nInv).nivelId) === nivel;
+
+  if (viaRef) {
+    const p = ref.progresoEstatus(nInv);
+    if (texto) {
+      texto.textContent = p.siguiente
+        ? `${nInv} invitados · ${p.faltan} para ${p.siguiente.nombre}`
+        : `${nInv} invitados · estatus máximo`;
+    }
+    if (barra) barra.style.width = `${p.porcentaje}%`;
+    return;
+  }
+
+  const p = api.progreso(puntosNivel());
   if (texto) {
     texto.textContent = p.siguiente
       ? `${puntosNivel()} puntos · ${p.faltan} para ${p.siguiente.nombre}`
       : `${puntosNivel()} puntos · nivel máximo`;
   }
-  const barra = $('#nivel-progreso-barra');
   if (barra) barra.style.width = `${p.porcentaje}%`;
 }
 
@@ -981,7 +1042,7 @@ function verNiveles() {
   const api = window.WhaTakaNiveles;
   if (!api) return;
   const puntos = puntosNivel();
-  const actual = api.nivelDe(puntos).id;
+  const actual = nivelActual().id;
   const filas = api.todosLosNiveles().map((n) => {
     const activo = n.id === actual ? ' · ← estás aquí' : '';
     const beneficios = n.beneficios.map((b) => `· ${b}`).join('<br>');
@@ -993,15 +1054,219 @@ function verNiveles() {
         <div style="font-size:13px;">${beneficios}</div>
       </div>`;
   }).join('');
+  const ref = apiReferidos();
+  const filasRef = ref ? ref.ESTATUS.filter((e) => e.nivelId).map((e) => {
+    const activo = e.nivelId === actual ? ' · ← estás aquí' : '';
+    return `<div style="font-size:13px; margin:4px 0; color:${e.color};">${e.emoji} <strong>${e.invitados} invitados</strong> → ${e.nombre}${activo}</div>`;
+  }).join('') : '';
   openModal('Niveles WhaTaka', `
     <p style="font-size:13px; opacity:.85; margin-bottom:8px;">
-      Sube de nivel con un pago único. Con tu dinero se compran WTK y se queman:
-      menos tokens en circulación y más valor para todos.
+      Sube de nivel con un pago único, o <strong>invitando gente</strong> si no puedes pagar.
+      Con el dinero se compran WTK y se queman: menos tokens en circulación y más valor para todos.
     </p>
     ${filas}
+    ${filasRef ? `<h5 class="sub-header">Subir de nivel invitando (sin pagar)</h5>${filasRef}` : ''}
     <p style="font-size:12px; opacity:.7; margin-top:10px;">
       Los niveles no son una inversión ni prometen ganancias: son ventajas dentro de la app.
     </p>`);
+}
+
+// ─────────────────────────────────────────────────────────────
+// Referidos: compartir la app y subir de nivel sin pagar
+// ─────────────────────────────────────────────────────────────
+
+// Invitar no da dinero ni tokens: solo estatus y puntos de nivel. Es la vía de
+// quien no puede pagar para llegar a Bronce, Plata, Oro, Platino o Diamante.
+
+function apiReferidos() {
+  return window.WhaTakaReferidos;
+}
+
+// Dirección donde vive la app, sin index.html ni barra final.
+function baseUrlApp() {
+  return location.href.replace(/[?#].*$/, '').replace(/index\.html$/, '').replace(/\/+$/, '');
+}
+
+function misInvitados() {
+  return Number(readStore(STORE.invitados, 0)) || 0;
+}
+
+// Guarda el conteo de invitados y los puntos que aportan a los niveles.
+function guardarInvitados(n) {
+  const k = Math.max(0, Math.floor(Number(n) || 0));
+  writeStore(STORE.invitados, k);
+  const api = apiReferidos();
+  if (api) writeStore(STORE.refPuntos, api.puntosPorInvitados(k));
+}
+
+let refPosicion = null;
+
+// Pide al relé cuántos invitados tengo y en qué puesto voy.
+async function refrescarReferidos() {
+  if (!state.identity) return;
+  try {
+    const res = await fetch(`${RELAY_HTTP}/api/referrals/${state.identity.peerId}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    refPosicion = data.posicion;
+    guardarInvitados(data.invitados);
+    renderNivel();
+    pintarResumenReferidos();
+  } catch {
+    /* sin conexión: seguimos con lo guardado */
+  }
+}
+
+function pintarResumenReferidos() {
+  const el = $('#ref-resumen');
+  const api = apiReferidos();
+  if (!el || !api) return;
+  const n = misInvitados();
+  const e = api.estatusPorInvitados(n);
+  el.textContent = `${e.emoji} ${e.nombre} · ${n} invitado${n === 1 ? '' : 's'} · ${api.puntosPorInvitados(n)} puntos`;
+}
+
+// Si llegamos por un enlace de invitación, avisamos al relé firmando con
+// nuestra clave. Solo se hace una vez por instalación.
+async function registrarPadrino() {
+  const padrino = readStore(STORE.padrino, null);
+  if (!padrino || readStore(STORE.padrinoHecho, false)) return;
+  if (!state.identity || padrino === state.identity.peerId) {
+    localStorage.removeItem(STORE.padrino);
+    return;
+  }
+  const api = apiReferidos();
+  if (!api) return;
+  try {
+    const mensaje = api.mensajeInvitacion(state.identity.peerId, padrino);
+    const signature = await signText(state.signKey, mensaje);
+    const res = await fetch(`${RELAY_HTTP}/api/referrals`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        invitado: state.identity.peerId,
+        padrino,
+        signPub: state.identity.signPub,
+        signature,
+      }),
+    });
+    // 409 = ya tenía padrino: no reintentamos.
+    if (res.ok || res.status === 409) {
+      writeStore(STORE.padrinoHecho, true);
+      localStorage.removeItem(STORE.padrino);
+    }
+  } catch {
+    /* se reintentará en el próximo arranque */
+  }
+}
+
+function verReferidos() {
+  const api = apiReferidos();
+  if (!api) return;
+  const peerId = state.identity.peerId;
+  const enlace = api.enlaceInvitacion(baseUrlApp(), peerId);
+  const codigo = api.codigoInvitacion(peerId);
+  const n = misInvitados();
+  const e = api.estatusPorInvitados(n);
+  const p = api.progresoEstatus(n);
+
+  const filas = api.ESTATUS.map((s) => {
+    const activo = s.id === e.id ? ' · ← estás aquí' : '';
+    const nota = s.invitados === 0
+      ? 'Empieza a invitar'
+      : `${s.invitados}+ invitados${s.nivelId ? ` → nivel ${s.nombre}` : ''}`;
+    return `
+      <div style="border-left:4px solid ${s.color}; padding:6px 12px; margin:6px 0; background:rgba(255,255,255,.05); border-radius:6px;">
+        <strong style="color:${s.color}">${s.emoji} ${s.nombre}${activo}</strong>
+        <div style="font-size:12px; opacity:.85;">${nota}</div>
+      </div>`;
+  }).join('');
+
+  const progresoTexto = p.siguiente
+    ? `Te faltan ${p.faltan} invitado${p.faltan === 1 ? '' : 's'} para ${p.siguiente.emoji} ${p.siguiente.nombre}`
+    : '¡Estás en el estatus máximo!';
+  const puesto = refPosicion ? ` · puesto #${refPosicion}` : '';
+
+  openModal('Invita y sube de nivel', `
+    <p style="font-size:13px; opacity:.9; margin-bottom:6px;">
+      Comparte WhaTaka con quien quieras. <strong>Aquí no se gana dinero</strong>: subes de
+      estatus y de nivel. Cada persona que entre con tu enlace te da
+      <strong>${api.PUNTOS_POR_INVITADO} puntos</strong>, así que puedes llegar a
+      Bronce, Plata, Oro, Platino o Diamante <strong>sin pagar nada</strong>.
+    </p>
+
+    <div style="text-align:center; margin:12px 0;">
+      <div style="font-size:26px; color:${e.color};">${e.emoji} ${e.nombre}</div>
+      <div style="font-size:12px; opacity:.8;">${e.frase}</div>
+      <div style="font-size:13px; margin-top:6px;">${n} invitado${n === 1 ? '' : 's'} · ${api.puntosPorInvitados(n)} puntos${puesto}</div>
+      <div style="height:8px; background:rgba(255,255,255,.12); border-radius:4px; margin:8px 0 4px; overflow:hidden;">
+        <div style="height:100%; width:${p.porcentaje}%; background:linear-gradient(90deg,${e.color},${(p.siguiente && p.siguiente.color) || e.color});"></div>
+      </div>
+      <div style="font-size:12px; opacity:.8;">${progresoTexto}</div>
+    </div>
+
+    <label style="font-size:12px; opacity:.8;">Tu enlace de invitación</label>
+    <div class="mono-text" id="ref-enlace" style="font-size:12px; word-break:break-all; background:rgba(0,0,0,.25); padding:8px; border-radius:6px; margin:4px 0 10px;">${escapeHtml(enlace)}</div>
+
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+      <button class="primary-btn" id="ref-compartir" style="flex:1; min-width:140px;">
+        <i class="fa-solid fa-share-nodes"></i> Compartir enlace
+      </button>
+      <button class="primary-btn" id="ref-copiar" style="flex:1; min-width:120px;">
+        <i class="fa-solid fa-copy"></i> Copiar
+      </button>
+      <button class="primary-btn" id="ref-codigo" style="flex:1; min-width:120px;">
+        <i class="fa-solid fa-hashtag"></i> Código: ${escapeHtml(codigo)}
+      </button>
+    </div>
+
+    <h5 class="sub-header">Estatus por invitaciones</h5>
+    ${filas}
+
+    <p style="font-size:12px; opacity:.7; margin-top:10px;">
+      Los referidos solo dan estatus y posición dentro de WhaTaka: no son una inversión,
+      no dan tokens ni dinero y no prometen ganancias.
+    </p>`);
+
+  const compartir = async () => {
+    const texto = api.textoCompartir(peerId, baseUrlApp());
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'WhaTaka', text: texto, url: enlace });
+        return;
+      } catch {
+        /* el usuario canceló o no se puede: probamos copiar */
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(texto);
+      toast('Enlace copiado para compartir');
+    } catch {
+      toast(enlace);
+    }
+  };
+  const btnCompartir = $('#ref-compartir');
+  const btnCopiar = $('#ref-copiar');
+  const btnCodigo = $('#ref-codigo');
+  if (btnCompartir) btnCompartir.addEventListener('click', compartir);
+  if (btnCopiar) btnCopiar.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(enlace);
+      toast('Enlace copiado');
+    } catch {
+      toast(enlace);
+    }
+  });
+  if (btnCodigo) btnCodigo.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(codigo);
+      toast('Código copiado');
+    } catch {
+      toast(codigo);
+    }
+  });
+
+  refrescarReferidos();
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -2836,6 +3101,7 @@ function bindEvents() {
   $('#coffee-card').addEventListener('click', verCafe);
   $('#btn-walletconnect').addEventListener('click', askWalletConnect);
   $('#btn-permissions').addEventListener('click', showPermissions);
+  $('#btn-referidos').addEventListener('click', verReferidos);
 }
 
 async function boot() {
@@ -2855,7 +3121,12 @@ async function boot() {
   renderCalls();
   renderMining();
   updateWalletUI();
+  pintarResumenReferidos();
   bindEvents();
+
+  // Referidos: registra la invitación si llegamos por un enlace y refresca el
+  // contador desde el relé (cuántos invitados tengo y en qué puesto voy).
+  registrarPadrino().then(refrescarReferidos);
 
   if (params.get('relay')) {
     writeStore(STORE.relay, params.get('relay'));

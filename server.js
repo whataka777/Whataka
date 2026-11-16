@@ -14,6 +14,7 @@ const { ethers } = require('ethers');
 const { WebSocketServer } = require('ws');
 const voucher = require('./lib/voucher');
 const donaciones = require('./lib/donaciones');
+const referidos = require('./lib/referidos');
 
 const PORT = Number(process.env.PORT) || 10000;
 const MAX_FRAME = 512 * 1024;
@@ -55,7 +56,21 @@ app.use((req, res, next) => {
 const peers = new Map();          // peerId -> { name, signPub, agreePub, sockets:Set, connectedAt }
 const ledger = new Map();         // peerId -> { score, reports, lastReportAt }
 const wallets = new Map();        // peerId -> { address, peerId, registeredAt }
+const referrals = new Map();      // invitado(peerId) -> { padrino, at }
 const startedAt = Date.now();
+
+// Invitados de cada padrino, para contar rápido. Se deriva de `referrals`.
+function invitadosDe(padrino) {
+  const out = [];
+  for (const [invitado, r] of referrals) if (r.padrino === padrino) out.push(invitado);
+  return out;
+}
+
+function tablaInvitadores() {
+  const counts = new Map();
+  for (const r of referrals.values()) counts.set(r.padrino, (counts.get(r.padrino) || 0) + 1);
+  return [...counts.entries()].map(([peerId, count]) => ({ peerId, count }));
+}
 
 function peerList() {
   return [...peers.values()].map((p) => ({
@@ -257,6 +272,117 @@ app.get('/api/wallets/:peerId', (req, res) => {
   const entry = wallets.get(req.params.peerId);
   if (!entry) return res.status(404).json({ error: 'no hay cartera registrada' });
   res.json({ ok: true, wallet: entry });
+});
+
+// ── Referidos: compartir la app y ganar estatus ─────────────────────────────
+// Invitar NO da dinero ni tokens: solo suma estatus y posición en la tabla. El
+// invitado firma con su clave para demostrar que acepta, y el relé comprueba
+// que su Peer ID sale de esa clave (nadie puede apuntar a otro como invitado).
+
+// Deriva el Peer ID a partir de una clave pública SPKI en base64. Es el mismo
+// cálculo que hace la app: sha256(spki) en base58, con prefijo "wt1".
+function peerIdDeSignPub(signPub) {
+  try {
+    const der = Buffer.from(signPub, 'base64');
+    const digest = crypto.createHash('sha256').update(der).digest();
+    return 'wt1' + referidos.base58(digest);
+  } catch {
+    return null;
+  }
+}
+
+app.post('/api/referrals', (req, res) => {
+  const body = req.body || {};
+  const { invitado, padrino, signPub, signature } = body;
+
+  if (!referidos.esPeerIdValido(invitado)) {
+    return res.status(400).json({ error: 'Peer ID de invitado inválido' });
+  }
+  if (!referidos.esPeerIdValido(padrino)) {
+    return res.status(400).json({ error: 'Peer ID de padrino inválido' });
+  }
+  if (invitado === padrino) {
+    return res.status(400).json({ error: 'nadie puede invitarse a sí mismo' });
+  }
+  if (typeof signPub !== 'string' || typeof signature !== 'string' || !signature) {
+    return res.status(400).json({ error: 'signPub y signature son obligatorios' });
+  }
+
+  // El Peer ID declarado tiene que salir de la clave pública: si no, cualquiera
+  // podría registrar a otro como invitado.
+  if (peerIdDeSignPub(signPub) !== invitado) {
+    return res.status(400).json({ error: 'el Peer ID no corresponde a esa clave' });
+  }
+
+  const mensaje = referidos.mensajeInvitacion(invitado, padrino);
+  let firmaOk = false;
+  try {
+    const key = crypto.createPublicKey({
+      key: Buffer.from(signPub, 'base64'),
+      format: 'der',
+      type: 'spki',
+    });
+    firmaOk = crypto.verify(
+      'sha256',
+      Buffer.from(mensaje),
+      { key, dsaEncoding: 'ieee-p1363' },
+      Buffer.from(signature, 'base64'),
+    );
+  } catch {
+    firmaOk = false;
+  }
+  if (!firmaOk) return res.status(400).json({ error: 'firma ECDSA inválida' });
+
+  // Un invitado solo puede tener un padrino, y solo una vez.
+  const previo = referrals.get(invitado);
+  if (previo) {
+    return res.status(409).json({ error: 'ese Peer ID ya tiene padrino', padrino: previo.padrino });
+  }
+
+  const entry = { padrino, at: new Date().toISOString() };
+  referrals.set(invitado, entry);
+
+  const count = invitadosDe(padrino).length;
+  res.json({
+    ok: true,
+    padrino,
+    invitados: count,
+    estatus: referidos.estatusPorInvitados(count).id,
+    puntos: referidos.puntosPorInvitados(count),
+  });
+});
+
+app.get('/api/referrals/ranking', (req, res) => {
+  const tabla = tablaInvitadores()
+    .sort((a, b) => b.count - a.count || a.peerId.localeCompare(b.peerId))
+    .slice(0, 50);
+  res.json({
+    count: tabla.length,
+    ranking: tabla.map((e, i) => ({
+      posicion: i + 1,
+      peerId: e.peerId,
+      invitados: e.count,
+      estatus: referidos.estatusPorInvitados(e.count).id,
+    })),
+  });
+});
+
+app.get('/api/referrals/:peerId', (req, res) => {
+  const peerId = req.params.peerId;
+  if (!referidos.esPeerIdValido(peerId)) {
+    return res.status(400).json({ error: 'Peer ID inválido' });
+  }
+  const count = invitadosDe(peerId).length;
+  const estatus = referidos.estatusPorInvitados(count);
+  res.json({
+    ok: true,
+    peerId,
+    invitados: count,
+    puntos: referidos.puntosPorInvitados(count),
+    estatus: { id: estatus.id, nombre: estatus.nombre, emoji: estatus.emoji },
+    posicion: referidos.posicionEnRanking(peerId, tablaInvitadores()),
+    padrino: referrals.get(peerId)?.padrino || null,
+  });
 });
 
 app.post('/api/mining/voucher', (req, res) => {

@@ -6,6 +6,7 @@ const { spawn } = require('node:child_process');
 const crypto = require('node:crypto');
 const path = require('node:path');
 const WebSocket = require('ws');
+const referidos = require('../lib/referidos');
 
 const PORT = 19876;
 const BASE = `http://127.0.0.1:${PORT}`;
@@ -440,4 +441,141 @@ test('el registro rechaza Peer ID, cartera o firma mal formados', async () => {
 test('consultar una cartera no registrada responde 404', async () => {
   const res = await fetch(`${BASE}/api/wallets/${makePeerId('sin-cartera')}`);
   assert.equal(res.status, 404);
+});
+
+// ── Referidos ────────────────────────────────────────────────────────────────
+
+// Crea una identidad real (clave P-256) y su Peer ID, como hace la app:
+// sha256(SPKI) en base58 con prefijo "wt1". Así el relé puede comprobar que el
+// Peer ID declarado sale de la clave pública.
+function makeIdentity(seed) {
+  const { privateKey, publicKey } = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  const der = publicKey.export({ type: 'spki', format: 'der' });
+  const signPub = der.toString('base64');
+  // Igual que la app: sha256(SPKI) en base58, con prefijo "wt1".
+  const digest = crypto.createHash('sha256').update(der).digest();
+  const peerId = 'wt1' + referidos.base58(digest);
+  return { privateKey, signPub, peerId, seed };
+}
+
+function firmaInvitacion(privateKey, mensaje) {
+  return crypto
+    .sign('sha256', Buffer.from(mensaje), { key: privateKey, dsaEncoding: 'ieee-p1363' })
+    .toString('base64');
+}
+
+async function registrarInvitacion(invitado, padrino, extra = {}) {
+  const mensaje = referidos.mensajeInvitacion(invitado.peerId, padrino);
+  const body = {
+    invitado: invitado.peerId,
+    padrino,
+    signPub: invitado.signPub,
+    signature: firmaInvitacion(invitado.privateKey, mensaje),
+    ...extra,
+  };
+  const res = await fetch(`${BASE}/api/referrals`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  return { res, body };
+}
+
+test('un invitado firmado queda registrado y suma al padrino', async () => {
+  const padrino = makeIdentity('padrino-1').peerId;
+  const invitado = makeIdentity('invitado-1');
+
+  const { res } = await registrarInvitacion(invitado, padrino);
+  assert.equal(res.status, 200);
+  const data = await res.json();
+  assert.equal(data.ok, true);
+  assert.equal(data.padrino, padrino);
+  assert.equal(data.invitados, 1);
+  assert.equal(data.estatus, 'recluta');
+  assert.equal(data.puntos, referidos.PUNTOS_POR_INVITADO);
+
+  const consulta = await fetch(`${BASE}/api/referrals/${padrino}`);
+  const info = await consulta.json();
+  assert.equal(info.invitados, 1);
+  assert.equal(info.estatus.id, 'recluta');
+  assert.equal(info.posicion, 1);
+});
+
+test('el relé rechaza una firma que no es del invitado', async () => {
+  const padrino = makeIdentity('padrino-2').peerId;
+  const invitado = makeIdentity('invitado-2');
+  const ajeno = makeIdentity('ajeno-2');
+
+  // Firma correcta en forma, pero hecha por otra clave.
+  const mensaje = referidos.mensajeInvitacion(invitado.peerId, padrino);
+  const res = await fetch(`${BASE}/api/referrals`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      invitado: invitado.peerId,
+      padrino,
+      signPub: invitado.signPub,
+      signature: firmaInvitacion(ajeno.privateKey, mensaje),
+    }),
+  });
+  assert.equal(res.status, 400);
+});
+
+test('el relé rechaza un Peer ID que no sale de la clave pública', async () => {
+  const padrino = makeIdentity('padrino-3').peerId;
+  const invitado = makeIdentity('invitado-3');
+
+  // Clave válida, pero declarando el Peer ID de otra persona.
+  const otro = makeIdentity('otro-3');
+  const mensaje = referidos.mensajeInvitacion(otro.peerId, padrino);
+  const res = await fetch(`${BASE}/api/referrals`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      invitado: otro.peerId,
+      padrino,
+      signPub: invitado.signPub,
+      signature: firmaInvitacion(invitado.privateKey, mensaje),
+    }),
+  });
+  assert.equal(res.status, 400);
+});
+
+test('nadie puede invitarse a sí mismo', async () => {
+  const yo = makeIdentity('solo-1');
+  const { res } = await registrarInvitacion(yo, yo.peerId);
+  assert.equal(res.status, 400);
+});
+
+test('un invitado solo puede tener un padrino', async () => {
+  const padrinoA = makeIdentity('padrino-4a').peerId;
+  const padrinoB = makeIdentity('padrino-4b').peerId;
+  const invitado = makeIdentity('invitado-4');
+
+  const primera = await registrarInvitacion(invitado, padrinoA);
+  assert.equal(primera.res.status, 200);
+
+  const segunda = await registrarInvitacion(invitado, padrinoB);
+  assert.equal(segunda.res.status, 409);
+});
+
+test('el ranking ordena por invitados', async () => {
+  const padrinoTop = makeIdentity('padrino-top').peerId;
+  const padrinoBajo = makeIdentity('padrino-bajo').peerId;
+
+  await registrarInvitacion(makeIdentity('top-i1'), padrinoTop);
+  await registrarInvitacion(makeIdentity('top-i2'), padrinoTop);
+  await registrarInvitacion(makeIdentity('bajo-i1'), padrinoBajo);
+
+  const res = await fetch(`${BASE}/api/referrals/ranking`);
+  const data = await res.json();
+  const posTop = data.ranking.find((e) => e.peerId === padrinoTop);
+  const posBajo = data.ranking.find((e) => e.peerId === padrinoBajo);
+  assert.equal(posTop.invitados, 2);
+  assert.ok(posTop.posicion < posBajo.posicion);
+});
+
+test('consultar un Peer ID inválido responde 400', async () => {
+  const res = await fetch(`${BASE}/api/referrals/no-es-peer`);
+  assert.equal(res.status, 400);
 });
