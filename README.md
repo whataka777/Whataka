@@ -7,6 +7,10 @@ presencia de los nodos, pero nunca ve el texto en claro.
 - App: <https://whataka777.github.io/Whataka/>
 - Relé: `https://whataka-relay.onrender.com`
 
+> 📄 ¿Vas a lanzar el proyecto en Polygon real? Lee
+> [`docs/PLAN-LANZAMIENTO.md`](docs/PLAN-LANZAMIENTO.md): pasos, costes y
+> cuánto dinero hace falta.
+
 ## Qué incluye
 
 | Capa | Archivo | Qué hace |
@@ -97,8 +101,9 @@ cualquier nodo sin recompilar. Sin parámetro se usa el relé de Render.
   se difunden por GossipSub real.
 - Las llamadas de voz muestran el canal de señalización; el audio WebRTC directo
   está pendiente.
-- Las recompensas WTK del reporte son una puntuación del relé, no un contrato
-  desplegado: no hay cadena ni token on-chain todavía.
+- Las recompensas WTK ya son on-chain: el relé firma un vale y el contrato
+  `WhaTakaTTC` paga WTK en Polygon Amoy. El lanzamiento en Polygon real (137)
+  está planificado en [`docs/PLAN-LANZAMIENTO.md`](docs/PLAN-LANZAMIENTO.md).
 
 ## Licencia
 
