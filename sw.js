@@ -1,4 +1,4 @@
-const CACHE = 'whataka-v39';
+const CACHE = 'whataka-v40';
 const ASSETS = [
   './',
   './index.html',
