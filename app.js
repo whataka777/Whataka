@@ -33,6 +33,7 @@ const STORE = {
   wallet: 'whataka.wallet',
   wc: 'whataka.wcProjectId',
   calls: 'whataka.calls',
+  nivel: 'whataka.nivel',
 };
 
 // Pesos de minería: idénticos a los del contrato WhaTakaMiningRewards.
@@ -1001,6 +1002,68 @@ function renderMining() {
     badge.className = 'badge-live off';
     badge.textContent = '● RELÉ DESCONECTADO';
   }
+
+  renderNivel();
+}
+
+// ─────────────────────────────────────────────────────────────
+// Niveles de estatus
+// ─────────────────────────────────────────────────────────────
+
+// Puntos del usuario: los que ha acumulado pagando o usando la app.
+function puntosNivel() {
+  return Number(readStore(STORE.nivel, 0)) || 0;
+}
+
+function sumarPuntos(extra) {
+  const total = puntosNivel() + Math.max(0, Number(extra) || 0);
+  writeStore(STORE.nivel, total);
+  renderNivel();
+  return total;
+}
+
+function renderNivel() {
+  const api = window.WhaTakaNiveles;
+  const badge = $('#nivel-badge');
+  if (!api || !badge) return;
+  const p = api.progreso(puntosNivel());
+  badge.textContent = `${p.actual.emoji} ${p.actual.nombre}`;
+  badge.style.color = p.actual.color;
+  const texto = $('#nivel-progreso-texto');
+  if (texto) {
+    texto.textContent = p.siguiente
+      ? `${puntosNivel()} puntos · ${p.faltan} para ${p.siguiente.nombre}`
+      : `${puntosNivel()} puntos · nivel máximo`;
+  }
+  const barra = $('#nivel-progreso-barra');
+  if (barra) barra.style.width = `${p.porcentaje}%`;
+}
+
+function verNiveles() {
+  const api = window.WhaTakaNiveles;
+  if (!api) return;
+  const puntos = puntosNivel();
+  const actual = api.nivelDe(puntos).id;
+  const filas = api.todosLosNiveles().map((n) => {
+    const activo = n.id === actual ? ' · ← estás aquí' : '';
+    const beneficios = n.beneficios.map((b) => `· ${b}`).join('<br>');
+    const precio = n.precioUsd === 0 ? 'Gratis' : `${n.precioUsd} $ (pago único)`;
+    return `
+      <div style="border-left:4px solid ${n.color}; padding:8px 12px; margin:8px 0; background:rgba(255,255,255,.05); border-radius:6px;">
+        <strong style="color:${n.color}">${n.emoji} ${n.nombre}${activo}</strong>
+        <div style="font-size:12px; opacity:.85; margin:4px 0;">${n.puntos} puntos · ${precio}</div>
+        <div style="font-size:13px;">${beneficios}</div>
+      </div>`;
+  }).join('');
+  openModal('Niveles WhaTaka', `
+    <p style="font-size:13px; opacity:.85; margin-bottom:8px;">
+      Sube de nivel con un pago único. Con tu dinero se compran WTK y se queman:
+      menos tokens en circulación y más valor para todos.
+    </p>
+    ${filas}
+    <p style="font-size:12px; opacity:.7; margin-top:10px;">
+      Los niveles no son una inversión ni prometen ganancias: son ventajas dentro de la app.
+    </p>`);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -2085,6 +2148,7 @@ function bindEvents() {
   $('#connect-wallet-box').addEventListener('click', connectWallet);
   $('#btn-connect-wallet').addEventListener('click', connectWallet);
   $('#btn-import-tokens').addEventListener('click', importTokens);
+  $('#btn-ver-niveles').addEventListener('click', verNiveles);
   $('#btn-walletconnect').addEventListener('click', askWalletConnect);
   $('#btn-permissions').addEventListener('click', showPermissions);
 }

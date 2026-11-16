@@ -18,6 +18,10 @@ presencia de los nodos, pero nunca ve el texto en claro.
 > 🔥 ¿Pensando en vender acciones o en quemar tokens? Lee
 > [`docs/ACCIONES-Y-QUEMA.md`](docs/ACCIONES-Y-QUEMA.md): por qué lo primero es
 > ilegal y por qué lo segundo (suscripción + quema) es una gran idea.
+>
+> 👑 ¿Cómo funcionan los niveles (Bronce → Diamante)? Lee
+> [`docs/NIVELES.md`](docs/NIVELES.md): la escalera, los precios, las ventajas y
+> cómo cada pago quema tokens.
 
 ## Qué incluye
 
