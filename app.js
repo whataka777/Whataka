@@ -674,8 +674,19 @@ async function repairNetwork(wallet, chainId) {
   }
 }
 
-// Añade los tokens de WhaTaka (BGP777 y WTK) a la wallet conectada. Antes repara
-// la red Amoy para que la wallet lea los tokens por un RPC que funciona.
+// El WTK está anclado al dólar (USDT) en el pool, así que ese es el token que
+// tiene sentido tener en la wallet junto al WTK. El USDT oficial solo existe en
+// las redes reales y usa 6 decimales; en Amoy (testnet) no hay USDT oficial, así
+// que se usa el dólar de prueba del proyecto (TUSD), que es la moneda a la que
+// está anclado el WTK en el pool de ensayo.
+const DOLAR_POR_CADENA = {
+  137: { address: '0xc2132D05D31c914a87C6611C10748AEb04B58e8F', symbol: 'USDT', decimals: 6 },
+  56: { address: '0x55d398326f99059fF775485246999027B3197955', symbol: 'USDT', decimals: 18 },
+  80002: { address: '0x22076F79328CaFaa026d14B8eAfCAb839869A9F6', symbol: 'USDT', decimals: 18 },
+};
+
+// Añade el USDT (el dólar al que está anclado el WTK) a la wallet conectada.
+// Antes repara la red para que la wallet lea el token por un RPC que funciona.
 async function importTokens() {
   let wallet = getWalletProvider();
   if (!wallet) {
@@ -692,17 +703,9 @@ async function importTokens() {
   await repairNetwork(wallet, chainId);
   await ensureChain(wallet, chainId);
 
-  const wtk = cfg && cfg.contract ? cfg.contract : null;
-  const tokens = [
-    { address: '0x325438A3E8F31B21D3b12fD61D8Ed22653F35C61', symbol: 'BGP777' },
-  ];
-  if (wtk) tokens.push({ address: wtk, symbol: 'WTK' });
-  let added = 0;
-  for (const t of tokens) {
-    const ok = await addTokenToWallet(wallet, { ...t, decimals: 18 });
-    if (ok) added++;
-  }
-  toast(added ? 'Tokens añadidos a tu wallet ✅' : 'No se añadió ningún token');
+  const usdt = DOLAR_POR_CADENA[Number(chainId)] || DOLAR_POR_CADENA[80002];
+  const ok = await addTokenToWallet(wallet, usdt);
+  toast(ok ? 'USDT añadido a tu wallet ✅' : 'No se añadió el token');
 }
 
 // ─────────────────────────────────────────────────────────────
