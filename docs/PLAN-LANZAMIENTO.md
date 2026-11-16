@@ -17,7 +17,7 @@ QuickSwap en lugar del pool de prueba.
 
 | Concepto | Cuánto | ¿Se recupera? |
 | --- | --- | --- |
-| Gas de despliegue (WTK + BGP777 + pool) | ~0,35 POL ≈ **0,03 $** | No (es la comisión de la red) |
+| Gas de despliegue (WTK + pool) | ~0,28 POL ≈ **0,02 $** | No (es la comisión de la red) |
 | Liquidez para el mercado | **1.000 – 10.000 USDC** | **Sí, es tuya** |
 | Reserva de POL para gas futuro | ~2 POL ≈ **0,16 $** | No (se gasta poco a poco) |
 | **Total desembolsado** | **desde ~1.000 USDC** | La mayor parte vuelve |
@@ -32,7 +32,6 @@ QuickSwap en lugar del pool de prueba.
 | Pieza | Dirección en Amoy | Estado |
 | --- | --- | --- |
 | Token WTK (minable) | `0x4b0C9d8233DeFa8EcDF28D7a2bAa3EDaa4C8252B` | ✅ Desplegado y congelado |
-| Token BGP777 | `0x325438A3E8F31B21D3b12fD61D8Ed22653F35C61` | ✅ Desplegado |
 | Pool de ensayo WTK/TUSD | `0x732F63C050a2d78F6fD75e1b0394d2e1B703aA95` | ✅ Liquidez de prueba |
 | Config "valiosa" (escasez) | `annualMintCap=0`, `autoMintTopUp=false` | ✅ Aplicada on-chain |
 
@@ -154,9 +153,8 @@ El precio del WTK lo decides tú con el dinero que pongas. Ejemplos (con
 | Operación | Gas | Coste @30 gwei | Coste @275 gwei |
 | --- | --- | --- | --- |
 | Desplegar WTK | 2.191.122 | 0,066 POL (0,005 $) | 0,60 POL (0,05 $) |
-| Desplegar BGP777 | 786.985 | 0,024 POL (0,002 $) | 0,22 POL (0,02 $) |
 | Abrir pool | ~400.000 | 0,012 POL (0,001 $) | 0,11 POL (0,01 $) |
-| **Total gas** | | **~0,10 POL** | **~0,93 POL** |
+| **Total gas** | | **~0,08 POL** | **~0,71 POL** |
 
 **Conclusión:** el gas es despreciable (menos de 0,10 $). El único coste real
 es la liquidez, y esa **sigue siendo tuya**: puedes retirarla cuando quieras.
