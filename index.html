@@ -671,6 +671,50 @@
     .call-row p.missed { color: var(--danger); }
     .call-row .call-action { color: var(--accent); font-size: 18px; background: none; border: none; cursor: pointer; padding: 8px; }
 
+    /* ============ LLAMADAS (audio/vídeo P2P) ============ */
+    .call-overlay {
+      display: none; position: fixed; inset: 0; z-index: 120;
+      background: #0b0b12; color: #fff;
+      flex-direction: column; align-items: center; justify-content: center;
+    }
+    .call-overlay.open { display: flex; }
+    .call-stage { display: flex; flex-direction: column; align-items: center; gap: 10px; z-index: 2; }
+    .call-avatar { background: rgba(255,255,255,.08); }
+    .call-name { font-size: 22px; font-weight: 600; color: #fff; }
+    .call-status { font-size: 14px; color: rgba(255,255,255,.72); }
+    .call-timer { font-size: 15px; color: rgba(255,255,255,.9); font-variant-numeric: tabular-nums; min-height: 18px; }
+    .call-remote-video {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      object-fit: cover; background: #000; z-index: 1;
+    }
+    .call-overlay.has-remote .call-stage { position: absolute; top: 24px; z-index: 3; text-shadow: 0 1px 6px rgba(0,0,0,.7); }
+    .call-overlay.has-remote .call-name, .call-overlay.has-remote .call-status { color: #fff; }
+    .call-local-video {
+      position: absolute; top: 16px; right: 16px; width: 108px; height: 148px;
+      object-fit: cover; border-radius: 12px; background: #000; z-index: 4;
+      box-shadow: 0 4px 18px rgba(0,0,0,.5); display: none;
+    }
+    .call-overlay.local-on .call-local-video { display: block; }
+    .call-actions {
+      position: absolute; bottom: 40px; left: 0; right: 0;
+      display: flex; gap: 22px; justify-content: center; z-index: 5;
+    }
+    .call-incoming {
+      position: absolute; bottom: 40px; left: 0; right: 0;
+      display: flex; gap: 40px; justify-content: center; z-index: 5;
+    }
+    .call-incoming[hidden] { display: none; }
+    .call-btn {
+      width: 62px; height: 62px; border-radius: 50%; border: none; cursor: pointer;
+      background: rgba(255,255,255,.16); color: #fff; font-size: 22px;
+      display: inline-flex; align-items: center; justify-content: center;
+      transition: transform .12s ease, background .12s ease;
+    }
+    .call-btn:active { transform: scale(.92); }
+    .call-btn.off { background: #fff; color: #111; }
+    .call-btn-danger { background: #e5484d; }
+    .call-btn-accept { background: #2ea043; }
+
     /* ============ MODAL ============ */
     .modal-overlay {
       display: none; position: fixed; inset: 0;
@@ -1114,13 +1158,35 @@
       </div>
     </div>
 
+    <!-- OVERLAY DE LLAMADA (audio/vídeo P2P) -->
+    <div id="call-overlay" class="call-overlay">
+      <video id="call-remote-video" class="call-remote-video" playsinline autoplay></video>
+      <div class="call-stage" id="call-stage">
+        <div class="avatar call-avatar" id="call-avatar" style="width:96px;height:96px;font-size:42px"></div>
+        <h3 id="call-name" class="call-name">Contacto</h3>
+        <p id="call-status" class="call-status">Llamando…</p>
+        <p id="call-timer" class="call-timer"></p>
+      </div>
+      <video id="call-local-video" class="call-local-video" playsinline autoplay muted></video>
+      <div class="call-actions">
+        <button id="call-toggle-mute" class="call-btn" title="Silenciar micrófono"><i class="fa-solid fa-microphone"></i></button>
+        <button id="call-toggle-video" class="call-btn" title="Activar/desactivar cámara"><i class="fa-solid fa-video"></i></button>
+        <button id="call-hangup" class="call-btn call-btn-danger" title="Colgar"><i class="fa-solid fa-phone-slash"></i></button>
+      </div>
+      <div class="call-incoming" id="call-incoming" hidden>
+        <button id="call-accept" class="call-btn call-btn-accept" title="Aceptar"><i class="fa-solid fa-phone"></i></button>
+        <button id="call-reject" class="call-btn call-btn-danger" title="Rechazar"><i class="fa-solid fa-phone-slash"></i></button>
+      </div>
+    </div>
+
     <div class="toast" id="toast"></div>
   </div>
 
   <script src="./vendor/ethers.umd.min.js"></script>
-  <script src="./lib/niveles.js?v=10"></script>
-  <script src="./lib/donaciones.js?v=10"></script>
-  <script src="./lib/stickers.js?v=10"></script>
-  <script src="./app.js?v=10"></script>
+  <script src="./lib/niveles.js?v=11"></script>
+  <script src="./lib/donaciones.js?v=11"></script>
+  <script src="./lib/stickers.js?v=11"></script>
+  <script src="./lib/llamadas.js?v=11"></script>
+  <script src="./app.js?v=11"></script>
 </body>
 </html>

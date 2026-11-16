@@ -718,6 +718,36 @@ function toast(msg) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
 }
 
+// Timbre de llamada entrante, generado con WebAudio (sin archivos externos).
+let ringCtx = null;
+let ringTimer = null;
+function ringtone() {
+  stopRingtone();
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    ringCtx = ringCtx || new AC();
+    const sonar = () => {
+      const osc = ringCtx.createOscillator();
+      const gain = ringCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = 660;
+      gain.gain.setValueAtTime(0.0001, ringCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.18, ringCtx.currentTime + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ringCtx.currentTime + 0.5);
+      osc.connect(gain).connect(ringCtx.destination);
+      osc.start();
+      osc.stop(ringCtx.currentTime + 0.55);
+    };
+    sonar();
+    ringTimer = setInterval(sonar, 1600);
+  } catch {}
+}
+function stopRingtone() {
+  if (ringTimer) clearInterval(ringTimer);
+  ringTimer = null;
+}
+
 function openModal(title, html) {
   // Agranda el emoji inicial del titulo (p. ej. "🤲🏽") sin tocar el resto.
   const el = $('#modal-title');
@@ -902,7 +932,7 @@ function renderStatus() {
     </div>`).join('');
 }
 
-// Registro local de llamadas (solo diseño: refleja el historial P2P).
+// Historial de llamadas (se guarda al iniciar cada llamada o videollamada).
 function renderCalls() {
   const list = $('#calls-list');
   if (!list) return;
@@ -1342,6 +1372,10 @@ function handleRelayMessage(msg) {
     }
     case 'msg': {
       receiveMessage(msg).catch((err) => console.warn('Mensaje ilegible', err));
+      break;
+    }
+    case 'call': {
+      recibirSenal(msg).catch((err) => console.warn('Señal de llamada ilegible', err));
       break;
     }
     default:
@@ -2045,22 +2079,373 @@ function askStatus() {
 }
 
 function voiceCall(video = false) {
-  const peerId = state.activePeer;
+  iniciarLlamada(video);
+}
+
+// ─────────────────────────────────────────────────────────────
+// LLAMADAS P2P (WebRTC): audio y vídeo directos entre pares.
+// El relé solo intercambia la negociación (offer/answer/ICE); el
+// audio y el vídeo viajan cifrados (DTLS-SRTP) entre los dos.
+// ─────────────────────────────────────────────────────────────
+const LL = window.WhaTakaLlamadas;
+const call = {
+  maquina: LL ? LL.crear() : null,
+  pc: null,
+  localStream: null,
+  remoteStream: null,
+  timer: null,
+  esperandoRespuesta: null, // temporizador de "sin respuesta"
+  video: false,
+  esLlamante: false,
+  muteado: false,
+  camaraApagada: false,
+  mediosListos: false, // llegó al menos una pista remota
+  descripcionRemota: false, // ya aplicamos offer/answer
+};
+
+const CALL_RING_SECONDS = 45;
+const RTC_CONFIG = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+  ],
+};
+
+// Pide al relé los servidores ICE (incluye TURN si está configurado). Si falla,
+// se usan los STUN de arriba.
+async function cargarIceServers() {
+  try {
+    const res = await fetch(`${RELAY_HTTP}/api/ice`, { cache: 'no-store' });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && Array.isArray(data.iceServers) && data.iceServers.length) {
+      RTC_CONFIG.iceServers = data.iceServers;
+    }
+  } catch {}
+}
+
+function callEl(id) { return document.getElementById(id); }
+
+function mostrarOverlayLlamada(mostrar) {
+  const o = callEl('call-overlay');
+  if (!o) return;
+  o.classList.toggle('open', mostrar);
+}
+
+function pintaCabeceraLlamada(peerId) {
   const peer = (peerId && state.peers[peerId]) || {};
-  const name = peer.name || (peerId ? `Peer ${shortPeer(peerId, 8, 4)}` : 'tu contacto');
-  const kind = video ? 'Videollamada P2P' : 'Llamada P2P';
+  const name = peer.name || (peerId ? `Peer ${shortPeer(peerId, 8, 4)}` : 'Contacto');
+  const av = callEl('call-avatar');
+  if (av) av.innerHTML = avatarInner(peer.photo);
+  const n = callEl('call-name');
+  if (n) n.textContent = name;
+}
+
+function setEstadoLlamada(texto) {
+  const s = callEl('call-status');
+  if (s) s.textContent = texto;
+}
+
+function arrancaTimerLlamada() {
+  paraTimerLlamada();
+  call.timer = setInterval(() => {
+    const t = callEl('call-timer');
+    if (t && call.maquina) t.textContent = LL.formatearDuracion(call.maquina.duracion());
+  }, 1000);
+}
+
+function paraTimerLlamada() {
+  if (call.timer) clearInterval(call.timer);
+  call.timer = null;
+  const t = callEl('call-timer');
+  if (t) t.textContent = '';
+}
+
+async function pedirMedios(video) {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    throw new Error('Tu navegador no permite usar cámara ni micrófono aquí. Abre la app en una pestaña normal (no incrustada) y por HTTPS.');
+  }
+  const constraints = video
+    ? { audio: true, video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } }
+    : { audio: true, video: false };
+  return navigator.mediaDevices.getUserMedia(constraints);
+}
+
+function pintaVideoLocal() {
+  const lv = callEl('call-local-video');
+  const o = callEl('call-overlay');
+  if (lv && call.localStream) {
+    lv.srcObject = call.localStream;
+    if (o) o.classList.toggle('local-on', call.video);
+  }
+}
+
+function enviaSenal(kind, payload) {
+  if (!call.maquina || !call.maquina.peer) return;
+  sendRaw({
+    t: 'call',
+    to: call.maquina.peer,
+    callId: call.maquina.callId,
+    kind,
+    video: call.video,
+    payload: payload || null,
+  });
+}
+
+function creaPeerConnection(peerId) {
+  const pc = new RTCPeerConnection(RTC_CONFIG);
+  pc.onicecandidate = (e) => {
+    if (e.candidate) enviaSenal('ice', { candidate: e.candidate.toJSON ? e.candidate.toJSON() : e.candidate });
+  };
+  pc.ontrack = (e) => {
+    call.remoteStream = e.streams[0];
+    const rv = callEl('call-remote-video');
+    const o = callEl('call-overlay');
+    if (rv) {
+      rv.srcObject = call.remoteStream;
+      if (o) o.classList.toggle('has-remote', call.video);
+    }
+    call.mediosListos = true;
+    quizasActivarLlamada();
+  };
+  pc.onconnectionstatechange = () => {
+    if (pc.connectionState === 'failed') terminaLlamada('sin_conexion', 'No se pudo conectar la llamada');
+    if (pc.connectionState === 'disconnected' || pc.connectionState === 'closed') {
+      if (call.maquina && call.maquina.estado === 'activa') terminaLlamada('terminada', 'Llamada finalizada');
+    }
+  };
+  if (call.localStream) {
+    call.localStream.getTracks().forEach((t) => pc.addTrack(t, call.localStream));
+  }
+  call.pc = pc;
+  return pc;
+}
+
+async function iniciarLlamada(video) {
+  const peerId = state.activePeer;
+  if (!peerId) { toast('Abre un chat para llamar a alguien'); return; }
+  if (!state.connected) { toast('Sin conexión con el relé'); return; }
+  if (call.maquina && !call.maquina.terminada && call.maquina.estado !== 'inactiva') {
+    toast('Ya hay una llamada en curso');
+    return;
+  }
+  const online = state.online.has(peerId);
+  if (!online) { toast('El contacto no está en línea'); }
+
+  try {
+    call.localStream = await pedirMedios(video);
+  } catch (err) {
+    toast(err.message || 'No se pudo acceder al micrófono/cámara');
+    return;
+  }
+
+  call.maquina = LL.crear();
+  call.video = !!video;
+  call.esLlamante = true;
+  call.muteado = false;
+  call.camaraApagada = false;
+  call.mediosListos = false;
+  call.descripcionRemota = false;
+  call.maquina.iniciar({ callId: LL.nuevoCallId(), peer: peerId, video });
   if (peerId) logCall(peerId, video);
-  openModal(kind, `
-    <div style="text-align:center;padding:6px 0 2px">
-      <div class="avatar purple-bg" style="width:74px;height:74px;font-size:32px;margin:0 auto 12px">${avatarInner(peer.photo)}</div>
-      <h4 style="font-size:17px;color:var(--text-strong);font-weight:500">${escapeHtml(name)}</h4>
-      <p style="color:var(--text-muted);font-size:13px;margin-top:4px">
-        ${video ? '<i class="fa-solid fa-video"></i> ' : '<i class="fa-solid fa-phone"></i> '}cifrado de extremo a extremo
-      </p>
-    </div>
-    <p>Las llamadas P2P cifradas necesitan el canal de señalización WebRTC.</p>
-    <p>Esta versión incluye el transporte y el cifrado de mensajes; la capa de audio y vídeo se conecta al mismo relé.</p>
-    <p class="hint-text">Próximamente: audio y vídeo directos entre pares.</p>`);
+
+  pintaCabeceraLlamada(peerId);
+  mostrarOverlayLlamada(true);
+  const o = callEl('call-overlay');
+  if (o) o.classList.remove('has-remote');
+  setEstadoLlamada(video ? 'Videollamada… llamando' : 'Llamando…');
+  pintaVideoLocal();
+  sincronizaBotonesLlamada();
+
+  const pc = creaPeerConnection(peerId);
+  const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: video });
+  await pc.setLocalDescription(offer);
+  enviaSenal('offer', { sdp: pc.localDescription });
+
+  call.esperandoRespuesta = setTimeout(() => {
+    if (call.maquina && call.maquina.estado === 'llamando') {
+      terminaLlamada('sin_conexion', 'El contacto no contestó');
+    }
+  }, CALL_RING_SECONDS * 1000);
+}
+
+async function aceptarLlamada() {
+  if (!call.maquina || call.maquina.estado !== 'sonando') return;
+  try {
+    call.localStream = await pedirMedios(call.video);
+  } catch (err) {
+    enviaSenal('reject', { motivo: 'sin_permiso' });
+    terminaLlamada('terminada', err.message || 'No se pudo acceder al micrófono/cámara');
+    return;
+  }
+  call.maquina.aceptar();
+  call.esLlamante = false;
+  callEl('call-incoming').hidden = true;
+  setEstadoLlamada('Conectando…');
+  pintaVideoLocal();
+  sincronizaBotonesLlamada();
+
+  const pc = creaPeerConnection(call.maquina.peer);
+  // La oferta ya la guardamos al recibirla.
+  if (call._offerSdp) {
+    await pc.setRemoteDescription(new RTCSessionDescription(call._offerSdp));
+    call.descripcionRemota = true;
+  }
+  const answer = await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+  enviaSenal('answer', { sdp: pc.localDescription });
+  quizasActivarLlamada();
+}
+
+function rechazarLlamada() {
+  enviaSenal('reject', {});
+  terminaLlamada('rechazada', 'Llamada rechazada');
+}
+
+function colgarLlamada() {
+  enviaSenal('hangup', {});
+  terminaLlamada('terminada', 'Llamada finalizada');
+}
+
+async function recibirSenal(msg) {
+  const kind = msg.kind;
+  if (kind === 'offer') {
+    // Si ya hay una llamada activa, avisamos de que está ocupado.
+    if (call.maquina && !call.maquina.terminada && call.maquina.estado !== 'inactiva') {
+      sendRaw({ t: 'call', to: msg.from, callId: msg.callId, kind: 'busy' });
+      return;
+    }
+    call.maquina = LL.crear();
+    call.video = !!msg.video;
+    call.esLlamante = false;
+    call.muteado = false;
+    call.camaraApagada = false;
+    call.mediosListos = false;
+    call.descripcionRemota = false;
+    call._offerSdp = msg.payload && msg.payload.sdp;
+    call.maquina.recibir({ callId: msg.callId, peer: msg.from, video: msg.video });
+    pintaCabeceraLlamada(msg.from);
+    mostrarOverlayLlamada(true);
+    const o = callEl('call-overlay');
+    if (o) o.classList.remove('has-remote', 'local-on');
+    setEstadoLlamada(msg.video ? 'Videollamada entrante' : 'Llamada entrante');
+    const inc = callEl('call-incoming');
+    if (inc) inc.hidden = false;
+    const acc = callEl('call-actions');
+    if (acc) acc.style.display = 'none';
+    // Sonido de timbre (si el navegador lo permite).
+    if (typeof ringtone === 'function') ringtone();
+    return;
+  }
+  if (kind === 'answer') {
+    if (!call.pc || !call.maquina) return;
+    await call.pc.setRemoteDescription(new RTCSessionDescription(msg.payload.sdp));
+    call.descripcionRemota = true;
+    call.maquina.conectar();
+    setEstadoLlamada('Conectando…');
+    quizasActivarLlamada();
+    return;
+  }
+  if (kind === 'ice') {
+    if (!call.pc || !msg.payload || !msg.payload.candidate) return;
+    try { await call.pc.addIceCandidate(new RTCIceCandidate(msg.payload.candidate)); } catch {}
+    return;
+  }
+  if (kind === 'reject') { terminaLlamada('rechazada', 'El contacto rechazó la llamada'); return; }
+  if (kind === 'busy') { terminaLlamada('rechazada', 'El contacto está en otra llamada'); return; }
+  if (kind === 'hangup') { terminaLlamada('terminada', 'El contacto colgó'); return; }
+  if (kind === 'offline') { terminaLlamada('sin_conexion', 'El contacto no está en línea'); return; }
+}
+
+function activarLlamada() {
+  if (!call.maquina || call.maquina.estado === 'activa') return;
+  if (call.esperandoRespuesta) { clearTimeout(call.esperandoRespuesta); call.esperandoRespuesta = null; }
+  try { call.maquina.activar(); } catch { return; }
+  setEstadoLlamada('En llamada');
+  arrancaTimerLlamada();
+  sincronizaBotonesLlamada();
+}
+
+// La llamada se da por "activa" solo cuando ya se aplicó la descripción remota
+// y llegó audio/vídeo. Así da igual el orden en que pasen ambas cosas.
+function quizasActivarLlamada() {
+  if (!call.maquina || call.maquina.estado === 'activa') return;
+  if (call.maquina.estado !== 'conectando') return;
+  if (call.descripcionRemota && call.mediosListos) activarLlamada();
+}
+
+function sincronizaBotonesLlamada() {
+  const mute = callEl('call-toggle-mute');
+  if (mute) {
+    mute.classList.toggle('off', call.muteado);
+    const i = mute.querySelector('i');
+    if (i) i.className = call.muteado ? 'fa-solid fa-microphone-slash' : 'fa-solid fa-microphone';
+  }
+  const vid = callEl('call-toggle-video');
+  if (vid) {
+    vid.classList.toggle('off', call.camaraApagada);
+    const i = vid.querySelector('i');
+    if (i) i.className = call.camaraApagada ? 'fa-solid fa-video-slash' : 'fa-solid fa-video';
+    vid.style.display = call.video ? '' : 'none';
+  }
+  const acc = callEl('call-actions');
+  if (acc && (!call.maquina || call.maquina.estado !== 'sonando')) acc.style.display = '';
+}
+
+function terminaLlamada(motivo, aviso) {
+  if (call.esperandoRespuesta) { clearTimeout(call.esperandoRespuesta); call.esperandoRespuesta = null; }
+  paraTimerLlamada();
+  try {
+    if (call.maquina && !call.maquina.terminada) {
+      if (motivo === 'rechazada') call.maquina.rechazar();
+      else if (motivo === 'sin_conexion') call.maquina.sinConexion();
+      else call.maquina.colgar();
+    }
+  } catch {}
+  if (call.pc) {
+    try { call.pc.getSenders().forEach((s) => s.track && s.track.stop && s.track.stop()); } catch {}
+    try { call.pc.close(); } catch {}
+  }
+  call.pc = null;
+  if (call.localStream) {
+    call.localStream.getTracks().forEach((t) => t.stop());
+    call.localStream = null;
+  }
+  call.remoteStream = null;
+  call._offerSdp = null;
+  call.mediosListos = false;
+  call.descripcionRemota = false;
+  const rv = callEl('call-remote-video'); if (rv) rv.srcObject = null;
+  const lv = callEl('call-local-video'); if (lv) lv.srcObject = null;
+  const inc = callEl('call-incoming'); if (inc) inc.hidden = true;
+  const o = callEl('call-overlay'); if (o) o.classList.remove('has-remote', 'local-on');
+  mostrarOverlayLlamada(false);
+  if (typeof stopRingtone === 'function') stopRingtone();
+  if (aviso) toast(aviso);
+  call.maquina = LL ? LL.crear() : null;
+}
+
+function alternarMute() {
+  if (!call.localStream) return;
+  call.muteado = !call.muteado;
+  call.localStream.getAudioTracks().forEach((t) => { t.enabled = !call.muteado; });
+  sincronizaBotonesLlamada();
+}
+
+function alternarCamara() {
+  if (!call.localStream || !call.video) return;
+  call.camaraApagada = !call.camaraApagada;
+  call.localStream.getVideoTracks().forEach((t) => { t.enabled = !call.camaraApagada; });
+  sincronizaBotonesLlamada();
+}
+
+function conectarBotonesLlamada() {
+  const q = (id) => document.getElementById(id);
+  if (q('call-hangup')) q('call-hangup').addEventListener('click', colgarLlamada);
+  if (q('call-accept')) q('call-accept').addEventListener('click', aceptarLlamada);
+  if (q('call-reject')) q('call-reject').addEventListener('click', rechazarLlamada);
+  if (q('call-toggle-mute')) q('call-toggle-mute').addEventListener('click', alternarMute);
+  if (q('call-toggle-video')) q('call-toggle-video').addEventListener('click', alternarCamara);
 }
 
 async function sendMiningReport() {
@@ -2321,6 +2706,7 @@ function bindEvents() {
   $('#btn-add-status').addEventListener('click', askStatus);
   $('#btn-voice-call').addEventListener('click', () => voiceCall(false));
   $('#btn-video-call').addEventListener('click', () => voiceCall(true));
+  conectarBotonesLlamada();
   $('#btn-verify-keys').addEventListener('click', showPeerSecurity);
   $('#btn-peer-security').addEventListener('click', showPeerSecurity);
   $('#btn-back-chats').addEventListener('click', () => {
@@ -2377,6 +2763,7 @@ async function boot() {
 
   connect();
   setInterval(renderMining, 30000);
+  cargarIceServers();
 
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
     navigator.serviceWorker.register('./sw.js').catch((err) => console.warn('SW', err));

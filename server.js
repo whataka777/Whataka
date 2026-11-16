@@ -86,6 +86,24 @@ app.get('/api/peers', (req, res) => {
   res.json({ count: peers.size, peers: peerList().map(({ id, name, connections }) => ({ id, name, connections })) });
 });
 
+// Servidores ICE para las llamadas. STUN basta en la mayoría de redes; con
+// TURN (redes móviles o NAT estricto) se configura por variables de entorno,
+// sin tocar el código. El navegador pide esta lista al iniciar una llamada.
+app.get('/api/ice', (req, res) => {
+  const stun = (process.env.ICE_STUN_URLS || 'stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302')
+    .split(',').map((s) => s.trim()).filter(Boolean);
+  const iceServers = [{ urls: stun }];
+  const turnUrl = (process.env.ICE_TURN_URL || '').trim();
+  if (turnUrl) {
+    iceServers.push({
+      urls: turnUrl.split(',').map((s) => s.trim()).filter(Boolean),
+      username: process.env.ICE_TURN_USERNAME || undefined,
+      credential: process.env.ICE_TURN_CREDENTIAL || undefined,
+    });
+  }
+  res.json({ iceServers });
+});
+
 app.post('/api/mining/report', (req, res) => {
   const body = req.body || {};
   const { peerId, signPub, signature, nonce } = body;
@@ -359,6 +377,29 @@ wss.on('connection', (socket) => {
         });
         for (const s of target.sockets) {
           if (s.readyState === 1) s.send(envelope);
+        }
+        break;
+      }
+      // Señalización de llamadas WebRTC. El relé NO ve el audio ni el vídeo
+      // (van directos entre pares, cifrados con DTLS-SRTP); aquí solo se
+      // reenvían los mensajes de negociación (offer/answer/ICE).
+      case 'call': {
+        if (!socket.peerId) return;
+        const target = peers.get(msg.to);
+        if (!target || !target.sockets.size) {
+          socket.send(JSON.stringify({ t: 'call', to: msg.to, kind: 'offline', callId: msg.callId }));
+          return;
+        }
+        const frame = JSON.stringify({
+          t: 'call',
+          from: socket.peerId,
+          callId: typeof msg.callId === 'string' ? msg.callId.slice(0, 64) : '',
+          kind: String(msg.kind || '').slice(0, 16),
+          video: !!msg.video,
+          payload: msg.payload && typeof msg.payload === 'object' ? msg.payload : null,
+        });
+        for (const s of target.sockets) {
+          if (s.readyState === 1) s.send(frame);
         }
         break;
       }

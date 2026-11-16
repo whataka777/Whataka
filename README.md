@@ -135,8 +135,11 @@ cualquier nodo sin recompilar. Sin parámetro se usa el relé de Render.
 
 - Los estados se guardan en el dispositivo y se comparten con la red; todavía no
   se difunden por GossipSub real.
-- Las llamadas de voz muestran el canal de señalización; el audio WebRTC directo
-  está pendiente.
+- Las llamadas y videollamadas son P2P reales con WebRTC: el audio y el vídeo
+  van cifrados (DTLS-SRTP) directos entre los dos, y el relé solo reenvía la
+  negociación (offer/answer/ICE). Necesitan permiso de micrófono/cámara y, en
+  redes móviles o NAT estricto, un servidor TURN (se configura con las variables
+  `ICE_TURN_URL`, `ICE_TURN_USERNAME` e `ICE_TURN_CREDENTIAL`; ver `/api/ice`).
 - Las recompensas WTK ya son on-chain: el relé firma un vale y el contrato
   `WhaTakaTTC` paga WTK en Polygon Amoy. El lanzamiento en Polygon real (137)
   está planificado en [`docs/PLAN-LANZAMIENTO.md`](docs/PLAN-LANZAMIENTO.md).
