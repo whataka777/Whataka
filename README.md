@@ -38,6 +38,10 @@ presencia de los nodos, pero nunca ve el texto en claro.
 > 🚨 ¿Donar USDT → cambiar a WTK → donar → cambiar a USDT y retirar? Lee
 > [`docs/FLUJO-DONACIONES-Y-CAMBIOS.md`](docs/FLUJO-DONACIONES-Y-CAMBIOS.md): los
 > cambios y el retiro son pasos regulados, y el flujo entero parece blanqueo.
+>
+> 💶 ¿Cobrar una comisión por mantener la app como "donación al creador"? Lee
+> [`docs/COMISION-MANTENIMIENTO.md`](docs/COMISION-MANTENIMIENTO.md): cobrar es
+> legal, pero una cuota obligatoria NO es una donación. No mezcles las dos.
 
 ## Qué incluye
 
