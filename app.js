@@ -608,109 +608,6 @@ async function ensureChain(wallet, chainId) {
   }
 }
 
-// Pide a la wallet que muestre un token en su lista (watchAsset). Si el token ya
-// está añadido, la wallet lo ignora sin error. Devuelve true si lo aceptó.
-async function addTokenToWallet(wallet, { address, symbol, decimals }) {
-  try {
-    return await wallet.request({
-      method: 'wallet_watchAsset',
-      params: {
-        type: 'ERC20',
-        options: { address, symbol, decimals: decimals ?? 18 },
-      },
-    });
-  } catch (err) {
-    if (err && err.code === 4001) return false; // el usuario canceló
-    console.warn('watchAsset', err);
-    return false;
-  }
-}
-
-// Comprueba qué RPC de la lista responde de verdad y devuelve el primero válido.
-// Así evitamos configurar la wallet con un RPC caído.
-async function pickWorkingRpc(rpcs) {
-  for (const url of rpcs) {
-    try {
-      const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 6000);
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_chainId', params: [] }),
-        signal: ctrl.signal,
-      });
-      clearTimeout(t);
-      const j = await res.json();
-      if (j && j.result) return url;
-    } catch {
-      /* probamos el siguiente */
-    }
-  }
-  return null;
-}
-
-// Repara la red en la wallet: si "Polygon Amoy" ya existe apuntando a un RPC
-// muerto (el caso habitual), wallet_addEthereumChain con los mismos datos y otro
-// rpcUrls hace que MetaMask ofrezca actualizarla. También la añade si no existe.
-async function repairNetwork(wallet, chainId) {
-  const meta = KNOWN_CHAINS[Number(chainId)];
-  if (!meta) return true;
-  const hex = '0x' + Number(chainId).toString(16);
-  const rpcs = meta.rpcs || [meta.rpc];
-  const working = (await pickWorkingRpc(rpcs)) || meta.rpc;
-  try {
-    await wallet.request({
-      method: 'wallet_addEthereumChain',
-      params: [{
-        chainId: hex,
-        chainName: meta.name,
-        nativeCurrency: { name: meta.symbol, symbol: meta.symbol, decimals: 18 },
-        rpcUrls: [working, ...rpcs.filter((u) => u !== working)],
-        blockExplorerUrls: [meta.explorer],
-      }],
-    });
-    return true;
-  } catch (err) {
-    if (err && err.code === 4001) return false; // el usuario canceló
-    console.warn('repairNetwork', err);
-    return false;
-  }
-}
-
-// El WTK está anclado al dólar (USDT) en el pool, así que ese es el token que
-// tiene sentido tener en la wallet junto al WTK. El USDT oficial solo existe en
-// las redes reales y usa 6 decimales; en Amoy (testnet) no hay USDT oficial, así
-// que se usa el dólar de prueba del proyecto (TUSD), que es la moneda a la que
-// está anclado el WTK en el pool de ensayo.
-const DOLAR_POR_CADENA = {
-  137: { address: '0xc2132D05D31c914a87C6611C10748AEb04B58e8F', symbol: 'USDT', decimals: 6 },
-  56: { address: '0x55d398326f99059fF775485246999027B3197955', symbol: 'USDT', decimals: 18 },
-  80002: { address: '0x22076F79328CaFaa026d14B8eAfCAb839869A9F6', symbol: 'USDT', decimals: 18 },
-};
-
-// Añade el USDT (el dólar al que está anclado el WTK) a la wallet conectada.
-// Antes repara la red para que la wallet lea el token por un RPC que funciona.
-async function importTokens() {
-  let wallet = getWalletProvider();
-  if (!wallet) {
-    const addr = await connectWallet();
-    if (!addr) return;
-    wallet = getWalletProvider();
-  }
-  if (!wallet) {
-    toast('Conecta una wallet primero');
-    return;
-  }
-  const cfg = await loadMiningConfig();
-  const chainId = cfg ? cfg.chainId : 80002;
-  await repairNetwork(wallet, chainId);
-  await ensureChain(wallet, chainId);
-
-  const usdt = DOLAR_POR_CADENA[Number(chainId)] || DOLAR_POR_CADENA[80002];
-  const ok = await addTokenToWallet(wallet, usdt);
-  toast(ok ? 'USDT añadido a tu wallet ✅' : 'No se añadió el token');
-}
-
 // ─────────────────────────────────────────────────────────────
 // Interfaz
 // ─────────────────────────────────────────────────────────────
@@ -2925,7 +2822,6 @@ function bindEvents() {
   $('#btn-send-report').addEventListener('click', sendMiningReport);
   $('#connect-wallet-box').addEventListener('click', connectWallet);
   $('#btn-connect-wallet').addEventListener('click', connectWallet);
-  $('#btn-import-tokens').addEventListener('click', importTokens);
   $('#btn-ver-niveles').addEventListener('click', verNiveles);
   $('#btn-sala').addEventListener('click', abrirSala);
   $('#btn-sala-mining').addEventListener('click', abrirSala);
