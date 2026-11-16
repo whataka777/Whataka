@@ -846,7 +846,7 @@ function renderBubbleContent(m) {
     case 'video':
       return `<div class="bubble-media"><video controls preload="metadata" style="width:100%;display:block" src="${escapeHtml(m.data)}"></video></div>${cap}`;
     case 'sticker':
-      return `<span class="bubble-sticker">${escapeHtml(m.data)}</span>`;
+      return renderSticker(m.data);
     case 'location':
       return `<div class="bubble-loc"><i class="fa-solid fa-location-dot"></i><div>${escapeHtml(m.data)}</div></div>${cap}`;
     case 'contact':
@@ -1156,7 +1156,7 @@ function verDonaciones() {
               border:none; cursor:pointer; background:linear-gradient(90deg,#8247e5,#6a2fd8); color:#fff; font-weight:700;">
       Donar ${api.formatearWtk(imp)} (on-chain)
     </button>`).join('');
-  openModal('💚 Mantén WhaTaka viva', `
+  openModal('🤲 Mantén WhaTaka viva', `
     <p style="font-size:13px; opacity:.9; margin-bottom:10px;">
       WhaTaka es gratis. Si quieres, puedes ayudar a pagar lo que cuesta mantenerla
       en marcha. <strong>Es 100% voluntario</strong>: si no donas, la app sigue igual.
@@ -1184,6 +1184,92 @@ function verDonaciones() {
   document.querySelectorAll('#modal-body .btn-donar-wtk').forEach((b) => {
     b.addEventListener('click', () => donarEnWtk(Number(b.dataset.wtk)));
   });
+}
+
+// ─────────────────────────────────────────────────────────────
+// Café ☕ ($1) + stickers animados
+// ─────────────────────────────────────────────────────────────
+
+const COFFEE_URL = `${DONACION_PAYPAL}/1`;
+
+// Reparte los emojis "spark" alrededor del sticker base en círculo.
+function posicionesSpark(n) {
+  return Array.from({ length: n }, (_, i) => {
+    const ang = (Math.PI * 2 * i) / n - Math.PI / 2;
+    return { dx: Math.round(Math.cos(ang) * 46), dy: Math.round(Math.sin(ang) * 46) };
+  });
+}
+
+// Pinta un sticker. Si `data` es un id del catálogo, sale animado; si no
+// (mensajes antiguos con un emoji suelto), se muestra tal cual.
+function renderSticker(data) {
+  const api = window.WhaTakaStickers;
+  const st = api && api.porId(data);
+  if (!st) return `<span class="bubble-sticker">${escapeHtml(data)}</span>`;
+  const sparks = (st.spark || []).map((e, i, arr) => {
+    const p = posicionesSpark(arr.length)[i];
+    return `<span class="st-spark" style="--dx:${p.dx}px; --dy:${p.dy}px">${e}</span>`;
+  }).join('');
+  return `<span class="st-wrap ${st.anim}">
+      ${sparks}
+      <span class="st-base">${st.emoji}</span>
+    </span>`;
+}
+
+// Muestra el selector de stickers (reutiliza el modal) y, al elegir uno,
+// lo envía al chat abierto.
+function elegirSticker() {
+  const api = window.WhaTakaStickers;
+  if (!api) return;
+  const secciones = api.porCategorias().map((c) => `
+    <div style="margin-bottom:10px">
+      <div style="font-size:12.5px;color:var(--text-muted);margin-bottom:6px">${c.emoji} ${c.nombre}</div>
+      <div class="sticker-grid">
+        ${c.stickers.map((s) => `<button class="pick-sticker" data-id="${s.id}" title="${escapeHtml(s.label)}">${s.emoji}</button>`).join('')}
+      </div>
+    </div>`).join('');
+  openModal('Elige un sticker', `
+    <p style="font-size:12.5px;color:var(--text-muted);margin-bottom:10px">
+      Toca uno para enviarlo al chat abierto.
+    </p>
+    ${secciones}`);
+  document.querySelectorAll('#modal-body .pick-sticker').forEach((b) => {
+    b.addEventListener('click', () => {
+      if (!state.activePeer) {
+        toast('Abre un chat para enviar el sticker');
+        return;
+      }
+      sendAttachment('sticker', b.dataset.id);
+      closeModal();
+      toast('Sticker enviado 🎉');
+    });
+  });
+}
+
+// Flujo del café: agradece, abre el pago de $1 en PayPal y luego ofrece
+// elegir un sticker para enviar. La donación es voluntaria.
+function verCafe() {
+  openModal('☕ ¡Gracias por el café!', `
+    <p style="font-size:13.5px;margin-bottom:10px">
+      Tu dólar ayuda a pagar el servidor y el dominio. <strong>Es voluntario</strong>:
+      si no quieres, puedes elegir el sticker igual.
+    </p>
+    <a href="${COFFEE_URL}" target="_blank" rel="noopener"
+       style="display:block;text-align:center;padding:12px;border-radius:10px;margin-bottom:8px;
+              background:linear-gradient(90deg,#ffb300,#ff8f00);color:#3a2a00;font-weight:800;text-decoration:none;">
+      ☕ Pagar $1 con PayPal
+    </a>
+    <button id="btn-cafe-sticker" style="display:block;width:100%;padding:12px;border-radius:10px;border:none;
+            cursor:pointer;background:linear-gradient(90deg,#8247e5,#6a2fd8);color:#fff;font-weight:700;">
+      🎉 Elegir un sticker para enviar
+    </button>
+    <p style="font-size:11px;opacity:.65;margin-top:12px">
+      Donación voluntaria, no es una inversión ni da ventajas ni promete ganancias.
+    </p>`);
+  const b = $('#btn-cafe-sticker');
+  if (b) b.addEventListener('click', () => elegirSticker());
+  // Abre el pago y, al volver, ofrece el selector de stickers.
+  try { window.open(COFFEE_URL, '_blank', 'noopener'); } catch { /* bloqueado: el botón queda arriba */ }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -1366,8 +1452,6 @@ const EMOJIS = [
   '🔥','✨','⭐','🌟','🎉','🎊','🥳','🎁','🥭','🍕','🍔','🍟','☕','🍺','🍻','🥂',
 ];
 
-const STICKERS = ['🥭','🟣','😎','🤩','😂','😭','🥳','🤝','🔥','💜','✨','🎉','👍','🙌','💯','🫶'];
-
 const ATTACH_ACTIONS = [
   { id: 'gallery', label: 'Galería', icon: 'fa-image', color: '#8e44ad' },
   { id: 'camera', label: 'Cámara', icon: 'fa-camera', color: '#e91e63' },
@@ -1419,19 +1503,24 @@ function renderEmojiBody(kind) {
   document.querySelectorAll('.emoji-tabs button').forEach((b) => {
     b.classList.toggle('active', b.dataset.panel === kind);
   });
-  const items = kind === 'stickers' ? STICKERS : EMOJIS;
-  body.className = kind === 'stickers' ? 'sticker-grid' : 'emoji-grid';
-  body.innerHTML = items.map((e) => `<button data-e="${e}">${e}</button>`).join('');
+  if (kind === 'stickers') {
+    const api = window.WhaTakaStickers;
+    const items = api ? api.todos() : [];
+    body.className = 'sticker-grid';
+    body.innerHTML = items.map((s) => `<button data-sid="${s.id}" title="${escapeHtml(s.label)}">${s.emoji}</button>`).join('');
+    body.querySelectorAll('button').forEach((btn) => {
+      btn.addEventListener('click', () => sendAttachment('sticker', btn.dataset.sid));
+    });
+    return;
+  }
+  body.className = 'emoji-grid';
+  body.innerHTML = EMOJIS.map((e) => `<button data-e="${e}">${e}</button>`).join('');
   body.querySelectorAll('button').forEach((btn) => {
     btn.addEventListener('click', () => {
-      if (kind === 'stickers') {
-        sendAttachment('sticker', btn.dataset.e);
-      } else {
-        const input = $('#msg-input');
-        input.value += btn.dataset.e;
-        input.focus();
-        toggleComposerState();
-      }
+      const input = $('#msg-input');
+      input.value += btn.dataset.e;
+      input.focus();
+      toggleComposerState();
     });
   });
 }
@@ -2270,6 +2359,7 @@ function bindEvents() {
   $('#btn-import-tokens').addEventListener('click', importTokens);
   $('#btn-ver-niveles').addEventListener('click', verNiveles);
   $('#btn-donar').addEventListener('click', verDonaciones);
+  $('#coffee-card').addEventListener('click', verCafe);
   $('#btn-walletconnect').addEventListener('click', askWalletConnect);
   $('#btn-permissions').addEventListener('click', showPermissions);
 }

@@ -569,6 +569,66 @@
     .msg-bubble.sticker::after { display: none; }
     .bubble-cap { display: block; margin-top: 2px; }
 
+    /* Stickers animados: el emoji base se mueve y los "spark" salen volando */
+    .st-wrap { position: relative; display: inline-flex; align-items: center; justify-content: center; padding: 14px 18px; }
+    .st-base { font-size: 62px; line-height: 1; display: inline-block; }
+    .st-spark {
+      position: absolute; left: 50%; top: 50%; font-size: 24px; line-height: 1;
+      opacity: 0; pointer-events: none; animation: stFly 1.5s ease-out infinite;
+    }
+    .st-spark:nth-child(3n)   { font-size: 18px; animation-delay: .25s; }
+    .st-spark:nth-child(3n+1) { font-size: 28px; animation-delay: .5s; }
+    .st-spark:nth-child(2n)   { animation-delay: .75s; }
+    @keyframes stFly {
+      0%   { opacity: 0; transform: translate(-50%,-50%) scale(.4); }
+      20%  { opacity: 1; }
+      100% { opacity: 0; transform: translate(var(--dx,0), var(--dy,-70px)) scale(1.15) rotate(20deg); }
+    }
+    @keyframes stWave    { 0%,100%{transform:rotate(0)} 20%{transform:rotate(18deg)} 40%{transform:rotate(-12deg)} 60%{transform:rotate(14deg)} 80%{transform:rotate(-8deg)} }
+    @keyframes stBounce  { 0%,100%{transform:translateY(0)} 30%{transform:translateY(-14px)} 55%{transform:translateY(0)} 70%{transform:translateY(-6px)} }
+    @keyframes stPulse   { 0%,100%{transform:scale(1)} 50%{transform:scale(1.22)} }
+    @keyframes stBeat    { 0%,100%{transform:scale(1)} 15%{transform:scale(1.3)} 30%{transform:scale(1)} 45%{transform:scale(1.25)} }
+    @keyframes stPop     { 0%{transform:scale(.6)} 60%{transform:scale(1.18)} 100%{transform:scale(1)} }
+    @keyframes stSwing   { 0%,100%{transform:rotate(-9deg)} 50%{transform:rotate(9deg)} }
+    @keyframes stGlow    { 0%,100%{filter:drop-shadow(0 0 2px #ffe08a); transform:scale(1)} 50%{filter:drop-shadow(0 0 14px #ffd54a); transform:scale(1.08)} }
+    @keyframes stSteam   { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-5px) rotate(-4deg)} }
+    @keyframes stFlicker { 0%,100%{transform:scale(1) rotate(-2deg)} 50%{transform:scale(1.12) rotate(2deg)} }
+    @keyframes stClink   { 0%,100%{transform:rotate(-14deg)} 50%{transform:rotate(6deg)} }
+    @keyframes stClap    { 0%,100%{transform:scale(1) rotate(-6deg)} 50%{transform:scale(1.15) rotate(6deg)} }
+    @keyframes stRise    { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-16px)} }
+    .st-wave    .st-base { animation: stWave    .9s ease-in-out infinite; }
+    .st-bounce  .st-base { animation: stBounce  1s  ease-in-out infinite; }
+    .st-pulse   .st-base { animation: stPulse  1.1s ease-in-out infinite; }
+    .st-beat    .st-base { animation: stBeat   1.2s ease-in-out infinite; }
+    .st-pop     .st-base { animation: stPop    1.4s ease-out   infinite; }
+    .st-swing   .st-base { animation: stSwing  1.6s ease-in-out infinite; }
+    .st-glow    .st-base { animation: stGlow   1.8s ease-in-out infinite; }
+    .st-steam   .st-base { animation: stSteam  1.7s ease-in-out infinite; }
+    .st-flicker .st-base { animation: stFlicker 1s  ease-in-out infinite; }
+    .st-clink   .st-base { animation: stClink  1s  ease-in-out infinite; }
+    .st-clap    .st-base { animation: stClap   .8s  ease-in-out infinite; }
+    .st-rise    .st-base { animation: stRise   1.5s ease-in-out infinite; }
+    @media (prefers-reduced-motion: reduce) {
+      .st-base, .st-spark { animation: none !important; }
+    }
+
+    /* Tarjeta "Invítame un café" */
+    .coffee-card {
+      display: flex; align-items: center; gap: 14px; cursor: pointer;
+      background: linear-gradient(135deg, rgba(255,193,7,.16), rgba(255,152,0,.10));
+      border: 1px solid rgba(255,193,7,.35); border-radius: 14px; padding: 12px 14px;
+      margin-bottom: 12px;
+    }
+    .coffee-card:active { filter: brightness(1.12); }
+    .coffee-cup { font-size: 38px; line-height: 1; animation: stSteam 2s ease-in-out infinite; }
+    .coffee-txt { flex: 1; }
+    .coffee-txt b { display: block; font-size: 15px; color: var(--text-strong); }
+    .coffee-txt small { font-size: 12.5px; color: var(--text-muted); }
+    .coffee-price {
+      background: #ffb300; color: #3a2a00; font-weight: 800; font-size: 14px;
+      padding: 6px 12px; border-radius: 20px; white-space: nowrap;
+    }
+
     /* ============ NOVEDADES / ESTADOS ============ */
     .my-status-card, .status-item {
       display: flex; align-items: center; gap: 14px;
@@ -816,11 +876,20 @@
             <i class="fa-solid fa-crown"></i> Ver niveles y ventajas
           </button>
 
+          <div class="coffee-card" id="coffee-card">
+            <span class="coffee-cup">☕</span>
+            <span class="coffee-txt">
+              <b>Invítame un café</b>
+              <small>Toca la taza: donas $1 y eliges un sticker para enviar</small>
+            </span>
+            <span class="coffee-price">$1</span>
+          </div>
+
           <div class="stat-box highlight" id="donaciones-card" style="margin-bottom: 12px;">
-            <span class="stat-val" id="donaciones-titulo" style="font-size: 16px;">💚 Mantén WhaTaka viva</span>
+            <span class="stat-val" id="donaciones-titulo" style="font-size: 16px;">🤲 Mantén WhaTaka viva</span>
             <span class="stat-lbl" id="donaciones-coste">Servidor (Render) + dominio (Porkbun): $7.92/mes</span>
             <button class="primary-btn" id="btn-donar" style="margin-top: 10px;">
-              <i class="fa-solid fa-hand-holding-heart"></i> Donar (voluntario)
+              🤲 Donar (voluntario)
             </button>
           </div>
 
@@ -1036,8 +1105,9 @@
   </div>
 
   <script src="./vendor/ethers.umd.min.js"></script>
-  <script src="./lib/niveles.js?v=5"></script>
-  <script src="./lib/donaciones.js?v=5"></script>
-  <script src="./app.js?v=5"></script>
+  <script src="./lib/niveles.js?v=7"></script>
+  <script src="./lib/donaciones.js?v=7"></script>
+  <script src="./lib/stickers.js?v=7"></script>
+  <script src="./app.js?v=7"></script>
 </body>
 </html>
