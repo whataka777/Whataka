@@ -30,6 +30,10 @@ presencia de los nodos, pero nunca ve el texto en claro.
 > 🔄 ¿Comprar y vender WTK dentro de la app y cobrar comisión? Lee
 > [`docs/EXCHANGE-Y-RUEDA.md`](docs/EXCHANGE-Y-RUEDA.md): la "rueda" funciona,
 > pero exige licencia MiCA (150.000 €). La vía legal y barata es un botón a un DEX.
+>
+> 🎁 ¿Donaciones (envío y recepción) en vez de compra-venta? Lee
+> [`docs/DONACIONES.md`](docs/DONACIONES.md): sin custodia, es legal y no necesita
+> licencia; da uso al token, pero no precio. Cuidado con las tres trampas.
 
 ## Qué incluye
 
