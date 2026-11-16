@@ -42,6 +42,10 @@ presencia de los nodos, pero nunca ve el texto en claro.
 > 💶 ¿Cobrar una comisión por mantener la app como "donación al creador"? Lee
 > [`docs/COMISION-MANTENIMIENTO.md`](docs/COMISION-MANTENIMIENTO.md): cobrar es
 > legal, pero una cuota obligatoria NO es una donación. No mezcles las dos.
+>
+> 🥗 ¿Cómo recibo dinero para subsistir con la app? Lee
+> [`docs/COMO-RECIBIR-DINERO.md`](docs/COMO-RECIBIR-DINERO.md): el orden correcto,
+> Stripe, cuántos usuarios necesitas y el plan paso a paso.
 
 ## Qué incluye
 
