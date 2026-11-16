@@ -1,5 +1,17 @@
 # Plan de lanzamiento de WhaTaka en Polygon real
 
+> **Estado: listo para lanzar.** Todo está comprobado contra Polygon mainnet
+> (chainId 137) el 2026-11-16. Lo único que falta es **depositar el gas** en la
+> wallet de despliegue y ejecutar **un comando**.
+>
+> | Dato | Valor |
+> | --- | --- |
+> | **Wallet que recibe el gas** | `0x5dca4aBB6D05A37442c152A7AC9B60a3a3E1AAe6` |
+> | Red | Polygon mainnet (chainId **137**), gas en **POL** |
+> | Gas necesario | **~2,7 millones de gas ≈ 1,05 POL ≈ $0,08** (con el gas alto de hoy; suele ser menos) |
+> | Cuánto depositar | **2 POL** (cubre el lanzamiento y sobra para gas futuro) |
+> | Comando del lanzamiento | `node scripts/lanzar.js` (ver paso 2) |
+
 Este documento explica, paso a paso, todo lo necesario para lanzar la app
 en **Polygon mainnet (chainId 137)**. Está escrito para que no haya que
 improvisar el día del lanzamiento.
@@ -9,6 +21,26 @@ Lanzar en real es **repetir los mismos scripts** cambiando el RPC y usando
 QuickSwap en lugar del pool de prueba.
 
 ---
+
+## 0. Lo que ya está preparado (2026-11-16)
+
+- Contratos **compilados** en `contracts/artifacts/` (solc 0.8.26, EVM `paris`).
+- `scripts/lanzar.js` **arreglado y probado**: antes desplegaba un segundo
+  contrato de premios con token `0x0` (revertía). Ahora despliega **solo
+  `WhaTakaTTC`**, que ya es el ERC-20 *y* el pagador (`claimMiningReward`).
+- Validación de **checksum EIP-55** de las direcciones antes de gastar gas.
+- La app resuelve **token y red desde el relé** (`tokenWtk()`/`redWtk()`): pasar
+  de Amoy a Polygon real solo requiere cambiar `MINING_CONTRACT` en Render, sin
+  tocar código.
+- **Dry-run real** contra Polygon mainnet: `2.665.534 gas` → `1,05 POL` con el
+  gas de hoy (394 gwei), `≈ $0,083`. Con gas normal (~30 gwei) son `~0,08 POL`
+  (`≈ $0,006`).
+- Claves generadas y guardadas en `.env.mainnet` (ignorado por git):
+  - **Desplegador / dueño**: `0x5dca4aBB6D05A37442c152A7AC9B60a3a3E1AAe6`
+  - **Oráculo (firma vales)**: `0x6C64E16fAa87fd0BfBDba95eCae0454Bc5ffc3bD`
+
+---
+
 
 ## 1. Resumen: ¿cuánto dinero hace falta?
 
@@ -76,7 +108,26 @@ wallet con fondos personales.
 
 ### Paso 2 — Desplegar el token WTK en Polygon real
 
-Se usa el script ya existente, apuntando al RPC de Polygon real:
+**Camino corto (recomendado).** Un solo comando que despliega `WhaTakaTTC`,
+congela la oferta y te da las variables de Render. Lee las claves de
+`.env.mainnet`:
+
+```bash
+npm run lanzar:real
+```
+
+Eso equivale a:
+
+```bash
+set -a; . ./.env.mainnet; set +a
+DRY_RUN=1 node scripts/lanzar.js   # simular primero, no gasta nada
+node scripts/lanzar.js             # lanzar de verdad (gasta el gas)
+```
+
+El script te avisa si el gas está caro, aborta si supera 5 $ (salvo `FORZAR=1`)
+y guarda el resultado en `deploy-mainnet.json`.
+
+**Camino largo (si prefieres el script de despliegue suelto):**
 
 ```bash
 RPC_URL="https://polygon-bor-rpc.publicnode.com" \
@@ -87,7 +138,8 @@ INITIAL_SUPPLY=100000000 HALVING_SECONDS=31536000 REWARD_FACTOR=0.001 ANNUAL_MIN
 node scripts/deploy.js
 ```
 
-Luego se aplica la configuración "valiosa" (congelar la oferta):
+Luego se aplica la configuración "valiosa" (congelar la oferta). `lanzar.js` ya
+lo hace solo; con `deploy.js` hay que hacerlo aparte:
 
 ```bash
 RPC_URL="https://polygon-bor-rpc.publicnode.com" \

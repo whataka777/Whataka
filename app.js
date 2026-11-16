@@ -1277,8 +1277,23 @@ function verReferidos() {
 const DONACION_PAYPAL = 'https://www.paypal.me/whataka';
 
 // Donaciones en WTK: transferencia ERC-20 directa, sin custodia.
-// El token WTK vive en Polygon Amoy y su dueño es la cartera que recibe.
 const WTK_CONTRACT = '0x4b0C9d8233DeFa8EcDF28D7a2bAa3EDaa4C8252B';
+
+// Dirección del token WTK en uso. Se prefiere la que anuncia el relé (así al
+// pasar de Amoy a Polygon real solo hay que cambiar MINING_CONTRACT en Render,
+// sin tocar la app). Si el relé aún no responde, se usa la de Amoy.
+function tokenWtk() {
+  const cfg = state.miningConfig;
+  return (cfg && cfg.contract) ? cfg.contract : WTK_CONTRACT;
+}
+
+// Red donde vive el WTK, según el relé.
+function redWtk() {
+  const cfg = state.miningConfig;
+  const id = cfg ? Number(cfg.chainId) : 80002;
+  return KNOWN_CHAINS[id] || { name: `red ${id}`, chainId: id };
+}
+
 // Respaldo por si el relé no publica cartera de donaciones. El destino real lo
 // fija el relé con la variable DONATION_WALLET (ver /api/donations/config).
 const DONACION_CARTERA_RESPALDO = '0xAdd0f33B4680289892F001BAC049b9579548b5d9';
@@ -1362,10 +1377,10 @@ async function donarEnWtk(wtk) {
     const onChain = Number(await provider.send('eth_chainId', []));
     if (onChain !== Number(chainId)) {
       const ok = await ensureChain(wallet, chainId);
-      if (!ok) throw new Error('cambia la wallet a Polygon Amoy');
+      if (!ok) throw new Error('cambia la wallet a la red del WTK');
     }
     const signer = await provider.getSigner();
-    const token = new ethers.Contract(WTK_CONTRACT, ERC20_ABI, signer);
+    const token = new ethers.Contract(tokenWtk(), ERC20_ABI, signer);
     const unidades = api.aUnidadesWtk(wtk);
     const saldo = await token.balanceOf(await signer.getAddress());
     if (saldo < unidades) {
@@ -1513,9 +1528,12 @@ async function conectarCarteraSala() {
 }
 
 // Modal propio de la sala para ENVIAR una donación en WTK (solo WTK).
-function verEnviarWtk() {
+async function verEnviarWtk() {
   const api = window.WhaTakaDonaciones;
   if (!api) return;
+  // Necesitamos la config del relé para saber en qué red está el WTK (Amoy o
+  // Polygon real) y pintar el aviso correcto.
+  await loadMiningConfig();
   const botones = api.IMPORTES_WTK.map((imp) => `
     <button class="btn-donar-wtk" data-wtk="${imp}"
        style="display:block; width:100%; text-align:center; padding:11px; margin:7px 0; border-radius:10px;
@@ -1529,7 +1547,7 @@ function verEnviarWtk() {
     </p>
     ${botones}
     <p style="font-size:11.5px; opacity:.7; margin-top:12px;">
-      Necesitas estar en ${api.RED_WTK.nombre} y tener WTK en tu cartera.
+      Necesitas estar en ${redWtk().name} y tener WTK en tu cartera.
       Donación voluntaria: no es una inversión ni promete ganancias.
     </p>`);
   document.querySelectorAll('#modal-body .btn-donar-wtk').forEach((b) => {

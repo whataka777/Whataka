@@ -71,10 +71,18 @@ async function main() {
   const provider = new ethers.JsonRpcProvider(rpcUrl, undefined, { staticNetwork: true });
   const net = await provider.getNetwork();
   const wallet = new ethers.Wallet(key, provider);
-  const signerAddress = (process.env.REPORT_SIGNER_ADDRESS || wallet.address).trim();
+
+  // Comprobamos el checksum EIP-55 del firmante antes de gastar gas: una letra
+  // cambiada de mayúscula/minúscula dejaría los vales firmados sin efecto.
+  let signerAddress = (process.env.REPORT_SIGNER_ADDRESS || wallet.address).trim();
+  try {
+    signerAddress = ethers.getAddress(signerAddress);
+  } catch {
+    console.error(`REPORT_SIGNER_ADDRESS no es una dirección válida (checksum EIP-55): ${signerAddress}`);
+    process.exit(1);
+  }
 
   const ttcArt = artifact('WhaTakaTTC');
-  const rewArt = artifact('WhaTakaMiningRewards');
 
   // Parámetros del token (los mismos que la guía de lanzamiento).
   const initialSupply = ethers.parseUnits(process.env.INITIAL_SUPPLY || '100000000', 18);
@@ -104,8 +112,6 @@ async function main() {
   const ttcTx = await ttcFactory.getDeployTransaction(
     signerAddress, initialSupply, halvingSeconds, rewardFactor, annualMintCap,
   );
-  const rewFactory = new ethers.ContractFactory(rewArt.abi, rewArt.bytecode);
-  const rewTx = await rewFactory.getDeployTransaction(ethers.ZeroAddress, signerAddress);
 
   // gasLimit de respaldo si estimateGas falla (p. ej. el nodo rechaza la simulación).
   const fallback = (data) => 32000n + BigInt((data.length - 2) / 2) * 250n;
@@ -117,9 +123,8 @@ async function main() {
     }
   };
   const gasTtc = await est(ttcTx.data);
-  const gasRew = await est(rewTx.data);
   const gasConfig = 3n * 120000n; // 3 llamadas onlyOwner
-  const gasTotal = gasTtc + gasRew + gasConfig;
+  const gasTotal = gasTtc + gasConfig;
 
   const polTotal = Number(ethers.formatEther(gasTotal * gasPrice));
   const usdTotal = pol ? polTotal * pol : null;
@@ -129,7 +134,6 @@ async function main() {
   console.log(`  POL             : ${pol ? '$' + pol.toFixed(4) : '(precio no disponible)'}`);
   console.log('\n── Coste estimado del lanzamiento ──');
   console.log(`  desplegar WTK   : ${gasTtc.toString()} gas`);
-  console.log(`  desplegar premios: ${gasRew.toString()} gas`);
   console.log(`  congelar oferta : ${gasConfig.toString()} gas`);
   console.log(`  TOTAL           : ${gasTotal.toString()} gas`);
   console.log(`  → ${polTotal.toFixed(4)} ${net.chainId === 137n ? 'POL' : 'nativo'}${usdTotal !== null ? '  ≈ $' + usdTotal.toFixed(4) : ''}`);
@@ -154,7 +158,9 @@ async function main() {
   }
 
   // ── 2) Desplegar el token WTK ────────────────────────────────────────
-  console.log('\n[1/3] Desplegando el token WTK…');
+  // WhaTakaTTC es autocontenido: es el ERC-20 Y el pagador de recompensas
+  // (expone claimMiningReward). No hace falta un segundo contrato.
+  console.log('\n[1/2] Desplegando el token WTK…');
   const ttc = new ethers.ContractFactory(ttcArt.abi, ttcArt.bytecode, wallet);
   const token = await ttc.deploy(signerAddress, initialSupply, halvingSeconds, rewardFactor, annualMintCap);
   const tokenTx = token.deploymentTransaction();
@@ -163,18 +169,8 @@ async function main() {
   const tokenAddress = await token.getAddress();
   console.log('      ✅ WTK en', tokenAddress);
 
-  // ── 3) Desplegar el contrato de recompensas ──────────────────────────
-  console.log('\n[2/3] Desplegando el contrato de recompensas…');
-  const rew = new ethers.ContractFactory(rewArt.abi, rewArt.bytecode, wallet);
-  const rewards = await rew.deploy(tokenAddress, signerAddress);
-  const rewTxSent = rewards.deploymentTransaction();
-  console.log('      tx:', rewTxSent.hash);
-  await rewTxSent.wait();
-  const rewardsAddress = await rewards.getAddress();
-  console.log('      ✅ Premios en', rewardsAddress);
-
-  // ── 4) Congelar la oferta (configuración "valiosa") ──────────────────
-  console.log('\n[3/3] Congelando la oferta (autoMintTopUp=false, annualMintCap=0)…');
+  // ── 3) Congelar la oferta (configuración "valiosa") ──────────────────
+  console.log('\n[2/2] Congelando la oferta (autoMintTopUp=false, annualMintCap=0)…');
   const abi = [
     'function setAutoMintTopUp(bool)',
     'function setAnnualMintCap(uint256)',
@@ -202,7 +198,6 @@ async function main() {
   const record = {
     chainId: Number(net.chainId),
     token: tokenAddress,
-    rewards: rewardsAddress,
     reportSigner: signerAddress,
     totalSupply: ethers.formatUnits(await t.totalSupply(), 18),
     deployedAt: new Date().toISOString(),

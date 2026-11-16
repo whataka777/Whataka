@@ -57,7 +57,15 @@ function required(name) {
 }
 
 function isAddress(value) {
-  return /^0x[0-9a-fA-F]{40}$/.test(value);
+  if (!/^0x[0-9a-fA-F]{40}$/.test(value)) return false;
+  // getAddress valida el checksum EIP-55: una dirección con una letra cambiada
+  // de mayúscula/minúscula lanzaría aquí, en vez de enviar el gas a la nada.
+  try {
+    ethers.getAddress(value);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function main() {

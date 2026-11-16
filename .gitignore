@@ -6,3 +6,8 @@ npm-debug.log*
 *.log
 
 .openhands/
+
+# Secretos y registros de despliegue en Polygon real
+deploy-mainnet.json
+.env.mainnet
+*.key

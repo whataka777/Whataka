@@ -16,7 +16,9 @@
     "test:contract": "node --test --test-concurrency=1 --test-timeout=60000 test/contracts/mining-rewards.evm.test.js",
     "test:tokenomics": "node --test --test-concurrency=1 --test-timeout=60000 test/contracts/ttc-tokenomics.evm.test.js",
     "test:all": "npm test && npm run test:contract && npm run test:tokenomics",
-    "lanzar": "node scripts/lanzar.js"
+    "lanzar": "node scripts/lanzar.js",
+    "lanzar:real": "set -a && . ./.env.mainnet && set +a && node scripts/lanzar.js",
+    "lanzar:simular": "set -a && . ./.env.mainnet && set +a && DRY_RUN=1 node scripts/lanzar.js"
   },
   "dependencies": {
     "ethers": "^6.17.0",
