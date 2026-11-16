@@ -207,6 +207,21 @@ Datos on-chain usados (Polygon Amoy, cadena 80002):
 
 ---
 
+## 6.ter Sala de donaciones (en la app)
+
+En la app hay una **Sala de donaciones** (botón de la taza ☕ en la cabecera).
+No se llama "billetera" a propósito: no es una cartera con custodia, es una sala
+de donaciones. Tiene cuatro partes:
+
+1. **☕ Invítame un café** — donación de $1 con PayPal.
+2. **🤲🏽 Mantén WhaTaka viva** — donación voluntaria para Render + Porkbun.
+3. **💜 Enviar y recibir donaciones** — en WTK, con la dirección propia para
+   recibir (se copia), el botón de enviar y las guías paso a paso.
+4. **🔄 Cambiar WTK en un DEX** — la app **solo enlaza** al DEX (QuickSwap). El
+   cambio lo hace el usuario; la app nunca cambia el token (§3, trampa 1).
+
+---
+
 ## 7. Resumen en una frase
 
 Las **donaciones sin custodia** son **legales y no necesitan licencia** (regalar
