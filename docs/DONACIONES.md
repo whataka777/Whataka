@@ -116,11 +116,58 @@ Suscripciones/niveles (ingresos)
 ---
 
 ## 5. Impuestos (no lo olvides)
-
 Las donaciones **recibidas** suelen contar como **ingreso** en España (IRPF o
 Impuesto de Sociedades), valoradas en euros el día de la donación. Y el donante
 puede tener su propia obligación fiscal. **Habla con un asesor fiscal.** No es
 "dinero gratis" para Hacienda.
+
+---
+
+## 5.bis ¿Pero las donaciones "quedan recogidas" o no?
+
+Pregunta del usuario: *"Pero es que las donaciones no quedan recogidas, ¿o sí?"*
+
+**Respuesta: sí, quedan recogidas — pero por OTRAS leyes, no por MiCA.** Esto es
+la clave, y conviene entenderlo bien:
+
+### Las donaciones están recogidas en la ley... pero en otra ley
+
+MiCA **no las menciona** (por eso no necesitas licencia de cripto). Pero eso **no
+significa** que "no estén recogidas". Lo están, en **tres** sitios:
+
+| Ley | Qué dice de las donaciones |
+| --- | --- |
+| **Código Civil, art. 618** | *"La donación es un acto de liberalidad por el cual una persona dispone gratuitamente de una cosa en favor de otra, que la acepta."* → La donación es una figura **legal y definida**. |
+| **Ley 29/1987 (ISD), art. 3.1.b** | *"La adquisición de bienes y derechos por **donación** o cualquier otro negocio jurídico a título gratuito, «intervivos»"* es **hecho imponible** → **se paga impuesto**. |
+| **Ley General Tributaria, art. 13** | *"Las obligaciones tributarias se exigirán con arreglo a la **naturaleza jurídica del hecho**... **cualquiera que sea la forma o denominación que los interesados le hubieran dado**."* |
+
+### Las dos caras de la moneda
+
+1. **Para MiCA (licencia):** las donaciones **no están en la lista** → ✅ no
+   necesitas licencia de cripto. Eso es **bueno**.
+2. **Para Hacienda (impuestos):** las donaciones **sí están recogidas** → ❌
+   **se pagan impuestos**. Y el art. 13 de la LGT avisa de lo importante:
+
+   > **Da igual cómo las llames.** Si en realidad es una compra-venta, Hacienda lo
+   > tratará como compra-venta (y como ingreso), **aunque tú lo llames "donación"**.
+
+### Entonces, ¿"no quedan recogidas"?
+Depende de qué entiendas por "recogidas":
+
+- ❌ **"No están en la lista de MiCA"** → correcto (por eso no hay licencia).
+- ✅ **"No están recogidas por ninguna ley"** → **falso**. Están en el Código
+  Civil (qué es una donación), en la ley del ISD (que se paga impuesto) y en la
+  LGT (que la ley mira el fondo, no el nombre).
+
+### La frase que lo resume
+**Las donaciones no te exigen licencia de cripto (MiCA), pero sí te exigen pagar
+impuestos (ISD/IRPF).** Y si una "donación" en realidad es un cambio con precio
+fijo, **Hacienda y MiCA la tratarán como compra-venta**, se llame como se llame.
+
+> **Aviso:** por debajo de ciertos importes (donaciones pequeñas entre
+> particulares) puede no haber que declarar nada en la práctica, pero **la ley sí
+> las recoge**. Los límites y las obligaciones concretas dependen de tu caso:
+> **consúltalo con un asesor fiscal.**
 
 ---
 
