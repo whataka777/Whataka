@@ -111,6 +111,61 @@ la orden.
 
 ---
 
+## 4.bis ¿Y si NO cobro comisión? ¿Entonces no hace falta licencia?
+
+Pregunta del usuario: *"Eso aplica si cobro la comisión. Si NO cobro comisión y dejo
+que los usuarios compren y vendan dentro de la app por USDT, ¿entonces?"*
+
+**Respuesta: la licencia NO depende de la comisión.** Depende de si **tú operas el
+mercado** (eres el intermediario). Cito el texto oficial de MiCA:
+
+### La regla está en el artículo 59 (Autorización)
+> *"**No se prestarán servicios de criptoactivos en la Unión a menos que quien los
+> preste sea... una persona jurídica... autorizada como proveedora de servicios de
+> criptoactivos**..."*
+
+No dice "si cobras". Dice **"si prestas el servicio"**. Y entre los servicios
+regulados están (art. 3, apartado 1, letra 16):
+
+> *"a) custodia...; **b) gestión de una plataforma de negociación de
+> criptoactivos; c) canje de criptoactivos por fondos**; d) canje de criptoactivos
+> por otros criptoactivos; e) **ejecución de órdenes**..."*
+
+Si la app **cruza** las compras y ventas de tus usuarios, estás haciendo
+**"gestión de una plataforma de negociación"** y **"ejecución de órdenes"**.
+**Cobres o no cobres.** La comisión es solo cómo ganas dinero; **no es lo que
+activa la licencia**.
+
+### Lo que SÍ decide: ¿hay un intermediario?
+MiCA dice (considerando 22, texto oficial):
+
+> *"Cuando los servicios de criptoactivos se presten de manera **totalmente
+> descentralizada sin recurrir a un intermediario**, no deben entrar en el ámbito
+> de aplicación del presente Reglamento."*
+
+La clave es la palabra **"intermediario"** y **"totalmente descentralizada"**:
+
+| Tu app... | ¿Hay intermediario? | ¿Licencia? |
+| --- | --- | --- |
+| Cruza compras y ventas **en sus servidores** | **Sí** (eres tú) | **Sí**, aunque no cobres |
+| Tú guardas el USDT de los usuarios | Sí | Sí |
+| Tú ejecutas la orden | Sí | Sí |
+| Solo **muestras un enlace** al DEX | No | Normalmente **no** |
+| Usa un DEX **descentralizado** (el contrato lo hace todo) | No | Normalmente **no** |
+
+### Conclusión
+- **Cobrar comisión** → activa la licencia.
+- **NO cobrar comisión pero operar tú el mercado** → **también** activa la licencia.
+- **Lo que te libra** no es "no cobrar", sino **"no ser el intermediario"**: usar
+  un DEX descentralizado o limitarte a enlazar a uno.
+
+> **Aviso de coherencia:** si dices "esto es un exchange sin comisión para que la
+> gente compre y venda", sigues siendo un exchange. La ley mira **lo que haces**,
+> no lo que cobras. Y en un exchange sin comisión, además, **no ganas nada**:
+> asumes el riesgo regulatorio sin ingresos.
+
+---
+
 ## 5. Recomendación
 
 1. **La "rueda" es buena, pero no la montes tú.** Añade un **botón "Comprar WTK"**
