@@ -10,6 +10,10 @@ presencia de los nodos, pero nunca ve el texto en claro.
 > 📄 ¿Vas a lanzar el proyecto en Polygon real? Lee
 > [`docs/PLAN-LANZAMIENTO.md`](docs/PLAN-LANZAMIENTO.md): pasos, costes y
 > cuánto dinero hace falta.
+>
+> 📈 ¿Tienes poco capital? Lee
+> [`docs/CRECER-CON-POCO-CAPITAL.md`](docs/CRECER-CON-POCO-CAPITAL.md):
+> publicidad, patrocinadores, referidos, subvenciones y utilidad del token.
 
 ## Qué incluye
 
