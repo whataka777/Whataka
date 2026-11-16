@@ -108,7 +108,17 @@
   <script>
     const AMOY = 80002;
     const CHAIN_META = {
-      80002: { name: 'Polygon Amoy', rpc: 'https://polygon-amoy-bor-rpc.publicnode.com', symbol: 'POL', explorer: 'https://amoy.polygonscan.com' },
+      80002: {
+        name: 'Polygon Amoy',
+        rpc: 'https://polygon-amoy-bor-rpc.publicnode.com',
+        rpcs: [
+          'https://polygon-amoy-bor-rpc.publicnode.com',
+          'https://polygon-amoy.drpc.org',
+          'https://80002.rpc.thirdweb.com',
+        ],
+        symbol: 'POL',
+        explorer: 'https://amoy.polygonscan.com',
+      },
     };
     const $ = (s) => document.querySelector(s);
     const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };

@@ -552,6 +552,13 @@ const KNOWN_CHAINS = {
   80002: {
     name: 'Polygon Amoy',
     rpc: 'https://polygon-amoy-bor-rpc.publicnode.com',
+    // Varios RPC: el oficial (rpc-amoy.polygon.technology) cae a menudo y deja
+    // la wallet colgada al importar tokens. La wallet prueba en orden.
+    rpcs: [
+      'https://polygon-amoy-bor-rpc.publicnode.com',
+      'https://polygon-amoy.drpc.org',
+      'https://80002.rpc.thirdweb.com',
+    ],
     symbol: 'POL',
     explorer: 'https://amoy.polygonscan.com',
   },
@@ -578,7 +585,7 @@ async function ensureChain(wallet, chainId) {
             chainId: hex,
             chainName: meta.name,
             nativeCurrency: { name: meta.symbol, symbol: meta.symbol, decimals: 18 },
-            rpcUrls: [meta.rpc],
+            rpcUrls: meta.rpcs || [meta.rpc],
             blockExplorerUrls: [meta.explorer],
           }],
         });
@@ -592,6 +599,51 @@ async function ensureChain(wallet, chainId) {
     toast(`Cambia tu wallet a la red ${chainId}`);
     return false;
   }
+}
+
+// Pide a la wallet que muestre un token en su lista (watchAsset). Si el token ya
+// está añadido, la wallet lo ignora sin error. Devuelve true si lo aceptó.
+async function addTokenToWallet(wallet, { address, symbol, decimals }) {
+  try {
+    return await wallet.request({
+      method: 'wallet_watchAsset',
+      params: {
+        type: 'ERC20',
+        options: { address, symbol, decimals: decimals ?? 18 },
+      },
+    });
+  } catch (err) {
+    if (err && err.code === 4001) return false; // el usuario canceló
+    console.warn('watchAsset', err);
+    return false;
+  }
+}
+
+// Añade los tokens de WhaTaka (BGP777 y WTK) a la wallet conectada. Es la forma
+// cómoda de que el usuario los vea sin escribir direcciones a mano.
+async function importTokens() {
+  let wallet = getWalletProvider();
+  if (!wallet) {
+    const addr = await connectWallet();
+    if (!addr) return;
+    wallet = getWalletProvider();
+  }
+  if (!wallet) {
+    toast('Conecta una wallet primero');
+    return;
+  }
+  const cfg = await loadMiningConfig();
+  const wtk = cfg && cfg.contract ? cfg.contract : null;
+  const tokens = [
+    { address: '0x325438A3E8F31B21D3b12fD61D8Ed22653F35C61', symbol: 'BGP777' },
+  ];
+  if (wtk) tokens.push({ address: wtk, symbol: 'WTK' });
+  let added = 0;
+  for (const t of tokens) {
+    const ok = await addTokenToWallet(wallet, { ...t, decimals: 18 });
+    if (ok) added++;
+  }
+  toast(added ? 'Tokens añadidos a tu wallet ✅' : 'No se añadió ningún token');
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -1974,6 +2026,7 @@ function bindEvents() {
   $('#btn-send-report').addEventListener('click', sendMiningReport);
   $('#connect-wallet-box').addEventListener('click', connectWallet);
   $('#btn-connect-wallet').addEventListener('click', connectWallet);
+  $('#btn-import-tokens').addEventListener('click', importTokens);
   $('#btn-walletconnect').addEventListener('click', askWalletConnect);
   $('#btn-permissions').addEventListener('click', showPermissions);
 }
