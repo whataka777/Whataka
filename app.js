@@ -1071,8 +1071,8 @@ function verNiveles() {
 // Donaciones finalistas (pagar Render + Porkbun)
 // ─────────────────────────────────────────────────────────────
 
-// Enlace de cobro. Cámbialo por tu PayPal.me real (o deja el de Stripe).
-const DONACION_PAYPAL = 'https://www.paypal.me/tu-usuario';
+// Enlace de cobro de donaciones en dinero (PayPal.me del creador).
+const DONACION_PAYPAL = 'https://www.paypal.me/whataka';
 
 // Donaciones en WTK: transferencia ERC-20 directa, sin custodia.
 // El token WTK vive en Polygon Amoy y su dueño es la cartera que recibe.
