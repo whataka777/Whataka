@@ -26,6 +26,10 @@ presencia de los nodos, pero nunca ve el texto en claro.
 > 🏦 ¿Se acaban los 100.000.000 de WTK? Lee
 > [`docs/FONDO-Y-SUPPLY.md`](docs/FONDO-Y-SUPPLY.md): el minado no crea tokens,
 > reparte el fondo, y cómo recargarlo sin acuñar nada nuevo.
+>
+> 🔄 ¿Comprar y vender WTK dentro de la app y cobrar comisión? Lee
+> [`docs/EXCHANGE-Y-RUEDA.md`](docs/EXCHANGE-Y-RUEDA.md): la "rueda" funciona,
+> pero exige licencia MiCA (150.000 €). La vía legal y barata es un botón a un DEX.
 
 ## Qué incluye
 
