@@ -22,6 +22,10 @@ presencia de los nodos, pero nunca ve el texto en claro.
 > 👑 ¿Cómo funcionan los niveles (Bronce → Diamante)? Lee
 > [`docs/NIVELES.md`](docs/NIVELES.md): la escalera, los precios, las ventajas y
 > cómo cada pago quema tokens.
+>
+> 🏦 ¿Se acaban los 100.000.000 de WTK? Lee
+> [`docs/FONDO-Y-SUPPLY.md`](docs/FONDO-Y-SUPPLY.md): el minado no crea tokens,
+> reparte el fondo, y cómo recargarlo sin acuñar nada nuevo.
 
 ## Qué incluye
 
