@@ -34,6 +34,10 @@ presencia de los nodos, pero nunca ve el texto en claro.
 > 🎁 ¿Donaciones (envío y recepción) en vez de compra-venta? Lee
 > [`docs/DONACIONES.md`](docs/DONACIONES.md): sin custodia, es legal y no necesita
 > licencia; da uso al token, pero no precio. Cuidado con las tres trampas.
+>
+> 🚨 ¿Donar USDT → cambiar a WTK → donar → cambiar a USDT y retirar? Lee
+> [`docs/FLUJO-DONACIONES-Y-CAMBIOS.md`](docs/FLUJO-DONACIONES-Y-CAMBIOS.md): los
+> cambios y el retiro son pasos regulados, y el flujo entero parece blanqueo.
 
 ## Qué incluye
 
