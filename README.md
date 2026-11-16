@@ -14,6 +14,10 @@ presencia de los nodos, pero nunca ve el texto en claro.
 > 📈 ¿Tienes poco capital? Lee
 > [`docs/CRECER-CON-POCO-CAPITAL.md`](docs/CRECER-CON-POCO-CAPITAL.md):
 > publicidad, patrocinadores, referidos, subvenciones y utilidad del token.
+>
+> 🔥 ¿Pensando en vender acciones o en quemar tokens? Lee
+> [`docs/ACCIONES-Y-QUEMA.md`](docs/ACCIONES-Y-QUEMA.md): por qué lo primero es
+> ilegal y por qué lo segundo (suscripción + quema) es una gran idea.
 
 ## Qué incluye
 

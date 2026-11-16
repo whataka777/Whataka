@@ -148,6 +148,7 @@ contract WhaTakaTTC is IERC20 {
     event PausedUpdated(bool isPaused);
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
     event TokensRescued(address indexed to, uint256 amount);
+    event TokensBurned(address indexed from, uint256 amount);
 
     /// @dev Semieje del orden de secp256k1, para descartar firmas maleables.
     uint256 private constant _SECP256K1_HALF_N =
@@ -453,11 +454,37 @@ contract WhaTakaTTC is IERC20 {
         emit Transfer(from, to, amount);
     }
 
+    /// @notice Quema WTK propios. Reduce `totalSupply` de forma permanente.
+    ///         Es la pieza deflacionaria: la app compra WTK con sus ingresos
+    ///         (suscripciones, publicidad) y los quema para presionar el precio.
+    function burn(uint256 amount) external {
+        _burn(msg.sender, amount);
+    }
+
+    /// @notice Quema WTK de otro, gastando el permiso concedido.
+    ///         Permite que un proceso de la app queme con la aprobación previa.
+    function burnFrom(address from, uint256 amount) external {
+        _spendAllowance(from, msg.sender, amount);
+        _burn(from, amount);
+    }
+
     function _mint(address to, uint256 amount) internal {
         require(to != address(0), "destino cero");
         totalSupply += amount;
         balanceOf[to] += amount;
         emit Transfer(address(0), to, amount);
+    }
+
+    function _burn(address from, uint256 amount) internal {
+        require(amount > 0, "Cantidad cero");
+        uint256 balance = balanceOf[from];
+        require(balance >= amount, "Saldo insuficiente");
+        unchecked {
+            balanceOf[from] = balance - amount;
+        }
+        totalSupply -= amount;
+        emit Transfer(from, address(0), amount);
+        emit TokensBurned(from, amount);
     }
 
     /// @dev Acuñación sujeta al tope anual. Cuenta por año natural desde el
