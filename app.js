@@ -693,8 +693,81 @@ function switchTab(target) {
   document.querySelectorAll('.nav-item').forEach((b) => {
     b.classList.toggle('active', b.dataset.target === target);
   });
+
+  // Alternar barras de cabecera y buscador según la pestaña activa estilo QuantumCall / WhaTaka
+  const actDash = $('#bar-actions-dashboard');
+  const actChats = $('#bar-actions-chats');
+  const actSettings = $('#bar-actions-settings');
+  const searchBox = $('#dash-search-container');
+
+  if (actDash && actChats && actSettings) {
+    actDash.style.display = (target === 'tab-dashboard') ? 'flex' : 'none';
+    actChats.style.display = (target === 'tab-chats') ? 'flex' : 'none';
+    actSettings.style.display = (target === 'tab-settings') ? 'flex' : 'none';
+    if (target !== 'tab-dashboard' && target !== 'tab-chats' && target !== 'tab-settings') {
+      actDash.style.display = 'flex';
+    }
+  }
+
+  if (searchBox) {
+    searchBox.style.display = (target === 'tab-chats') ? 'flex' : 'none';
+  }
+
+  if (target === 'tab-dashboard') renderDashboard();
+  if (target === 'tab-chats') renderChats();
   if (target === 'tab-calls') renderCalls();
   if (target === 'tab-status') renderStatus();
+}
+
+function renderDashboard() {
+  let unreadCount = 0;
+  let lastMessageSnippet = 'New from WhaTaka';
+  const peers = Object.keys(state.messages || {});
+  peers.forEach((p) => {
+    const msgs = state.messages[p] || [];
+    msgs.forEach((m) => {
+      if (m.from !== state.identity.peerId && !m.read) unreadCount++;
+    });
+    if (msgs.length > 0) {
+      const last = msgs[msgs.length - 1];
+      if (last.text) lastMessageSnippet = last.text.slice(0, 24);
+    }
+  });
+
+  const badge = $('#dash-msg-badge');
+  if (badge) {
+    badge.textContent = unreadCount > 0 ? String(unreadCount) : (peers.length > 0 ? String(peers.length) : '3');
+  }
+  const sub = $('#dash-msg-sub');
+  if (sub && lastMessageSnippet) {
+    sub.textContent = lastMessageSnippet;
+  }
+
+  const syncList = $('#dash-sync-list');
+  if (syncList && state.peers) {
+    const knownPeers = Object.keys(state.peers).filter((id) => id !== state.identity.peerId);
+    if (knownPeers.length > 0) {
+      syncList.innerHTML = knownPeers.slice(0, 2).map((id) => {
+        const p = state.peers[id] || {};
+        const name = p.name || `Peer ${shortPeer(id, 6, 4)}`;
+        const initial = (name || 'P').charAt(0).toUpperCase();
+        const msgs = state.messages[id] || [];
+        const lastMsg = msgs.length ? (msgs[msgs.length - 1].text || 'Archivo adjunto') : 'Recent files messages at…';
+        return `
+          <div class="dash-sync-item" data-peer="${id}">
+            <div class="sync-avatar">${initial}</div>
+            <div class="dash-sync-info">
+              <h5>${escapeHtml(name)}</h5>
+              <p>${escapeHtml(lastMsg)}</p>
+            </div>
+          </div>
+        `;
+      }).join('');
+      syncList.querySelectorAll('.dash-sync-item').forEach((row) => {
+        row.addEventListener('click', () => openChat(row.dataset.peer));
+      });
+    }
+  }
 }
 
 function showScreen(id) {
@@ -3120,6 +3193,42 @@ function bindEvents() {
   $('#btn-walletconnect').addEventListener('click', askWalletConnect);
   $('#btn-permissions').addEventListener('click', showPermissions);
   $('#btn-referidos').addEventListener('click', verReferidos);
+
+  // Eventos de la pestaña Dashboard (estilo QuantumCall / WhaTaka)
+  const tileVideo = $('#dash-tile-video');
+  if (tileVideo) tileVideo.addEventListener('click', () => switchTab('tab-calls'));
+  const tileMsg = $('#dash-tile-messages');
+  if (tileMsg) tileMsg.addEventListener('click', () => switchTab('tab-chats'));
+
+  const dashMic = $('#dash-btn-mic');
+  if (dashMic) dashMic.addEventListener('click', () => toast('Micrófono listo'));
+  const dashHangup = $('#dash-btn-hangup');
+  if (dashHangup) dashHangup.addEventListener('click', () => voiceCall(false));
+  const dashCam = $('#dash-btn-cam');
+  if (dashCam) dashCam.addEventListener('click', () => voiceCall(true));
+
+  const dashContacts = $('#dash-gold-contacts');
+  if (dashContacts) dashContacts.addEventListener('click', () => askAddPeer());
+  const dashGroup = $('#dash-gold-group');
+  if (dashGroup) dashGroup.addEventListener('click', () => askAddPeer());
+  const dashShare = $('#dash-gold-share');
+  if (dashShare) dashShare.addEventListener('click', () => {
+    switchTab('tab-chats');
+    toast('Selecciona un contacto para compartir archivos');
+  });
+  const dashCalendar = $('#dash-gold-calendar');
+  if (dashCalendar) dashCalendar.addEventListener('click', abrirSala);
+
+  const dashHeadset = $('#btn-dash-headset');
+  if (dashHeadset) dashHeadset.addEventListener('click', showSecurity);
+  const searchToggle = $('#btn-search-toggle');
+  if (searchToggle) searchToggle.addEventListener('click', () => {
+    const box = $('#dash-search-container');
+    if (box) {
+      box.style.display = box.style.display === 'none' ? 'flex' : 'none';
+      if (box.style.display === 'flex') $('#search-input').focus();
+    }
+  });
 }
 
 async function boot() {
@@ -3134,6 +3243,7 @@ async function boot() {
   state.wallet = readStore(STORE.wallet, null);
 
   renderProfile();
+  renderDashboard();
   renderChats();
   renderStatus();
   renderCalls();

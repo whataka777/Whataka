@@ -10,8 +10,8 @@
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
   "orientation": "portrait",
-  "background_color": "#0b141a",
-  "theme_color": "#6c3483",
+  "background_color": "#0d2238",
+  "theme_color": "#0d2238",
   "categories": ["social", "communication"],
   "icons": [
     {
