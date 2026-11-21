@@ -282,50 +282,132 @@ test('GET /api/mining/config publica contrato y cadena', async () => {
   assert.equal(cfg.weights.call, 10);
 });
 
-test('el vale firmado recupera al firmante del relé y calcula la recompensa', async () => {
+async function registrarCarteraDePrueba(peerId, wallet) {
+  const donaciones = require('../lib/donaciones');
+  const signature = await wallet.signMessage(
+    donaciones.mensajeRegistroCartera(peerId, wallet.address),
+  );
+  const res = await fetch(`${BASE}/api/wallets`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ peerId, address: wallet.address, signature }),
+  });
+  assert.equal(res.status, 200);
+}
+
+test('el vale solo paga las unidades que mide el relé', async () => {
   const voucher = require('../lib/voucher');
   const { ethers } = require('ethers');
-  const user = '0x' + 'cd'.repeat(20);
-  const body = {
-    user,
-    peerId: 'wt1testpeer',
-    relayUnits: '10',
-    storeUnits: '2',
-    uptimeUnits: '30',
-    callUnits: '1',
-    reputationUnits: '5',
-  };
+  const wallet = ethers.Wallet.createRandom();
+  const peerId = makePeerId('minero-honesto');
+  const otroId = makePeerId('receptor-honesto');
+  await registrarCarteraDePrueba(peerId, wallet);
+
+  const a = await openSocket();
+  const b = await openSocket();
+  a.send(JSON.stringify({ t: 'hello', id: peerId, name: 'Minero' }));
+  b.send(JSON.stringify({ t: 'hello', id: otroId, name: 'Receptor' }));
+  await wait(150);
+  for (let i = 0; i < 3; i += 1) {
+    a.send(JSON.stringify({ t: 'msg', to: otroId, iv: 'iv', ct: 'ct' }));
+  }
+  await wait(200);
 
   const res = await fetch(`${BASE}/api/mining/voucher`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    // El cliente intenta inflar su trabajo; el relé debe ignorarlo.
+    body: JSON.stringify({
+      user: wallet.address,
+      peerId,
+      relayUnits: '1000000000',
+      storeUnits: '1000000000',
+      uptimeUnits: '1000000000',
+      callUnits: '1000000000',
+      reputationUnits: '1000000000',
+    }),
   });
   assert.equal(res.status, 200);
   const data = await res.json();
 
-  // Score 10*5 + 2*8 + 30*1 + 1*10 + 5*3 = 121 -> 0.121 WTK
-  assert.equal(data.score, '121');
-  assert.equal(data.rewardFormatted, '0.121');
-  assert.equal(data.contract, TEST_CONTRACT);
+  // Solo los 3 sobres reenviados; el resto de categorías no se pueden medir.
+  assert.equal(data.units.relay, '3');
+  assert.equal(data.units.store, '0');
+  assert.equal(data.score, '15'); // 3 * 5
+  assert.equal(data.rewardFormatted, '0.015');
   assert.match(data.reportHash, /^0x[0-9a-f]{64}$/);
 
-  // La firma debe recuperar la dirección del firmante configurado.
-  const expectedSigner = voucher.signerAddress(TEST_SIGNER_KEY);
   const recovered = ethers.verifyMessage(
     ethers.getBytes(
       voucher.voucherDigest({
         chainId: TEST_CHAIN_ID,
         contract: TEST_CONTRACT,
-        user,
+        user: wallet.address,
         reportHash: data.reportHash,
-        units: { relay: 10n, store: 2n, uptime: 30n, call: 1n, reputation: 5n },
+        units: { relay: 3n, store: 0n, uptime: 0n, call: 0n, reputation: 0n },
         deadline: data.deadline,
       }),
     ),
     data.signature,
   );
-  assert.equal(recovered, expectedSigner);
+  assert.equal(recovered, voucher.signerAddress(TEST_SIGNER_KEY));
+
+  // Un segundo vale inmediato choca con el enfriamiento.
+  const again = await fetch(`${BASE}/api/mining/voucher`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user: wallet.address, peerId }),
+  });
+  assert.equal(again.status, 429);
+  const cooled = await again.json();
+  assert.ok(cooled.retryAfter > 0);
+
+  // Y otra cartera no puede cobrar el trabajo de este nodo.
+  const otra = ethers.Wallet.createRandom();
+  const robo = await fetch(`${BASE}/api/mining/voucher`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user: otra.address, peerId }),
+  });
+  assert.equal(robo.status, 403);
+
+  a.close();
+  b.close();
+});
+
+test('GET /api/mining/status publica lo medido y lo pendiente', async () => {
+  const peerId = makePeerId('minero-honesto');
+  const res = await fetch(`${BASE}/api/mining/status/${peerId}`);
+  assert.equal(res.status, 200);
+  const data = await res.json();
+  assert.equal(data.units.relay, '3');
+  assert.equal(data.claimable.relay, '0'); // ya se cobraron
+  assert.ok(data.cooldownSeconds > 0);
+});
+
+test('el vale exige que la cartera esté registrada por el nodo', async () => {
+  const { ethers } = require('ethers');
+  const wallet = ethers.Wallet.createRandom();
+  const peerId = makePeerId('sin-cartera');
+  const res = await fetch(`${BASE}/api/mining/voucher`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user: wallet.address, peerId }),
+  });
+  assert.equal(res.status, 409);
+});
+
+test('el vale rechaza un nodo sin actividad medida', async () => {
+  const { ethers } = require('ethers');
+  const wallet = ethers.Wallet.createRandom();
+  const peerId = makePeerId('ocioso');
+  await registrarCarteraDePrueba(peerId, wallet);
+  const res = await fetch(`${BASE}/api/mining/voucher`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user: wallet.address, peerId }),
+  });
+  assert.equal(res.status, 400);
 });
 
 test('el vale rechaza una dirección de wallet inválida', async () => {
@@ -337,7 +419,7 @@ test('el vale rechaza una dirección de wallet inválida', async () => {
   assert.equal(res.status, 400);
 });
 
-test('el vale rechaza un score cero', async () => {
+test('el vale rechaza una petición sin peerId', async () => {
   const res = await fetch(`${BASE}/api/mining/voucher`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
