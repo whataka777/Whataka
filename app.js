@@ -31,6 +31,7 @@ const STORE = {
   relay: 'whataka.relay',
   avatar: 'whataka.avatar',
   wallet: 'whataka.wallet',
+  directKey: 'whataka.directKey',
   wc: 'whataka.wcProjectId',
   calls: 'whataka.calls',
   nivel: 'whataka.nivel',
@@ -376,22 +377,18 @@ function updateWalletUI() {
   const sub = $('#wallet-address-sub');
   if (!status || !sub) return;
   if (state.wallet) {
-    status.textContent = 'Wallet conectada 🟢';
-    sub.textContent = shortPeer(state.wallet, 6, 4);
+    const isDirect = Boolean(state.directWallet);
+    status.textContent = isDirect ? '⚡ Cartera Directa Conectada' : 'Wallet conectada 🟢';
+    sub.textContent = `${shortPeer(state.wallet, 8, 4)} · Toca para ver opciones`;
   } else {
-    status.textContent = '🦊 Conectar wallet';
-    sub.textContent = 'Vincular wallet para cobrar WTK on-chain';
+    status.textContent = '⚡ Conectar wallet (Directa)';
+    sub.textContent = 'Vincular wallet sin salir de la app para cobrar WTK';
   }
 }
 
-// Devuelve el proveedor Web3 disponible. Con MetaMask y Brave Wallet a la vez,
-// ambos inyectan su propio objeto en window.ethereum.providers; elegimos uno de
-// forma estable (Brave primero, luego MetaMask) en vez de dejar que decida el
-// orden de carga, que cambia entre navegaciones y rompe la conexión.
+// Devuelve el proveedor Web3 disponible. Si hay una cartera directa integrada, esa manda para que el usuario nunca salga de la app.
 function getWalletProvider() {
-  // Binance Wallet se inyecta a veces como window.BinanceChain y a veces dentro
-  // de window.ethereum.providers. Lo preferimos si está, porque su provider de
-  // window.ethereum puede ser en realidad el de otra wallet.
+  if (state.directWalletProvider) return state.directWalletProvider;
   if (window.BinanceChain) return window.BinanceChain;
   const injected = window.ethereum;
   if (injected) {
@@ -404,8 +401,142 @@ function getWalletProvider() {
       injected
     );
   }
-  // Sin wallet inyectada, si ya abrimos una sesión WalletConnect, esa manda.
   return state.wcProvider || null;
+}
+
+// Crea un proveedor EIP-1193 completo para la cartera directa integrada,
+// permitiendo firmar mensajes y transacciones de minería/donaciones sin apps externas.
+function createDirectWalletProvider(walletInstance, rpcUrl, chainId = 80002) {
+  const jsonRpc = new ethers.JsonRpcProvider(rpcUrl);
+  const connectedSigner = walletInstance.connect(jsonRpc);
+
+  return {
+    isDirectWallet: true,
+    isMetaMask: false,
+    request: async ({ method, params }) => {
+      if (method === 'eth_requestAccounts' || method === 'eth_accounts') {
+        return [walletInstance.address];
+      }
+      if (method === 'eth_chainId') {
+        return '0x' + Number(chainId).toString(16);
+      }
+      if (method === 'wallet_switchEthereumChain' || method === 'wallet_addEthereumChain') {
+        return null;
+      }
+      if (method === 'personal_sign') {
+        const msg = params[0].startsWith('0x') && params[0].length === 42 ? params[1] : params[0];
+        const bytes = ethers.isHexString(msg) ? ethers.getBytes(msg) : ethers.toUtf8Bytes(msg);
+        return connectedSigner.signMessage(bytes);
+      }
+      if (method === 'eth_signTypedData_v4') {
+        const data = typeof params[1] === 'string' ? JSON.parse(params[1]) : params[1];
+        return connectedSigner.signTypedData(data.domain, data.types, data.message);
+      }
+      if (method === 'eth_sendTransaction') {
+        const tx = await connectedSigner.sendTransaction(params[0]);
+        return tx.hash;
+      }
+      return jsonRpc.send(method, params || []);
+    },
+  };
+}
+
+function initDirectWalletFromKey(privateKey, chainId = 80002) {
+  try {
+    const w = new ethers.Wallet(privateKey);
+    const meta = KNOWN_CHAINS[chainId] || KNOWN_CHAINS[80002];
+    const rpc = meta.rpcs ? meta.rpcs[0] : meta.rpc;
+    state.directWallet = w;
+    state.directWalletProvider = createDirectWalletProvider(w, rpc, chainId);
+    state.wallet = w.address;
+    writeStore(STORE.wallet, w.address);
+    writeStore(STORE.directKey, privateKey);
+    updateWalletUI();
+    return w;
+  } catch (err) {
+    console.error('Error inicializando directWallet', err);
+    return null;
+  }
+}
+
+async function connectWalletDirect() {
+  const existingKey = readStore(STORE.directKey, null);
+  let w;
+  if (existingKey) {
+    w = initDirectWalletFromKey(existingKey);
+  } else {
+    const randomWallet = ethers.Wallet.createRandom();
+    w = initDirectWalletFromKey(randomWallet.privateKey);
+    toast('¡Cartera directa creada en WhaTaka!');
+  }
+  if (w) {
+    registrarCartera(w.address).then((ok) => { if (ok) console.info('Cartera registrada en el relé'); });
+    updateWalletUI();
+    closeModal();
+    toast(`Conectado directo: ${shortPeer(w.address, 6, 4)}`);
+    return w.address;
+  }
+  return null;
+}
+
+function showWalletDetails() {
+  const isDirect = Boolean(state.directWallet);
+  openModal('Tu Wallet Conectada', `
+    <div style="text-align:center; padding:10px 0;">
+      <div style="font-size:36px; margin-bottom:8px;">${isDirect ? '⚡' : '🦊'}</div>
+      <h4 style="color:var(--text-strong); margin-bottom:4px;">${isDirect ? 'Cartera Directa Integrada' : 'Wallet Web3'}</h4>
+      <p class="mono-text" style="font-size:12px; background:rgba(0,0,0,0.3); padding:8px 10px; border-radius:8px; word-break:break-all; margin:10px 0;">
+        ${state.wallet}
+      </p>
+      <button class="primary-btn" id="btn-copy-wallet" style="margin-bottom:8px;">📋 Copiar Dirección</button>
+      ${isDirect ? `
+        <button class="ghost-btn" id="btn-show-privkey" style="margin-bottom:8px; width:100%;">🔑 Ver / Exportar Clave Privada</button>
+      ` : ''}
+      <button class="ghost-btn" id="btn-disconnect-wallet" style="color:var(--danger); border-color:var(--danger); width:100%;">Desconectar Cartera</button>
+    </div>
+  `);
+
+  $('#btn-copy-wallet').addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(state.wallet);
+      toast('Dirección copiada');
+    } catch {
+      toast(state.wallet);
+    }
+  });
+
+  if (isDirect) {
+    $('#btn-show-privkey').addEventListener('click', () => {
+      const key = readStore(STORE.directKey, '');
+      openModal('Clave Privada (Respaldar)', `
+        <p style="color:var(--danger); font-weight:600; font-size:13px; margin-bottom:8px;">⚠️ Nunca compartas tu clave privada con nadie.</p>
+        <p style="font-size:12px; color:var(--text-muted); margin-bottom:8px;">Puedes importar esta clave en MetaMask cuando quieras para ver tus tokens WTK también allí:</p>
+        <p class="mono-text" style="font-size:11px; background:rgba(0,0,0,0.4); padding:10px; border-radius:8px; word-break:break-all; user-select:all;">
+          ${key}
+        </p>
+        <button class="primary-btn" id="btn-copy-privkey" style="margin-top:10px;">📋 Copiar Clave Privada</button>
+      `);
+      $('#btn-copy-privkey').addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(key);
+          toast('Clave copiada al portapapeles');
+        } catch {
+          toast(key);
+        }
+      });
+    });
+  }
+
+  $('#btn-disconnect-wallet').addEventListener('click', () => {
+    state.wallet = null;
+    state.directWallet = null;
+    state.directWalletProvider = null;
+    localStorage.removeItem(STORE.wallet);
+    localStorage.removeItem(STORE.directKey);
+    updateWalletUI();
+    closeModal();
+    toast('Wallet desconectada');
+  });
 }
 
 // ── WalletConnect (Reown) ───────────────────────────────────────────────────
@@ -432,8 +563,6 @@ function loadScript(src) {
 async function openWcSession(chainId) {
   const projectId = wcProjectId();
   if (!projectId) return null;
-  // El bundle de WalletConnect referencia process.env.NODE_ENV; en el
-  // navegador `process` no existe y lanzaría ReferenceError.
   if (typeof window.process === 'undefined') {
     window.process = { env: { NODE_ENV: 'production' } };
   }
@@ -460,62 +589,122 @@ async function openWcSession(chainId) {
   return provider;
 }
 
-// Abre WhaTaka dentro de la app de MetaMask (deep link). Es el respaldo cuando
-// no hay Project ID de WalletConnect: ahí MetaMask sí inyecta su proveedor.
+// Abre WhaTaka dentro de la app de MetaMask (deep link).
 function openInMetaMask() {
   const target = location.href.replace(/^https?:\/\//, '');
   window.location.href = METAMASK_DEEPLINK + target;
 }
 
 async function connectWallet() {
-  const cfg = await loadMiningConfig();
-  const chainId = cfg ? cfg.chainId : 80002;
-  let wallet = getWalletProvider();
-
-  // 1. Wallet inyectada (MetaMask dentro de su navegador, Brave, etc.).
-  if (!wallet) {
-    // 2. WalletConnect: conecta MetaMask desde el navegador normal del móvil.
-    try {
-      wallet = await openWcSession(chainId);
-    } catch (err) {
-      console.warn('WalletConnect', err);
-      wallet = null;
-    }
+  if (state.wallet) {
+    showWalletDetails();
+    return state.wallet;
   }
 
-  // 3. Sin nada disponible: ofrecemos abrir la app dentro de MetaMask.
-  if (!wallet) {
-    if (!wcProjectId()) {
-      openModal('Conectar wallet', `
-        <p>Para conectar MetaMask desde este navegador hay dos caminos:</p>
-        <p><strong>Opción A (recomendada).</strong> Abre WhaTaka dentro de MetaMask con un toque.</p>
-        <button class="primary-btn" id="wc-open-mm">🦊 Abrir WhaTaka en MetaMask</button>
-        <p class="hint-text">Si no se abre, toca los tres puntos de MetaMask → Navegador y pega la dirección.</p>
-        <hr style="border-color:var(--border-color);margin:14px 0">
-        <p><strong>Opción B.</strong> Pega tu <em>Project ID</em> gratuito de WalletConnect (cloud.reown.com)
-        y podrás conectar sin salir de este navegador.</p>
-        <input class="modal-input" id="wc-pid-input" placeholder="Project ID de WalletConnect">
-        <button class="primary-btn" id="wc-pid-save">Guardar Project ID</button>`);
-      $('#wc-open-mm').addEventListener('click', openInMetaMask);
-      $('#wc-pid-save').addEventListener('click', () => {
-        const v = $('#wc-pid-input').value.trim();
-        if (!v) {
-          toast('Escribe un Project ID válido');
-          return;
-        }
-        writeStore(STORE.wc, v);
-        renderProfile();
+  const injected = window.ethereum;
+
+  openModal('Conectar Cartera Web3', `
+    <div style="display:flex; flex-direction:column; gap:12px; padding:6px 0;">
+      <p style="font-size:13px; color:var(--text-muted); line-height:1.4;">
+        Conéctate <strong>directamente sin salir de WhaTaka</strong> para recibir y reclamar tus tokens WTK.
+      </p>
+
+      <!-- Opción 1: Cartera Directa Integrada (Sin salir de la app) -->
+      <div style="background:var(--bg-card); border:1px solid var(--accent); border-radius:12px; padding:12px; text-align:left;">
+        <h4 style="color:var(--text-strong); font-size:14px; margin-bottom:4px; display:flex; align-items:center; gap:6px;">
+          <span style="color:var(--accent); font-size:16px;">⚡</span> Cartera Directa Integrada <span style="font-size:10px; background:var(--accent); color:#fff; padding:2px 6px; border-radius:10px;">Recomendada</span>
+        </h4>
+        <p style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">
+          Crea o activa tu cartera en 1 toque. Cero apps externas, cero inicios de sesión, 100% dentro de WhaTaka.
+        </p>
+        <button class="primary-btn" id="btn-wallet-instant" style="width:100%; padding:11px;">
+          ⚡ Conectar Directo (1 toque)
+        </button>
+      </div>
+
+      <!-- Opción 2: Importar cuenta o clave de MetaMask -->
+      <div style="background:var(--bg-card); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:12px; text-align:left;">
+        <h4 style="color:var(--text-strong); font-size:13.5px; margin-bottom:4px;">
+          🔑 Importar cuenta o clave de MetaMask
+        </h4>
+        <p style="font-size:11.5px; color:var(--text-muted); margin-bottom:8px;">
+          Pega tu clave privada (o dirección) para usar tu cuenta directamente aquí sin salirte.
+        </p>
+        <input class="modal-input" id="input-import-wallet" placeholder="0x... (clave privada o dirección)" style="margin-bottom:8px;">
+        <button class="ghost-btn" id="btn-import-wallet" style="width:100%; padding:10px;">
+          Importar y Conectar
+        </button>
+      </div>
+
+      ${injected ? `
+      <!-- Opción 3: Extensión inyectada si existe -->
+      <button class="ghost-btn" id="btn-wallet-injected" style="width:100%; padding:10px;">
+        🦊 Conectar Extensión del Navegador (${walletName(injected)})
+      </button>
+      ` : ''}
+
+      <!-- Opción alternativa: abrir en app MetaMask -->
+      <p style="font-size:11px; color:var(--text-dim); text-align:center; margin-top:4px;">
+        ¿Prefieres abrir la app externa de MetaMask? 
+        <a href="#" id="link-open-mm" style="color:var(--accent); text-decoration:underline;">Abrir en MetaMask</a>
+      </p>
+    </div>
+  `);
+
+  $('#btn-wallet-instant').addEventListener('click', async () => {
+    closeModal();
+    await connectWalletDirect();
+  });
+
+  $('#btn-import-wallet').addEventListener('click', async () => {
+    const val = $('#input-import-wallet').value.trim();
+    if (!val) {
+      toast('Ingresa una clave privada o dirección');
+      return;
+    }
+    const cleanKey = val.startsWith('0x') ? val : '0x' + val;
+    if (cleanKey.length === 66 && /^0x[0-9a-fA-F]{64}$/.test(cleanKey)) {
+      const w = initDirectWalletFromKey(cleanKey);
+      if (w) {
+        registrarCartera(w.address).then((ok) => { if (ok) console.info('Registrada en relé'); });
+        updateWalletUI();
         closeModal();
-        toast('Project ID guardado; reintentando…');
-        setTimeout(() => connectWallet(), 300);
-      });
-      return null;
+        toast(`Conectado directo: ${shortPeer(w.address, 6, 4)}`);
+      } else {
+        toast('Clave privada inválida');
+      }
+      return;
     }
-    toast('No hay wallet disponible para conectar');
-    return null;
+    if (ethers.isAddress(val)) {
+      state.wallet = ethers.getAddress(val);
+      writeStore(STORE.wallet, state.wallet);
+      updateWalletUI();
+      closeModal();
+      toast(`Dirección vinculada: ${shortPeer(state.wallet, 6, 4)}`);
+      return;
+    }
+    toast('Formato no reconocido (debe ser clave privada o dirección 0x...)');
+  });
+
+  if (injected) {
+    $('#btn-wallet-injected').addEventListener('click', async () => {
+      closeModal();
+      await connectInjectedWallet(injected);
+    });
   }
 
+  $('#link-open-mm').addEventListener('click', (e) => {
+    e.preventDefault();
+    openInMetaMask();
+  });
+
+  return null;
+}
+
+async function connectInjectedWallet(wallet) {
   try {
+    const cfg = await loadMiningConfig();
+    const chainId = cfg ? cfg.chainId : 80002;
     const provider = new ethers.BrowserProvider(wallet);
     const accounts = await provider.send('eth_requestAccounts', []);
     const address = accounts && accounts[0];
@@ -529,8 +718,6 @@ async function connectWallet() {
     state.wallet = address;
     writeStore(STORE.wallet, address);
     updateWalletUI();
-    // Registramos la cartera en el relé (firma del dueño) para que quede
-    // asociada a este Peer ID. Si el usuario no firma, seguimos igual.
     registrarCartera(address).then((ok) => { if (ok) console.info('Cartera registrada en el relé'); });
     toast(`Wallet conectada (${walletName(wallet)})`);
     return address;
@@ -3242,6 +3429,11 @@ async function boot() {
   state.agreeKey = await importAgreePrivate(identity.agreePriv);
   state.wallet = readStore(STORE.wallet, null);
 
+  const savedDirectKey = readStore(STORE.directKey, null);
+  if (savedDirectKey) {
+    initDirectWalletFromKey(savedDirectKey);
+  }
+
   renderProfile();
   renderDashboard();
   renderChats();
@@ -3251,6 +3443,7 @@ async function boot() {
   updateWalletUI();
   pintarResumenReferidos();
   bindEvents();
+  switchTab('tab-dashboard');
 
   // Referidos: registra la invitación si llegamos por un enlace y refresca el
   // contador desde el relé (cuántos invitados tengo y en qué puesto voy).

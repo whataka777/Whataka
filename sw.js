@@ -1,4 +1,4 @@
-const CACHE = 'whataka-v40';
+const CACHE = 'whataka-v60';
 const ASSETS = [
   './',
   './index.html',
@@ -28,9 +28,8 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Estrategia "red primero": con conexión siempre se sirve la última versión y
-// se refresca la caché; sin conexión se responde desde la caché. El relé y el
-// CDN (otros orígenes) van directos a la red.
+// Estrategia "red primero": con conexión siempre se sirve la última versión fresca
+// y se refresca la caché para que los cambios visuales se vean de inmediato.
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
@@ -38,7 +37,7 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
 
   event.respondWith(
-    fetch(request)
+    fetch(request, { cache: 'no-cache' })
       .then((res) => {
         const copy = res.clone();
         caches.open(CACHE).then((cache) => cache.put(request, copy)).catch(() => {});
