@@ -26,6 +26,10 @@ const CHAIN_ID = Number(process.env.CHAIN_ID) || 80002; // Polygon Amoy por defe
 const MINING_CONTRACT = (process.env.MINING_CONTRACT || '').trim();
 const REPORT_SIGNER_KEY = (process.env.REPORT_SIGNER_KEY || '').trim();
 const VOUCHER_TTL_SECONDS = Number(process.env.VOUCHER_TTL_SECONDS) || 600;
+// Las unidades las mide el relé, pero aun así se acota cuánto puede pagar un
+// solo vale y cada cuánto se puede pedir otro.
+const MAX_REWARD_PER_CLAIM_WEI = BigInt(process.env.MAX_REWARD_PER_CLAIM_WEI || 5n * 10n ** 18n);
+const CLAIM_COOLDOWN_SECONDS = Number(process.env.CLAIM_COOLDOWN_SECONDS) || 600;
 
 // Cartera de donaciones (la del administrador). Se configura por variable de
 // entorno para NO incrustarla en el código: al pasar a Polygon real solo hay
@@ -56,8 +60,86 @@ app.use((req, res, next) => {
 const peers = new Map();          // peerId -> { name, signPub, agreePub, sockets:Set, connectedAt }
 const ledger = new Map();         // peerId -> { score, reports, lastReportAt }
 const wallets = new Map();        // peerId -> { address, peerId, registeredAt }
+const mining = new Map();         // peerId -> unidades medidas por el relé
 const referrals = new Map();      // invitado(peerId) -> { padrino, at }
 const startedAt = Date.now();
+
+// ── Unidades de minería medidas por el relé ─────────────────────────────────
+// El navegador no decide las unidades: solo suman los sobres que este proceso
+// reenvía de verdad, la señalización de llamadas y los minutos conectado. Un
+// vale nunca paga por actividad que el relé no haya visto pasar.
+
+function miningEntry(peerId) {
+  let entry = mining.get(peerId);
+  if (!entry) {
+    entry = {
+      relay: 0n,
+      call: 0n,
+      uptimeMs: 0,
+      sessionStart: 0,
+      claimed: { relay: 0n, uptime: 0n, call: 0n },
+      claimCount: 0,
+      lastClaimAt: 0,
+    };
+    mining.set(peerId, entry);
+  }
+  return entry;
+}
+
+function openMiningSession(peerId) {
+  const entry = miningEntry(peerId);
+  if (!entry.sessionStart) entry.sessionStart = Date.now();
+}
+
+function closeMiningSession(peerId) {
+  const entry = mining.get(peerId);
+  if (!entry || !entry.sessionStart) return;
+  entry.uptimeMs += Date.now() - entry.sessionStart;
+  entry.sessionStart = 0;
+}
+
+function uptimeMinutesOf(entry) {
+  const live = entry.sessionStart ? Date.now() - entry.sessionStart : 0;
+  return BigInt(Math.floor((entry.uptimeMs + live) / 60000));
+}
+
+function measuredUnits(peerId) {
+  const entry = mining.get(peerId);
+  if (!entry) return { relay: 0n, store: 0n, uptime: 0n, call: 0n, reputation: 0n };
+  // `store` y `reputation` dependen del historial local del navegador, así que
+  // el relé no puede comprobarlos y no los paga.
+  return {
+    relay: entry.relay,
+    store: 0n,
+    uptime: uptimeMinutesOf(entry),
+    call: entry.call,
+    reputation: 0n,
+  };
+}
+
+function claimableUnits(peerId) {
+  const entry = mining.get(peerId);
+  const total = measuredUnits(peerId);
+  if (!entry) return total;
+  const rest = (measured, claimed) => (measured > claimed ? measured - claimed : 0n);
+  return {
+    relay: rest(total.relay, entry.claimed.relay),
+    store: 0n,
+    uptime: rest(total.uptime, entry.claimed.uptime),
+    call: rest(total.call, entry.claimed.call),
+    reputation: 0n,
+  };
+}
+
+function unitsToJson(units) {
+  return {
+    relay: units.relay.toString(),
+    store: units.store.toString(),
+    uptime: units.uptime.toString(),
+    call: units.call.toString(),
+    reputation: units.reputation.toString(),
+  };
+}
 
 // Invitados de cada padrino, para contar rápido. Se deriva de `referrals`.
 function invitadosDe(padrino) {
@@ -204,16 +286,10 @@ app.get('/api/mining/config', (req, res) => {
       reputation: Number(voucher.WEIGHTS.reputation),
     },
     rewardFactor: voucher.REWARD_FACTOR.toString(),
+    maxRewardPerClaim: MAX_REWARD_PER_CLAIM_WEI.toString(),
+    cooldownSeconds: CLAIM_COOLDOWN_SECONDS,
   });
 });
-
-// Valida un entero de unidades (0..MAX_UNITS) y lo devuelve como BigInt.
-function readUnits(value) {
-  if (value === undefined || value === null || value === '') return 0n;
-  const n = typeof value === 'bigint' ? value : BigInt(String(value).trim());
-  if (n < 0n || n > voucher.MAX_UNITS) throw new Error('unidades fuera de rango');
-  return n;
-}
 
 function isAddress(value) {
   return typeof value === 'string' && /^0x[0-9a-fA-F]{40}$/.test(value);
@@ -391,42 +467,69 @@ app.post('/api/mining/voucher', (req, res) => {
   }
 
   const body = req.body || {};
-  const { user, reportHash, nonce } = body;
+  const { user, peerId } = body;
   if (!isAddress(user)) {
     return res.status(400).json({ error: 'dirección de wallet inválida' });
   }
-
-  let units;
-  try {
-    units = {
-      relay: readUnits(body.relayUnits),
-      store: readUnits(body.storeUnits),
-      uptime: readUnits(body.uptimeUnits),
-      call: readUnits(body.callUnits),
-      reputation: readUnits(body.reputationUnits),
-    };
-  } catch (err) {
-    return res.status(400).json({ error: err.message });
+  if (!validatePeerId(peerId)) {
+    return res.status(400).json({ error: 'peerId inválido' });
   }
 
-  const score = voucher.scoreOf(units);
+  // La cartera tiene que estar registrada por ese nodo; si no, cualquiera
+  // podría cobrar en la suya las unidades que ha minado otro.
+  const registered = wallets.get(peerId);
+  if (!registered) {
+    return res.status(409).json({ error: 'la cartera no está registrada para este nodo' });
+  }
+  if (registered.address.toLowerCase() !== user.toLowerCase()) {
+    return res.status(403).json({ error: 'la cartera no pertenece a este nodo' });
+  }
+
+  const entry = miningEntry(peerId);
+  const now = Math.floor(Date.now() / 1000);
+  const waiting = entry.lastClaimAt + CLAIM_COOLDOWN_SECONDS - now;
+  if (waiting > 0) {
+    return res.status(429).json({
+      error: `espera ${waiting} s antes de pedir otro vale`,
+      retryAfter: waiting,
+    });
+  }
+
+  // Las unidades salen de lo que ha medido el relé, nunca del cuerpo.
+  let units = claimableUnits(peerId);
+  let score = voucher.scoreOf(units);
   if (score === 0n) {
-    return res.status(400).json({ error: 'score cero, no hay nada que reclamar' });
+    return res.status(400).json({ error: 'no hay unidades nuevas que reclamar' });
   }
 
-  const hash = typeof reportHash === 'string' && /^0x[0-9a-fA-F]{64}$/.test(reportHash)
-    ? reportHash
-    : voucher.reportHashFor(body.peerId || 'anon', nonce || crypto.randomBytes(8).toString('hex'));
+  // Recorte proporcional para no pasarse del tope por vale.
+  const maxScore = MAX_REWARD_PER_CLAIM_WEI / voucher.REWARD_FACTOR;
+  if (score > maxScore) {
+    const scale = (n) => (n * maxScore) / score;
+    units = {
+      relay: scale(units.relay),
+      store: 0n,
+      uptime: scale(units.uptime),
+      call: scale(units.call),
+      reputation: 0n,
+    };
+    score = voucher.scoreOf(units);
+  }
 
-  const deadline = Math.floor(Date.now() / 1000) + VOUCHER_TTL_SECONDS;
+  const claimCount = entry.claimCount + 1;
+  const reportHash = voucher.reportHashFor(
+    peerId,
+    `${claimCount}:${crypto.randomBytes(8).toString('hex')}`,
+  );
+  const deadline = now + VOUCHER_TTL_SECONDS;
 
   let signature;
   try {
     signature = voucher.signVoucher(REPORT_SIGNER_KEY, {
       chainId: CHAIN_ID,
       contract: MINING_CONTRACT,
-      user,
-      reportHash: hash,
+      user: registered.address,
+      reportHash,
       units,
       deadline,
     });
@@ -434,24 +537,47 @@ app.post('/api/mining/voucher', (req, res) => {
     return res.status(500).json({ error: `no se pudo firmar: ${err.message}` });
   }
 
+  // Reservamos las unidades antes de responder: dos peticiones seguidas no
+  // pueden firmar dos veces el mismo trabajo.
+  entry.claimed.relay += units.relay;
+  entry.claimed.uptime += units.uptime;
+  entry.claimed.call += units.call;
+  entry.claimCount = claimCount;
+  entry.lastClaimAt = now;
+
   res.json({
     ok: true,
     chainId: CHAIN_ID,
     contract: MINING_CONTRACT,
-    user,
-    reportHash: hash,
-    units: {
-      relay: units.relay.toString(),
-      store: units.store.toString(),
-      uptime: units.uptime.toString(),
-      call: units.call.toString(),
-      reputation: units.reputation.toString(),
-    },
+    user: registered.address,
+    reportHash,
+    units: unitsToJson(units),
     score: score.toString(),
     reward: voucher.rewardUnits(units).toString(),
     rewardFormatted: voucher.formatReward(units),
     deadline,
     signature,
+  });
+});
+
+// Lo que el relé ha medido para un nodo, sin firmar nada.
+app.get('/api/mining/status/:peerId', (req, res) => {
+  const { peerId } = req.params;
+  if (!validatePeerId(peerId)) {
+    return res.status(400).json({ error: 'peerId inválido' });
+  }
+  const entry = mining.get(peerId);
+  const measured = measuredUnits(peerId);
+  const pending = claimableUnits(peerId);
+  const now = Math.floor(Date.now() / 1000);
+  res.json({
+    peerId,
+    units: unitsToJson(measured),
+    claimable: unitsToJson(pending),
+    score: voucher.scoreOf(pending).toString(),
+    rewardFormatted: voucher.formatReward(pending),
+    cooldownSeconds: entry ? Math.max(0, entry.lastClaimAt + CLAIM_COOLDOWN_SECONDS - now) : 0,
+    wallet: wallets.get(peerId)?.address || null,
   });
 });
 
@@ -500,7 +626,10 @@ function dropPeer(socket) {
   const peer = peers.get(socket.peerId);
   if (!peer) return;
   peer.sockets.delete(socket);
-  if (peer.sockets.size === 0) peers.delete(socket.peerId);
+  if (peer.sockets.size === 0) {
+    peers.delete(socket.peerId);
+    closeMiningSession(socket.peerId);
+  }
   sendPresence();
 }
 
@@ -539,6 +668,7 @@ wss.on('connection', (socket) => {
         peer.signPub = typeof msg.signPub === 'string' ? msg.signPub : peer.signPub;
         peer.sockets.add(socket);
         peers.set(msg.id, peer);
+        openMiningSession(msg.id);
         sendPresence();
         break;
       }
@@ -567,6 +697,7 @@ wss.on('connection', (socket) => {
         for (const s of target.sockets) {
           if (s.readyState === 1) s.send(envelope);
         }
+        miningEntry(socket.peerId).relay += 1n;
         break;
       }
       // Señalización de llamadas WebRTC. El relé NO ve el audio ni el vídeo
@@ -590,6 +721,7 @@ wss.on('connection', (socket) => {
         for (const s of target.sockets) {
           if (s.readyState === 1) s.send(frame);
         }
+        miningEntry(socket.peerId).call += 1n;
         break;
       }
       default:

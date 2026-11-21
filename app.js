@@ -1223,6 +1223,23 @@ function renderMining() {
 
   renderNivel();
   renderDonaciones();
+  refreshMiningStatus();
+}
+
+// Quien paga es el relé, así que la vista enseña sus números en cuanto llegan.
+// Los locales se quedan solo como respaldo mientras responde.
+async function refreshMiningStatus() {
+  try {
+    const res = await fetch(`${RELAY_HTTP}/api/mining/status/${state.identity.peerId}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    $('#m-relay').textContent = data.units.relay;
+    $('#m-uptime').textContent = data.units.uptime;
+    $('#m-store').textContent = data.units.store;
+    $('#m-score').textContent = data.score;
+  } catch {
+    /* sin relé se muestran los números locales */
+  }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -3104,32 +3121,20 @@ async function sendMiningReport() {
       return;
     }
 
-    const units = miningUnits();
-    const score = miningScore(units);
-    if (score === 0n) {
-      log.textContent = 'Aún no acumulaste unidades de minería.';
-      return;
-    }
-
-    // 3. Pedimos al relé un vale firmado para nuestras unidades.
+    // 3. Pedimos al relé un vale por las unidades que él mismo ha medido.
     log.textContent = 'Solicitando vale firmado al relé…';
-    const reportHash = ethers.keccak256(
-      ethers.toUtf8Bytes(`${state.identity.peerId}:${randomHex(8)}`),
-    );
-    const voucherRes = await fetch(`${RELAY_HTTP}/api/mining/voucher`, {
+    const pedirVale = () => fetch(`${RELAY_HTTP}/api/mining/voucher`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        user: state.wallet,
-        peerId: state.identity.peerId,
-        reportHash,
-        relayUnits: units.relay.toString(),
-        storeUnits: units.store.toString(),
-        uptimeUnits: units.uptime.toString(),
-        callUnits: units.call.toString(),
-        reputationUnits: units.reputation.toString(),
-      }),
+      body: JSON.stringify({ user: state.wallet, peerId: state.identity.peerId }),
     });
+    let voucherRes = await pedirVale();
+    if (voucherRes.status === 409) {
+      // El relé todavía no tiene esta cartera asociada al nodo: la firmamos.
+      log.textContent = 'Firmando la cartera para este nodo…';
+      await registrarCartera(state.wallet);
+      voucherRes = await pedirVale();
+    }
     const voucherData = await voucherRes.json().catch(() => ({}));
     if (!voucherRes.ok) throw new Error(voucherData.error || `HTTP ${voucherRes.status}`);
 
