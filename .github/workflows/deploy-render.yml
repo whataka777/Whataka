@@ -1,0 +1,38 @@
+name: Deploy del relé a Render
+
+# El webhook de Render hacia este repo dejó de llegar el 16 de noviembre de 2026,
+# así que los commits se quedaban sin publicar. Este workflow lo dispara por API.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: render-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disparar despliegue en Render
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${RENDER_API_KEY:-}" ]; then
+            echo "Falta el secreto RENDER_API_KEY en el repo." >&2
+            exit 1
+          fi
+          response=$(curl -sS -X POST \
+            -H "Authorization: Bearer $RENDER_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{}' \
+            -w '\n%{http_code}' \
+            https://api.render.com/v1/services/srv-dbrneam7bikc73b2iu2g/deploys)
+          code=$(printf '%s' "$response" | tail -n 1)
+          body=$(printf '%s' "$response" | sed '$d')
+          echo "Render respondió HTTP $code"
+          printf '%s\n' "$body"
+          test "$code" = "201"
