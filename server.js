@@ -471,7 +471,7 @@ const PUBLIC_FILES = new Set([
 ]);
 const PUBLIC_DIRS = ['/vendor/', '/icons/', '/lib/'];
 app.use((req, res, next) => {
-  if (req.method !== 'GET') return next();
+  if (req.method !== 'GET' && req.method !== 'HEAD') return next();
   const p = req.path;
   if (!PUBLIC_FILES.has(p) && !PUBLIC_DIRS.some((d) => p.startsWith(d))) return next();
   express.static(__dirname, { index: 'index.html' })(req, res, next);
