@@ -1,4 +1,4 @@
-const CACHE = 'whataka-v66';
+const CACHE = 'whataka-v67';
 const ASSETS = [
   './',
   './index.html',
@@ -46,6 +46,14 @@ self.addEventListener('push', (event) => {
   }
   const nombre = datos.nombre || 'Alguien';
 
+  // El que llamaba se cansó: se quita el cartel de "Contestar" del teléfono.
+  if (datos.tipo === 'colgado') {
+    event.waitUntil((async () => {
+      const lista = await self.registration.getNotifications({ tag: `llamada-${datos.callId || 'sin-id'}` });
+      for (const aviso of lista) aviso.close();
+    })());
+    return;
+  }
   if (datos.tipo === 'mensaje') {
     event.waitUntil(
       self.registration.showNotification(`Mensaje de ${nombre}`, {
@@ -66,9 +74,15 @@ self.addEventListener('push', (event) => {
       {
         body: 'Toca para contestar en Whataka',
         tag: `llamada-${datos.callId || 'sin-id'}`,
+        // El relé repite el aviso cada pocos segundos mientras suena: con el
+        // mismo tag y renotify, cada repetición vuelve a sonar y a vibrar en
+        // lugar de amontonar notificaciones.
         requireInteraction: true,
         renotify: true,
-        vibrate: [600, 300, 600, 300, 600, 300, 600],
+        silent: false,
+        timestamp: Date.now(),
+        // Patrón largo, tipo timbre de teléfono, no un pitido suelto.
+        vibrate: [900, 400, 900, 400, 900, 400, 900, 400, 900],
         icon: './icons/icon-192.png',
         badge: './icons/icon-192.png',
         data: datos,

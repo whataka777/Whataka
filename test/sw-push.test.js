@@ -23,6 +23,9 @@ function cargarSW() {
     registration: {
       scope: `${ORIGEN}/`,
       showNotification: async (titulo, opciones) => { notificaciones.push({ titulo, opciones }); },
+      getNotifications: async ({ tag } = {}) => notificaciones
+        .filter((n) => !tag || n.opciones.tag === tag)
+        .map((n) => ({ tag: n.opciones.tag, close: () => { n.cerrada = true; } })),
     },
     clients: {
       matchAll: async () => ventanas,
@@ -94,6 +97,9 @@ test('un push de llamada muestra aviso con vibración y botones', async () => {
   assert.equal(opciones.actions.map((a) => a.action).join(','), 'contestar,rechazar');
   assert.equal(opciones.data.callId, 'c-1');
   assert.equal(opciones.tag, 'llamada-c-1');
+  assert.equal(opciones.renotify, true, 'cada repetición vuelve a sonar');
+  assert.equal(opciones.silent, false);
+  assert.ok(opciones.vibrate.length >= 9, 'patrón largo de timbre');
 });
 
 test('una videollamada se anuncia como videollamada', async () => {
@@ -234,4 +240,19 @@ test('con la app abierta el aviso de mensaje abre ese chat sin recargar', async 
   assert.equal(mensajes.length, 1);
   assert.equal(mensajes[0].tipo, 'aviso-mensaje');
   assert.equal(mensajes[0].de, 'wt1zzz');
+});
+
+test('al colgar el que llama se retira el cartel de la llamada', async () => {
+  const { manejadores, notificaciones } = cargarSW();
+  const pushLlamada = eventoPush({ tipo: 'llamada', de: 'wt1abc', callId: 'c-9', nombre: 'Bruno' });
+  manejadores.get('push')(pushLlamada.event);
+  await pushLlamada.listo();
+  assert.equal(notificaciones.length, 1);
+
+  const colgado = eventoPush({ tipo: 'colgado', callId: 'c-9' });
+  manejadores.get('push')(colgado.event);
+  await colgado.listo();
+
+  assert.equal(notificaciones.length, 1, 'no se crea otra notificación');
+  assert.equal(notificaciones[0].cerrada, true, 'se cierra la que estaba');
 });

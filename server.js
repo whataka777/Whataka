@@ -82,6 +82,17 @@ const ledger = new Map();         // peerId -> { score, reports, lastReportAt }
 const wallets = new Map();        // peerId -> { address, peerId, registeredAt }
 const mining = new Map();         // peerId -> unidades medidas por el relé
 const referrals = new Map();      // invitado(peerId) -> { padrino, at }
+const esperasRepique = new Map(); // callId -> temporizador que espera la confirmación del móvil
+
+// Si la llamada se contesta, se cuelga o el móvil confirma, el temporizador que
+// iba a empezar a repicar tiene que morir con ella: si no, un repique tardío
+// despertaría el teléfono por una llamada que ya terminó.
+function cancelarEspera(callId) {
+  const espera = esperasRepique.get(callId);
+  if (!espera) return;
+  clearTimeout(espera);
+  esperasRepique.delete(callId);
+}
 const directorio = new Map();     // peerId -> { name, agreePub, signPub, at } (sobrevive a la desconexión)
 const startedAt = Date.now();
 
@@ -203,6 +214,7 @@ app.get('/health', (req, res) => {
     ok: true,
     service: 'whataka-relay',
     peers: peers.size,
+    repiques: push.repiquesActivos(),
     uptimeSeconds: Math.floor((Date.now() - startedAt) / 1000),
     time: new Date().toISOString(),
   });
@@ -789,37 +801,80 @@ wss.on('connection', (socket) => {
           video: !!msg.video,
           payload: msg.payload && typeof msg.payload === 'object' ? msg.payload : null,
         };
+
+        // El móvil confirma que tiene la llamada en pantalla: se deja de
+        // repicar. Sin esta confirmación, una pestaña congelada no sonaría.
+        if (kind === 'recibida') {
+          cancelarEspera(callId);
+          push.pararRepique(callId);
+          break;
+        }
+        if (kind === 'answer' || kind === 'reject' || kind === 'busy' || kind === 'hangup') {
+          cancelarEspera(callId);
+          push.pararRepique(callId);
+          // El que llama se cansó: la oferta guardada ya no debe sonar y el
+          // cartel tiene que desaparecer del teléfono.
+          if (kind === 'hangup' || kind === 'reject') {
+            const habiaPendiente = push.hayPendiente(callId);
+            push.olvidarLlamada(callId);
+            if (habiaPendiente) push.enviar(destino, { tipo: 'colgado', callId }).catch(() => {});
+          }
+        }
+
         const target = peers.get(destino);
-        if (target && target.sockets.size) {
+        const conectado = !!(target && target.sockets.size);
+
+        if (kind !== 'offer') {
+          if (conectado) {
+            const texto = JSON.stringify(frame);
+            for (const s of target.sockets) {
+              if (s.readyState === 1) s.send(texto);
+            }
+            push.olvidarLlamada(callId);
+            miningEntry(socket.peerId).call += 1n;
+          } else if (kind === 'ice' && push.hayPendiente(callId)) {
+            push.guardarCandidato(callId, msg.payload);
+          }
+          break;
+        }
+
+        const emisor = peers.get(socket.peerId) || {};
+        const aviso = {
+          tipo: 'llamada',
+          de: socket.peerId,
+          callId,
+          video: !!msg.video,
+          nombre: emisor.name || '',
+        };
+
+        if (conectado) {
           const texto = JSON.stringify(frame);
           for (const s of target.sockets) {
             if (s.readyState === 1) s.send(texto);
           }
-          push.olvidarLlamada(callId);
           miningEntry(socket.peerId).call += 1n;
+          // Conectado no siempre es estar despierto: una pestaña en segundo
+          // plano puede no sonar. Si en 3 s no confirma, se repica igual.
+          const espera = setTimeout(() => {
+            esperasRepique.delete(callId);
+            push.repicar(destino, aviso);
+          }, 3000);
+          if (espera.unref) espera.unref();
+          esperasRepique.set(callId, espera);
           return;
         }
-        // Nadie conectado: puede que el teléfono esté apagado o con la app
-        // cerrada. Se guarda la oferta y se manda un aviso push para que el
-        // sistema lo despierte.
-        if (kind === 'offer') {
-          push.guardarLlamada(callId, { to: destino, from: socket.peerId, frame });
-          socket.send(JSON.stringify({ t: 'call', to: destino, kind: 'offline', callId }));
-          const emisor = peers.get(socket.peerId) || {};
-          push.enviar(destino, {
-            tipo: 'llamada',
-            de: socket.peerId,
-            callId,
-            video: !!msg.video,
-            nombre: emisor.name || '',
-          }).then((entregados) => {
-            if (!entregados) {
-              socket.send(JSON.stringify({ t: 'call', to: destino, kind: 'sin_aviso', callId }));
-            }
-          }).catch(() => {});
-        } else if (kind === 'ice' && push.hayPendiente(callId)) {
-          push.guardarCandidato(callId, msg.payload);
-        }
+
+        // Nadie conectado: el teléfono está con la app cerrada. Se guarda la
+        // oferta y se le repica hasta que conteste o se canse el que llama.
+        push.guardarLlamada(callId, { to: destino, from: socket.peerId, frame });
+        socket.send(JSON.stringify({ t: 'call', to: destino, kind: 'offline', callId }));
+        push.enviar(destino, aviso).then((entregados) => {
+          if (!entregados) {
+            socket.send(JSON.stringify({ t: 'call', to: destino, kind: 'sin_aviso', callId }));
+            return;
+          }
+          push.repicar(destino, aviso, { retraso: 4000 });
+        }).catch(() => {});
         break;
       }
       case 'ping': {

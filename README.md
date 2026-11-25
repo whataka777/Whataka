@@ -174,7 +174,17 @@ mudos en menos de un minuto.
 ## Llamadas con la app cerrada
 
 El relé manda un aviso push al teléfono cuando alguien llama y el destinatario
-no está conectado. El sistema despierta el service worker, muestra la llamada
+no está conectado, y **repite el aviso cada 4 segundos durante un minuto**: el
+móvil vuelve a sonar y a vibrar en cada repetición, como un teléfono que
+insiste, en vez de un pitido suelto que se pierde. Se para en cuanto alguien
+contesta, cuelga o rechaza; si el que llama cuelga, el cartel de "Contestar"
+desaparece solo del teléfono. Los tiempos se ajustan con `REPIQUE_CADA_MS` y
+`REPIQUE_DURACION_MS`.
+
+Si la app está abierta pero la pestaña está congelada (segundo plano), el relé
+no se fía: espera 3 segundos a que el móvil confirme que tiene la llamada en
+pantalla y, si no lo hace, repica igual. Con la app despierta no manda nada, así
+que nunca suenan dos timbres a la vez. El sistema despierta el service worker, muestra la llamada
 con vibración y, al tocar **Contestar**, abre Whataka con la oferta que el relé
 dejó guardada (75 segundos). El llamante ya no cuelga al instante: se queda
 esperando y ve "Avisando al contacto…".

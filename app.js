@@ -3230,6 +3230,8 @@ async function recibirSenal(msg) {
       sendRaw({ t: 'call', to: msg.from, callId: msg.callId, kind: 'busy' });
       return;
     }
+    // Aviso al relé: la llamada ya está en pantalla, deja de repicar.
+    sendRaw({ t: 'call', to: msg.from, callId: msg.callId, kind: 'recibida' });
     call.maquina = LL.crear();
     call.video = !!msg.video;
     call.esLlamante = false;

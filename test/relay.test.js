@@ -982,3 +982,106 @@ test('el latido del cliente recibe respuesta', async () => {
   await pong;
   a.close();
 });
+
+// ── Repique de llamada ──────────────────────────────────────────────────────
+
+async function repiquesActivos() {
+  const res = await fetch(`${BASE}/health`);
+  const datos = await res.json();
+  return datos.repiques;
+}
+
+test('si el móvil confirma la llamada, no se le repica', async () => {
+  const a = await openSocket();
+  const b = await openSocket();
+  const idA = makePeerId('repique-confirma-a');
+  const idB = makePeerId('repique-confirma-b');
+
+  a.send(JSON.stringify({ t: 'hello', id: idA, name: 'Alicia', agreePub: 'AAA', signPub: 'SSS' }));
+  await nextMessage(a, 'presence');
+  b.send(JSON.stringify({ t: 'hello', id: idB, name: 'Bruno', agreePub: 'BBB', signPub: 'TTT' }));
+  await nextMessage(b, 'presence');
+
+  const oferta = nextMessage(b, 'call');
+  a.send(JSON.stringify({ t: 'call', to: idB, callId: 'llamada-1', kind: 'offer', payload: { sdp: 'x' } }));
+  const recibida = await oferta;
+  assert.equal(recibida.kind, 'offer');
+
+  b.send(JSON.stringify({ t: 'call', to: idA, callId: 'llamada-1', kind: 'recibida' }));
+  await wait(3600);
+  assert.equal(await repiquesActivos(), 0, 'la app tiene la llamada en pantalla');
+
+  a.send(JSON.stringify({ t: 'call', to: idB, callId: 'llamada-1', kind: 'hangup' }));
+  a.close();
+  b.close();
+});
+
+test('si el móvil está conectado pero no confirma, se le repica igual', async () => {
+  const a = await openSocket();
+  const b = await openSocket();
+  const idA = makePeerId('repique-mudo-a');
+  const idB = makePeerId('repique-mudo-b');
+
+  a.send(JSON.stringify({ t: 'hello', id: idA, name: 'Alicia', agreePub: 'AAA', signPub: 'SSS' }));
+  await nextMessage(a, 'presence');
+  b.send(JSON.stringify({ t: 'hello', id: idB, name: 'Bruno', agreePub: 'BBB', signPub: 'TTT' }));
+  await nextMessage(b, 'presence');
+
+  const oferta = nextMessage(b, 'call');
+  a.send(JSON.stringify({ t: 'call', to: idB, callId: 'llamada-2', kind: 'offer', payload: { sdp: 'x' } }));
+  await oferta;
+
+  await wait(3400);
+  assert.equal(await repiquesActivos(), 1, 'la pestaña congelada recibe el aviso');
+
+  // El que llama cuelga: se deja de repicar y la oferta guardada se olvida.
+  a.send(JSON.stringify({ t: 'call', to: idB, callId: 'llamada-2', kind: 'hangup' }));
+  await wait(300);
+  assert.equal(await repiquesActivos(), 0, 'colgar corta el repique');
+
+  a.close();
+  b.close();
+});
+
+test('una llamada a quien no tiene avisos no repica en el vacío', async () => {
+  const a = await openSocket();
+  const idA = makePeerId('repique-sin-aviso-a');
+  const idB = makePeerId('repique-sin-aviso-b');
+
+  a.send(JSON.stringify({ t: 'hello', id: idA, name: 'Alicia', agreePub: 'AAA', signPub: 'SSS' }));
+  await nextMessage(a, 'presence');
+
+  const primera = nextMessage(a, 'call');
+  a.send(JSON.stringify({ t: 'call', to: idB, callId: 'llamada-3', kind: 'offer', payload: { sdp: 'x' } }));
+  assert.equal((await primera).kind, 'offline');
+
+  const segunda = nextMessage(a, 'call');
+  assert.equal((await segunda).kind, 'sin_aviso', 'sin avisos no hay a quién repicar');
+  assert.equal(await repiquesActivos(), 0);
+
+  a.close();
+});
+
+test('contestar enseguida no deja un repique tardío', async () => {
+  const a = await openSocket();
+  const b = await openSocket();
+  const idA = makePeerId('repique-answer-a');
+  const idB = makePeerId('repique-answer-b');
+
+  a.send(JSON.stringify({ t: 'hello', id: idA, name: 'Alicia', agreePub: 'AAA', signPub: 'SSS' }));
+  await nextMessage(a, 'presence');
+  b.send(JSON.stringify({ t: 'hello', id: idB, name: 'Bruno', agreePub: 'BBB', signPub: 'TTT' }));
+  await nextMessage(b, 'presence');
+
+  const oferta = nextMessage(b, 'call');
+  a.send(JSON.stringify({ t: 'call', to: idB, callId: 'llamada-4', kind: 'offer', payload: { sdp: 'x' } }));
+  await oferta;
+
+  // Contesta antes de los 3 s que el relé espera para decidir si repica.
+  b.send(JSON.stringify({ t: 'call', to: idA, callId: 'llamada-4', kind: 'answer', payload: { sdp: 'y' } }));
+  await wait(3600);
+  assert.equal(await repiquesActivos(), 0, 'la llamada ya está en curso');
+
+  a.close();
+  b.close();
+});
