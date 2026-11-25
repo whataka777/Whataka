@@ -3131,7 +3131,12 @@ async function iniciarLlamada(video) {
     return;
   }
   const online = state.online.has(peerId);
-  if (!online) { toast('El contacto no está en línea'); }
+  if (!online) {
+    const nombre = (state.peers[peerId] && state.peers[peerId].name) || 'El contacto';
+    // No es un error: el relé guarda la llamada y le repica el teléfono hasta
+    // que abra Whataka o se canse el que llama.
+    toast(`${nombre} no está conectado ahora: le aviso para que abra Whataka`, 6000);
+  }
 
   try {
     call.localStream = await pedirMedios(video);
@@ -3294,7 +3299,7 @@ async function recibirSenal(msg) {
   }
   if (kind === 'sin_aviso') {
     setEstadoLlamada('Esperando a que abra Whataka…');
-    toast('Ese contacto no tiene avisos activados: tiene que abrir Whataka una vez para poder recibir llamadas.', 9000);
+    toast('No puedo despertar su teléfono: tiene que abrir Whataka una vez y aceptar los avisos. La llamada le espera un minuto y medio.', 10000);
     esperaRespuesta(90);
     return;
   }
@@ -3626,6 +3631,60 @@ async function activarAvisosPush() {
   }
 }
 
+// Sin avisos activados nadie puede hacer sonar este teléfono: el recordatorio
+// se queda a la vista en la lista de chats hasta que se activan (o se oculta
+// unos días).
+const AVISO_LLAMADAS_CLAVE = 'whataka-aviso-llamadas-oculto';
+const AVISO_LLAMADAS_DIAS = 3;
+
+function ocultarAvisoLlamadas(recordar) {
+  const caja = document.getElementById('aviso-llamadas');
+  if (caja) caja.hidden = true;
+  if (recordar) {
+    try { localStorage.setItem(AVISO_LLAMADAS_CLAVE, String(Date.now())); } catch { /* modo privado */ }
+  }
+}
+
+function pintaAvisoLlamadas() {
+  const caja = document.getElementById('aviso-llamadas');
+  if (!caja) return;
+  if (!('Notification' in window)) { caja.hidden = true; return; }
+  if (Notification.permission === 'granted') { caja.hidden = true; return; }
+
+  const detalle = document.getElementById('aviso-llamadas-detalle');
+  const boton = document.getElementById('aviso-llamadas-activar');
+  if (Notification.permission === 'denied') {
+    // Bloqueado: volver a pedirlo no abre nada, hay que ir a los ajustes del sitio.
+    if (detalle) detalle.textContent = 'Los avisos están bloqueados para Whataka: actívalos en los ajustes del sitio de este navegador.';
+    if (boton) boton.hidden = true;
+  } else if (esIPhone() && !estaInstalada()) {
+    if (detalle) detalle.textContent = 'En iPhone, añade Whataka a la pantalla de inicio y activa los avisos: si no, no puede sonar con la app cerrada.';
+  }
+
+  let oculto = 0;
+  try { oculto = Number(localStorage.getItem(AVISO_LLAMADAS_CLAVE)) || 0; } catch { /* modo privado */ }
+  const dias = (Date.now() - oculto) / 86400000;
+  caja.hidden = oculto > 0 && dias < AVISO_LLAMADAS_DIAS;
+}
+
+async function activarAvisosDesdeLaLista() {
+  await requestNotificationPermission();
+  pintaAvisoLlamadas();
+  pintaEstadoAvisos();
+}
+
+// iOS solo entrega avisos push a las webs añadidas a la pantalla de inicio: sin
+// instalar, el teléfono no suena por mucho que el relé avise.
+function esIPhone() {
+  return /iPhone|iPad|iPod/.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+function estaInstalada() {
+  return window.matchMedia('(display-mode: standalone)').matches
+    || window.navigator.standalone === true;
+}
+
 // Sin permiso de avisos el relé no puede despertar el teléfono: la fila de
 // ajustes lo dice en claro en vez de quedarse con un texto genérico.
 function pintaEstadoAvisos() {
@@ -3636,6 +3695,11 @@ function pintaEstadoAvisos() {
   if (permiso === 'granted') {
     texto.textContent = 'Avisos de llamada activados: te llaman con la app cerrada';
     fila.classList.remove('pendiente');
+    return;
+  }
+  if (esIPhone() && !estaInstalada()) {
+    texto.textContent = 'En iPhone: añade Whataka a la pantalla de inicio para recibir llamadas con la app cerrada';
+    fila.classList.add('pendiente');
     return;
   }
   texto.textContent = 'Toca aquí para recibir llamadas con la app cerrada';
@@ -3865,6 +3929,11 @@ async function boot() {
   connect();
   activarAvisosPush();
   pintaEstadoAvisos();
+  pintaAvisoLlamadas();
+  const botonAviso = document.getElementById('aviso-llamadas-activar');
+  if (botonAviso) botonAviso.addEventListener('click', activarAvisosDesdeLaLista);
+  const cerrarAviso = document.getElementById('aviso-llamadas-cerrar');
+  if (cerrarAviso) cerrarAviso.addEventListener('click', () => ocultarAvisoLlamadas(true));
 
   // Si la app ya estaba abierta, el aviso del sistema llega por aquí en vez de
   // por la URL: se contesta igual.

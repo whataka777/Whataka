@@ -44,6 +44,12 @@ services:
         sync: false
       - key: VAPID_PRIVATE_KEY
         sync: false
+      # Alternativa a las dos claves de arriba: una semilla cualquiera. El relé
+      # deriva de ella el mismo par VAPID siempre, así que los móviles no
+      # pierden la suscripción al reiniciar ni al desplegar. Render la genera
+      # una vez y la conserva.
+      - key: VAPID_SEED
+        generateValue: true
       # Dominio único de la app: el subdominio de Render redirige aquí para que
       # nadie acabe con dos identidades (localStorage es por origen).
       - key: CANONICAL_HOST

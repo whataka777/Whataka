@@ -181,6 +181,18 @@ contesta, cuelga o rechaza; si el que llama cuelga, el cartel de "Contestar"
 desaparece solo del teléfono. Los tiempos se ajustan con `REPIQUE_CADA_MS` y
 `REPIQUE_DURACION_MS`.
 
+Para que el aviso llegue hace falta que el móvil tenga una suscripción push
+activa, y eso solo pasa si el dueño abrió Whataka y aceptó los avisos. La lista
+de chats lo recuerda con una franja ("Que te suene el teléfono") mientras no
+estén activados, y en iPhone avisa de que hay que añadir la app a la pantalla
+de inicio: iOS solo entrega push a las webs instaladas.
+
+Las claves VAPID tienen que ser las mismas siempre. Con `VAPID_PUBLIC_KEY` y
+`VAPID_PRIVATE_KEY` se usan tal cual; con `VAPID_SEED` (una cadena cualquiera,
+que Render puede generar) el relé deriva el par de forma determinista, así que
+un reinicio o un despliegue no invalida las suscripciones. Sin ninguna de las
+dos, se inventan al arrancar y cada reinicio deja a todos sin avisos.
+
 Si la app está abierta pero la pestaña está congelada (segundo plano), el relé
 no se fía: espera 3 segundos a que el móvil confirme que tiene la llamada en
 pantalla y, si no lo hace, repica igual. Con la app despierta no manda nada, así
