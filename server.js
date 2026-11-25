@@ -1,6 +1,6 @@
 'use strict';
 
-/* Relé de WhaTaka.
+/* Relé de Whataka.
  *
  * El relé es deliberadamente "tonto": mantiene la presencia de los nodos y
  * reenvía sobres cifrados de un Peer ID a otro. Nunca ve el texto en claro,
@@ -765,7 +765,7 @@ const heartbeat = setInterval(() => {
 wss.on('close', () => clearInterval(heartbeat));
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`WhaTaka relay escuchando en http://0.0.0.0:${PORT}`);
+  console.log(`Whataka relay escuchando en http://0.0.0.0:${PORT}`);
 });
 
 function shutdown() {

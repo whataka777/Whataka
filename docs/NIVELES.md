@@ -1,4 +1,4 @@
-# Niveles de estatus de WhaTaka
+# Niveles de estatus de Whataka
 
 La app vende una **suscripción de pago único** (no una inversión) y, con ese
 dinero, **compra WTK en el mercado y los quema**. A cambio, el usuario sube de

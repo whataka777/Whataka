@@ -1,6 +1,6 @@
 'use strict';
 
-/* Despliega el contrato de minería de WhaTaka sin depender de Remix.
+/* Despliega el contrato de minería de Whataka sin depender de Remix.
  *
  * Uso:
  *   RPC_URL="https://polygon-amoy-bor-rpc.publicnode.com" \

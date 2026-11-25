@@ -1,4 +1,4 @@
-/* WhaTaka — PWA de mensajería P2P con cifrado de extremo a extremo.
+/* Whataka — PWA de mensajería P2P con cifrado de extremo a extremo.
    El relé solo transporta sobres cifrados: nunca ve el texto en claro. */
 
 'use strict';
@@ -13,7 +13,7 @@ const DEFAULT_RELAY = 'https://whataka-relay.onrender.com';
 
 // Project ID de Reown/WalletConnect Cloud (gratuito). Con él, la app conecta
 // con MetaMask desde el navegador normal del móvil: no hace falta abrir
-// WhaTaka dentro de MetaMask. Si está vacío, se usa el que el usuario pegue
+// Whataka dentro de MetaMask. Si está vacío, se usa el que el usuario pegue
 // en Ajustes → WalletConnect, y si tampoco hay, se ofrece abrir la app en
 // MetaMask mediante enlace directo.
 const DEFAULT_WC_PROJECT_ID = '';
@@ -350,7 +350,7 @@ const state = {
   identity: null,
   signKey: null,
   agreeKey: null,
-  profile: readStore(STORE.profile, { name: 'Usuario WhaTaka', photo: null }),
+  profile: readStore(STORE.profile, { name: 'Usuario Whataka', photo: null }),
   peers: readStore(STORE.peers, {}),        // peerId -> { name, agreePub, lastSeen }
   keyCache: readStore(STORE.keys, {}),      // peerId -> agreePub
   messages: readStore(STORE.messages, {}),  // peerId -> [{ from, text, ts }]
@@ -486,7 +486,7 @@ async function connectWalletDirect() {
   } else {
     const randomWallet = ethers.Wallet.createRandom();
     w = initDirectWalletFromKey(randomWallet.privateKey);
-    toast('¡Cartera directa creada en WhaTaka!');
+    toast('¡Cartera directa creada en Whataka!');
   }
   if (w) {
     registrarCartera(w.address).then((ok) => { if (ok) console.info('Cartera registrada en el relé'); });
@@ -598,7 +598,7 @@ async function openWcSession(chainId) {
     showQrModal: true,
     rpcMap: { [id]: meta.rpc },
     metadata: {
-      name: 'WhaTaka',
+      name: 'Whataka',
       description: 'Mensajería P2P cifrada y minería WTK',
       url: location.origin,
       icons: [`${location.origin}/icons/icon-192.png`],
@@ -608,7 +608,7 @@ async function openWcSession(chainId) {
   return provider;
 }
 
-// Abre WhaTaka dentro de la app de MetaMask (deep link).
+// Abre Whataka dentro de la app de MetaMask (deep link).
 function openInMetaMask() {
   const target = location.href.replace(/^https?:\/\//, '');
   window.location.href = METAMASK_DEEPLINK + target;
@@ -625,7 +625,7 @@ async function connectWallet() {
   openModal('Conectar Cartera Web3', `
     <div style="display:flex; flex-direction:column; gap:12px; padding:6px 0;">
       <p style="font-size:13px; color:var(--text-muted); line-height:1.4;">
-        Conéctate <strong>directamente sin salir de WhaTaka</strong> para recibir y reclamar tus tokens WTK.
+        Conéctate <strong>directamente sin salir de Whataka</strong> para recibir y reclamar tus tokens WTK.
       </p>
 
       <!-- Opción 1: Cartera Directa Integrada (Sin salir de la app) -->
@@ -634,7 +634,7 @@ async function connectWallet() {
           <span style="color:var(--accent); font-size:16px;">⚡</span> Cartera Directa Integrada <span style="font-size:10px; background:var(--accent); color:#fff; padding:2px 6px; border-radius:10px;">Recomendada</span>
         </h4>
         <p style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">
-          Crea o activa tu cartera en 1 toque. Cero apps externas, cero inicios de sesión, 100% dentro de WhaTaka.
+          Crea o activa tu cartera en 1 toque. Cero apps externas, cero inicios de sesión, 100% dentro de Whataka.
         </p>
         <button class="primary-btn" id="btn-wallet-instant" style="width:100%; padding:11px;">
           ⚡ Conectar Directo (1 toque)
@@ -912,11 +912,11 @@ function avisarLlamadaEntrante(from, video) {
   };
   if (navigator.serviceWorker && navigator.serviceWorker.ready) {
     navigator.serviceWorker.ready
-      .then((reg) => reg.showNotification('WhaTaka', options))
-      .catch(() => { try { new Notification('WhaTaka', options); } catch { /* ignorado */ } });
+      .then((reg) => reg.showNotification('Whataka', options))
+      .catch(() => { try { new Notification('Whataka', options); } catch { /* ignorado */ } });
     return;
   }
-  try { new Notification('WhaTaka', options); } catch { /* ignorado */ }
+  try { new Notification('Whataka', options); } catch { /* ignorado */ }
 }
 
 function stopRingtone() {
@@ -953,7 +953,7 @@ function switchTab(target) {
     b.classList.toggle('active', b.dataset.target === target);
   });
 
-  // Alternar barras de cabecera y buscador según la pestaña activa estilo QuantumCall / WhaTaka
+  // Alternar barras de cabecera y buscador según la pestaña activa estilo QuantumCall / Whataka
   const actDash = $('#bar-actions-dashboard');
   const actChats = $('#bar-actions-chats');
   const actSettings = $('#bar-actions-settings');
@@ -980,7 +980,7 @@ function switchTab(target) {
 
 function renderDashboard() {
   let unreadCount = 0;
-  let lastMessageSnippet = 'New from WhaTaka';
+  let lastMessageSnippet = 'New from Whataka';
   const peers = Object.keys(state.messages || {});
   peers.forEach((p) => {
     const msgs = state.messages[p] || [];
@@ -1174,7 +1174,7 @@ function renderStatus() {
     <div class="status-item">
       <div class="avatar ring-purple">🛡️</div>
       <div>
-        <h4>Sistema WhaTaka P2P</h4>
+        <h4>Sistema Whataka P2P</h4>
         <p>${state.connected ? 'Hoy, cifrado de extremo a extremo activo' : 'Relé desconectado — modo local'}</p>
       </div>
     </div>`;
@@ -1408,7 +1408,7 @@ function verNiveles() {
     const activo = e.nivelId === actual ? ' · ← estás aquí' : '';
     return `<div style="font-size:13px; margin:4px 0; color:${e.color};">${e.emoji} <strong>${e.invitados} invitados</strong> → ${e.nombre}${activo}</div>`;
   }).join('') : '';
-  openModal('Niveles WhaTaka', `
+  openModal('Niveles Whataka', `
     <p style="font-size:13px; opacity:.85; margin-bottom:8px;">
       Sube de nivel con un pago único, o <strong>invitando gente</strong> si no puedes pagar.
       Con el dinero se compran WTK y se queman: menos tokens en circulación y más valor para todos.
@@ -1538,7 +1538,7 @@ function verReferidos() {
 
   openModal('Invita y sube de nivel', `
     <p style="font-size:13px; opacity:.9; margin-bottom:6px;">
-      Comparte WhaTaka con quien quieras. <strong>Aquí no se gana dinero</strong>: subes de
+      Comparte Whataka con quien quieras. <strong>Aquí no se gana dinero</strong>: subes de
       estatus y de nivel. Cada persona que entre con tu enlace te da
       <strong>${api.PUNTOS_POR_INVITADO} puntos</strong>, así que puedes llegar a
       Bronce, Plata, Oro, Platino o Diamante <strong>sin pagar nada</strong>.
@@ -1573,7 +1573,7 @@ function verReferidos() {
     ${filas}
 
     <p style="font-size:12px; opacity:.7; margin-top:10px;">
-      Los referidos solo dan estatus y posición dentro de WhaTaka: no son una inversión,
+      Los referidos solo dan estatus y posición dentro de Whataka: no son una inversión,
       no dan tokens ni dinero y no prometen ganancias.
     </p>`);
 
@@ -1581,7 +1581,7 @@ function verReferidos() {
     const texto = api.textoCompartir(peerId, baseUrlApp());
     if (navigator.share) {
       try {
-        await navigator.share({ title: 'WhaTaka', text: texto, url: enlace });
+        await navigator.share({ title: 'Whataka', text: texto, url: enlace });
         return;
       } catch {
         /* el usuario canceló o no se puede: probamos copiar */
@@ -1772,9 +1772,9 @@ function verDonaciones() {
               background:linear-gradient(90deg,#1dcb5d,#15be1c); color:#fff; font-weight:700; text-decoration:none;">
       Donar ${api.formatearUsd(imp)} con PayPal — ${api.textoMeses(imp)}
     </a>`).join('');
-  openModal('🤲🏽 Mantén WhaTaka viva', `
+  openModal('🤲🏽 Mantén Whataka viva', `
     <p style="font-size:13px; opacity:.9; margin-bottom:10px;">
-      WhaTaka es gratis. Si quieres, puedes ayudar a pagar lo que cuesta mantenerla
+      Whataka es gratis. Si quieres, puedes ayudar a pagar lo que cuesta mantenerla
       en marcha. <strong>Es 100% voluntario</strong>: si no donas, la app sigue igual.
     </p>
     <div style="background:rgba(255,255,255,.05); border-radius:8px; padding:10px; margin-bottom:12px;">
@@ -2730,7 +2730,7 @@ function askEditName() {
 function askWalletConnect() {
   openModal('WalletConnect', `
     <p>Pega tu <strong>Project ID</strong> gratuito de WalletConnect (cloud.reown.com).
-    Con él, WhaTaka conecta MetaMask desde este mismo navegador, sin abrir la app dentro de MetaMask.</p>
+    Con él, Whataka conecta MetaMask desde este mismo navegador, sin abrir la app dentro de MetaMask.</p>
     <input class="modal-input" id="wc-input" value="${escapeHtml(wcProjectId())}" placeholder="Project ID de WalletConnect">
     <p class="hint-text">Cómo conseguirlo: entra en cloud.reown.com → crea un proyecto → copia el Project ID.</p>
     <div class="modal-btn-row">
@@ -3442,7 +3442,7 @@ async function showPermissions() {
   const [cam, mic] = await Promise.all([permissionState('camera'), permissionState('microphone')]);
   const notif = ('Notification' in window) ? Notification.permission : 'unsupported';
   openModal('Permisos', `
-    <p>WhaTaka necesita estos permisos para las llamadas y los avisos.</p>
+    <p>Whataka necesita estos permisos para las llamadas y los avisos.</p>
     <div class="settings-list">
       <div class="setting-item" id="perm-camera">
         <i class="fa-solid fa-camera"></i>
@@ -3472,11 +3472,11 @@ function notifyIncoming(from, name) {
   const options = { body: `Nuevo mensaje de ${name}`, tag: `wt-${from}` };
   if (navigator.serviceWorker && navigator.serviceWorker.ready) {
     navigator.serviceWorker.ready
-      .then((reg) => reg.showNotification('WhaTaka', options))
-      .catch(() => { try { new Notification('WhaTaka', options); } catch { /* ignorado */ } });
+      .then((reg) => reg.showNotification('Whataka', options))
+      .catch(() => { try { new Notification('Whataka', options); } catch { /* ignorado */ } });
     return;
   }
-  try { new Notification('WhaTaka', options); } catch { /* ignorado */ }
+  try { new Notification('Whataka', options); } catch { /* ignorado */ }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -3552,7 +3552,7 @@ function bindEvents() {
   $('#btn-permissions').addEventListener('click', showPermissions);
   $('#btn-referidos').addEventListener('click', verReferidos);
 
-  // Eventos de la pestaña Dashboard (estilo QuantumCall / WhaTaka)
+  // Eventos de la pestaña Dashboard (estilo QuantumCall / Whataka)
   const tileVideo = $('#dash-tile-video');
   if (tileVideo) tileVideo.addEventListener('click', () => switchTab('tab-calls'));
   const tileMsg = $('#dash-tile-messages');
@@ -3675,13 +3675,13 @@ function hideSplash() {
 }
 
 boot().catch((err) => {
-  console.error('Fallo al iniciar WhaTaka', err);
+  console.error('Fallo al iniciar Whataka', err);
   hideSplash();
   const pista = location.protocol === 'https:'
     ? 'Recarga la app; si sigue igual, borra los datos del sitio en los ajustes del navegador.'
     : 'Abre la app por HTTPS: sin conexión segura el navegador bloquea las claves.';
   document.body.insertAdjacentHTML(
     'beforeend',
-    `<div class="toast show">No se pudo iniciar WhaTaka. ${escapeHtml(pista)}</div>`,
+    `<div class="toast show">No se pudo iniciar Whataka. ${escapeHtml(pista)}</div>`,
   );
 });

@@ -2,7 +2,7 @@
   "name": "whataka",
   "version": "1.0.0",
   "private": true,
-  "description": "WhaTaka — PWA de mensajería P2P cifrada y relé de nodos.",
+  "description": "Whataka — PWA de mensajería P2P cifrada y relé de nodos.",
   "main": "server.js",
   "engines": {
     "node": ">=18"

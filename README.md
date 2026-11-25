@@ -1,4 +1,4 @@
-# WhaTaka 🥭
+# Whataka 🥭
 
 Mensajería **P2P cifrada de extremo a extremo** instalable como app (PWA).
 El servidor es un **relé tonto**: reenvía sobres cifrados y mantiene la

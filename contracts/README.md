@@ -1,4 +1,4 @@
-# Minería WTK on-chain (WhaTaka)
+# Minería WTK on-chain (Whataka)
 
 Pago de recompensas de minería en tokens WTK reales, reclamables desde MetaMask.
 
@@ -7,7 +7,7 @@ Pago de recompensas de minería en tokens WTK reales, reclamables desde MetaMask
 | Contrato | Cuándo usarlo |
 | --- | --- |
 | `contracts/WhaTakaMiningRewards.sol` | Ya tienes un token WTK desplegado y solo quieres el sistema de recompensas. |
-| `contracts/WhaTakaTTC.sol` | Quieres que WhaTaka controle su propio token, con emisión, halving y tope anual. Es autocontenido (es el ERC-20 **y** el pagador). |
+| `contracts/WhaTakaTTC.sol` | Quieres que Whataka controle su propio token, con emisión, halving y tope anual. Es autocontenido (es el ERC-20 **y** el pagador). |
 
 La app y el backend funcionan igual con cualquiera de los dos: lo único que
 cambia es la dirección que pones en `MINING_CONTRACT`. Los dos exponen

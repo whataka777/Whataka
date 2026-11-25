@@ -6,7 +6,7 @@ pragma solidity ^0.8.20;
  * -----------------------------------------------------------------
  * Contrato autocontenido: es a la vez el ERC-20 de WTK y el sistema que paga
  * las recompensas de minería. Sustituye a la pareja (token externo +
- * WhaTakaMiningRewards) cuando quieres que WhaTaka controle su propia emisión.
+ * WhaTakaMiningRewards) cuando quieres que Whataka controle su propia emisión.
  *
  * Objetivo económico: que el fondo de minería no se agote nunca y que el token
  * no se infle sin control. Para eso combina tres piezas:

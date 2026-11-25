@@ -214,7 +214,7 @@ No se llama "billetera" a propósito: no es una cartera con custodia, es una sal
 de donaciones. Tiene cuatro partes:
 
 1. **☕ Invítame un café** — donación de $1 con PayPal.
-2. **🤲🏽 Mantén WhaTaka viva** — donación voluntaria para Render + Porkbun.
+2. **🤲🏽 Mantén Whataka viva** — donación voluntaria para Render + Porkbun.
 3. **💜 Enviar y recibir donaciones** — en WTK, con la dirección propia para
    recibir (se copia), el botón de enviar y las guías paso a paso.
 4. **🔄 Cambiar WTK en un DEX** — la app **solo enlaza** al DEX (QuickSwap). El

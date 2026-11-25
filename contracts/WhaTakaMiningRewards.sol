@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 /*
  * WhaTakaMiningRewards
  * --------------------
- * Paga tokens WTK por los reportes de minería de WhaTaka.
+ * Paga tokens WTK por los reportes de minería de Whataka.
  *
  * Modelo de confianza (IMPORTANTE):
  *   El contrato NO se fía de las unidades que le manda quien llama. Si lo

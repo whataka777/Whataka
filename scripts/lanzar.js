@@ -91,7 +91,7 @@ async function main() {
   const annualMintCap = ethers.parseUnits(process.env.ANNUAL_MINT_CAP || '100000000', 18);
 
   console.log('════════════════════════════════════════════════════════════');
-  console.log('  Lanzamiento de WhaTaka WTK');
+  console.log('  Lanzamiento de Whataka WTK');
   console.log('════════════════════════════════════════════════════════════');
   console.log('Red          :', net.chainId.toString(), net.chainId === 137n ? '(Polygon mainnet)' : '');
   console.log('RPC          :', rpcUrl);

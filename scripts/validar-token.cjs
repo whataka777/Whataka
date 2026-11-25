@@ -1,11 +1,11 @@
 'use strict';
 
-/* Valida un token de minería de WhaTaka contra la blockchain, sin webs de
+/* Valida un token de minería de Whataka contra la blockchain, sin webs de
  * terceros y sin desplegar nada: solo llamadas JSON-RPC al nodo.
  *
  *   node scripts/validar-token.cjs [dirección]
  *
- * Por defecto valida el token WhaTaka WTK de Polygon Amoy. Si existe la clave
+ * Por defecto valida el token Whataka WTK de Polygon Amoy. Si existe la clave
  * del oráculo en /workspace/.whataka-keys/signer.key, además simula un cobro
  * (eth_call) para comprobar que el pago funcionaría de verdad.
  */
@@ -52,7 +52,7 @@ async function codeLen(chain, addr) {
 }
 
 async function main() {
-  console.log('\n🔎 VALIDACIÓN DEL TOKEN WhaTaka CONTRA LA BLOCKCHAIN');
+  console.log('\n🔎 VALIDACIÓN DEL TOKEN Whataka CONTRA LA BLOCKCHAIN');
   console.log('   Contrato:', CONTRACT);
   console.log(SEP);
 

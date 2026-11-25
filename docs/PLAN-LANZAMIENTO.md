@@ -1,4 +1,4 @@
-# Plan de lanzamiento de WhaTaka en Polygon real
+# Plan de lanzamiento de Whataka en Polygon real
 
 > **Estado: listo para lanzar.** Todo está comprobado contra Polygon mainnet
 > (chainId 137) el 2026-11-16. Lo único que falta es **depositar el gas** en la

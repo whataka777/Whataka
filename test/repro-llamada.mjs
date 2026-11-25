@@ -80,7 +80,7 @@ const tras = await B.evaluate(() => ({
 }));
 if (tras.timbre || tras.vibracion) throw new Error('el timbre sigue sonando después de contestar');
 if (tras.parada !== 0) throw new Error('la vibración no se detuvo al contestar');
-if (tras.titulo !== 'WhaTaka') throw new Error(`el título no se restauró: ${tras.titulo}`);
+if (tras.titulo !== 'Whataka') throw new Error(`el título no se restauró: ${tras.titulo}`);
 console.log('✅ Al contestar se paran timbre y vibración y el título vuelve a la normalidad');
 
 // Ambos deben llegar a estado "activa" y con audio fluyendo.

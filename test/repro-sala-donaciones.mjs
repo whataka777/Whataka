@@ -27,7 +27,7 @@ const r = await p.evaluate(() => {
   return {
     titulo: document.querySelector('#sala-screen h4').textContent.trim(),
     cafe: !!document.getElementById('sala-cafe') && /café|\$1/i.test(txt),
-    manitas: /Mantén WhaTaka viva/.test(txt) && document.getElementById('sala-costes').innerText.includes('Render'),
+    manitas: /Mantén Whataka viva/.test(txt) && document.getElementById('sala-costes').innerText.includes('Render'),
     enviar: pasos('sala-guia-enviar'),
     recibir: pasos('sala-guia-recibir'),
     cambiar: pasos('sala-guia-cambiar'),

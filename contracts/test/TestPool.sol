@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-/* Pool de ensayo (constante producto x*y=k) para WhaTaka.
+/* Pool de ensayo (constante producto x*y=k) para Whataka.
  *
  * NO es un DEX de producción: es un pool mínimo para PRACTICAR en una testnet
  * la mecánica de liquidez, precio y compra/venta con el token WTK real, sin
