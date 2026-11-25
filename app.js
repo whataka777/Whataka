@@ -851,12 +851,28 @@ function toast(msg, ms = 2600) {
 // Timbre de llamada entrante, generado con WebAudio (sin archivos externos).
 let ringCtx = null;
 let ringTimer = null;
-function ringtone() {
-  stopRingtone();
+let vibrarTimer = null;
+let tituloAntesDeLlamar = null;
+
+// El navegador deja el AudioContext en pausa hasta que el usuario toca algo, así
+// que una llamada entrante sin gesto previo entraba en silencio. Se desbloquea
+// en el primer toque de la sesión.
+function desbloquearAudio() {
   try {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
     ringCtx = ringCtx || new AC();
+    if (ringCtx.state === 'suspended') ringCtx.resume().catch(() => {});
+  } catch {}
+}
+['pointerdown', 'keydown', 'touchstart'].forEach((ev) =>
+  window.addEventListener(ev, desbloquearAudio, { once: true, passive: true }));
+
+function ringtone() {
+  stopRingtone();
+  desbloquearAudio();
+  try {
+    if (!ringCtx) return;
     const sonar = () => {
       const osc = ringCtx.createOscillator();
       const gain = ringCtx.createGain();
@@ -873,9 +889,46 @@ function ringtone() {
     ringTimer = setInterval(sonar, 1600);
   } catch {}
 }
+
+// En móvil el aviso del sistema y la vibración llegan aunque la pantalla esté
+// apagada; el timbre del navegador no.
+function vibrarTimbre() {
+  if (typeof navigator.vibrate !== 'function') return;
+  const patron = [500, 350, 500, 350, 500];
+  navigator.vibrate(patron);
+  vibrarTimer = setInterval(() => navigator.vibrate(patron), 2500);
+}
+
+function avisarLlamadaEntrante(from, video) {
+  tituloAntesDeLlamar = tituloAntesDeLlamar || document.title;
+  document.title = video ? '📹 Videollamada entrante' : '📞 Llamada entrante';
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  if (document.visibilityState === 'visible') return;
+  const peer = state.peers[from] || {};
+  const options = {
+    body: `${peer.name || 'Alguien'} te llama${video ? ' por vídeo' : ''}`,
+    tag: `wt-call-${from}`,
+    requireInteraction: true,
+  };
+  if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+    navigator.serviceWorker.ready
+      .then((reg) => reg.showNotification('WhaTaka', options))
+      .catch(() => { try { new Notification('WhaTaka', options); } catch { /* ignorado */ } });
+    return;
+  }
+  try { new Notification('WhaTaka', options); } catch { /* ignorado */ }
+}
+
 function stopRingtone() {
   if (ringTimer) clearInterval(ringTimer);
   ringTimer = null;
+  if (vibrarTimer) clearInterval(vibrarTimer);
+  vibrarTimer = null;
+  if (typeof navigator.vibrate === 'function') navigator.vibrate(0);
+  if (tituloAntesDeLlamar !== null) {
+    document.title = tituloAntesDeLlamar;
+    tituloAntesDeLlamar = null;
+  }
 }
 
 function openModal(title, html) {
@@ -3012,6 +3065,8 @@ async function iniciarLlamada(video) {
 
 async function aceptarLlamada() {
   if (!call.maquina || call.maquina.estado !== 'sonando') return;
+  // Se calla al instante: pedir el micrófono tarda y el timbre seguiría sonando.
+  stopRingtone();
   try {
     call.localStream = await pedirMedios(call.video);
   } catch (err) {
@@ -3078,8 +3133,11 @@ async function recibirSenal(msg) {
     if (inc) inc.hidden = false;
     const acc = callEl('call-actions');
     if (acc) acc.style.display = 'none';
-    // Sonido de timbre (si el navegador lo permite).
-    if (typeof ringtone === 'function') ringtone();
+    // Sonido de timbre (si el navegador lo permite), vibración y aviso del
+    // sistema: con la pantalla apagada el timbre solo no se oye.
+    ringtone();
+    vibrarTimbre();
+    avisarLlamadaEntrante(msg.from, msg.video);
     return;
   }
   if (kind === 'answer') {

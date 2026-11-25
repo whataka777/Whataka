@@ -40,6 +40,13 @@ console.log('Peer B:', idB);
 await A.evaluate((id) => rememberPeer(id, 'B'), idB);
 await B.evaluate((id) => rememberPeer(id, 'A'), idA);
 
+// Espía de la vibración: en un móvil es lo único que se nota con la pantalla
+// apagada, y en el navegador de pruebas no hay motor que la ejecute.
+await B.evaluate(() => {
+  window.__vibraciones = [];
+  navigator.vibrate = (patron) => { window.__vibraciones.push(patron); return true; };
+});
+
 // A llama a B (audio).
 await A.evaluate((id) => { state.activePeer = id; voiceCall(false); }, idB);
 
@@ -51,8 +58,30 @@ await B.waitForFunction(
 );
 console.log('✅ B recibe la llamada entrante (overlay + botones aceptar/rechazar)');
 
+const aviso = await B.evaluate(() => ({
+  vibra: window.__vibraciones.length > 0,
+  patron: window.__vibraciones.find((p) => p !== 0),
+  timbre: Boolean(ringTimer),
+  titulo: document.title,
+}));
+if (!aviso.vibra) throw new Error('la llamada entrante no vibró');
+if (!aviso.timbre) throw new Error('la llamada entrante no activó el timbre');
+if (!aviso.titulo.includes('Llamada entrante')) throw new Error(`el título no avisa: ${aviso.titulo}`);
+console.log('✅ Aviso de llamada entrante: vibra', aviso.patron, '· timbre activo · título:', aviso.titulo);
+
 // B acepta.
 await B.click('#call-accept');
+
+const tras = await B.evaluate(() => ({
+  timbre: Boolean(ringTimer),
+  vibracion: Boolean(vibrarTimer),
+  titulo: document.title,
+  parada: window.__vibraciones[window.__vibraciones.length - 1],
+}));
+if (tras.timbre || tras.vibracion) throw new Error('el timbre sigue sonando después de contestar');
+if (tras.parada !== 0) throw new Error('la vibración no se detuvo al contestar');
+if (tras.titulo !== 'WhaTaka') throw new Error(`el título no se restauró: ${tras.titulo}`);
+console.log('✅ Al contestar se paran timbre y vibración y el título vuelve a la normalidad');
 
 // Ambos deben llegar a estado "activa" y con audio fluyendo.
 await A.waitForFunction(() => call.maquina && call.maquina.estado === 'activa', null, { timeout: 15000 });
