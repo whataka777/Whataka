@@ -1110,10 +1110,7 @@ function renderChat() {
       lastDay = day;
       chip = `<span class="date-chip">${dayLabel(m.ts)}</span>`;
     }
-    // Ticks estilo WhatsApp: enviado (✓) o leído (✓✓) si el peer ya tiene clave.
-    const tick = out
-      ? `<span class="tick${state.online.has(peerId) ? ' read' : ''}"><i class="fa-solid fa-check${state.online.has(peerId) ? '-double' : ''}"></i></span>`
-      : '';
+    const tick = out ? tickDeEntrega(m) : '';
     const sticker = m.kind === 'sticker';
     return `${chip}
       <div class="msg-bubble ${out ? 'out' : 'in'}${sticker ? ' sticker' : ''}">
@@ -1126,6 +1123,14 @@ function renderChat() {
 }
 
 // Dibuja el cuerpo de una burbuja según el tipo de contenido.
+// El tick dice lo que de verdad pasó: en cola, entregado o fallido.
+function tickDeEntrega(m) {
+  if (m.delivery === 'fallido') return '<span class="tick fail"><i class="fa-solid fa-triangle-exclamation"></i></span>';
+  if (m.delivery === 'entregado') return '<span class="tick read"><i class="fa-solid fa-check-double"></i></span>';
+  if (m.delivery === 'pendiente') return '<span class="tick"><i class="fa-regular fa-clock"></i></span>';
+  return '<span class="tick"><i class="fa-solid fa-check"></i></span>';
+}
+
 function renderBubbleContent(m) {
   const cap = m.caption ? `<span class="bubble-cap">${escapeHtml(m.caption)}</span>` : '';
   switch (m.kind) {
@@ -2044,7 +2049,54 @@ async function adoptarRelayPropio() {
   } catch {}
 }
 
+let reconexionTimer = null;
+let latidoTimer = null;
+
+// Espera progresiva: 1, 2, 4, 8… hasta 30 s. Reintentar cada 4 s fijos castiga
+// al servidor cuando se cae y no ayuda a reconectar antes.
+function programaReconexion() {
+  if (reconexionTimer) return;
+  const escalon = Math.min(state.relayIntentos, 5);
+  const espera = Math.min(1000 * 2 ** escalon, 30000) + Math.random() * 400;
+  reconexionTimer = setTimeout(() => {
+    reconexionTimer = null;
+    connect();
+  }, espera);
+}
+
+// El móvil vuelve de segundo plano o recupera cobertura: reconectar ya, sin
+// esperar el turno del temporizador.
+function reconectaYa() {
+  if (state.connected) return;
+  if (state.socket && state.socket.readyState <= WebSocket.OPEN) return;
+  if (reconexionTimer) {
+    clearTimeout(reconexionTimer);
+    reconexionTimer = null;
+  }
+  connect();
+}
+
+function empezarLatido() {
+  paraLatido();
+  // Muchos NAT móviles cortan una conexión muda a los 30-60 s.
+  latidoTimer = setInterval(() => {
+    if (!sendRaw({ t: 'ping' })) paraLatido();
+  }, 25000);
+}
+
+function paraLatido() {
+  if (latidoTimer) clearInterval(latidoTimer);
+  latidoTimer = null;
+}
+
+window.addEventListener('online', reconectaYa);
+window.addEventListener('pageshow', reconectaYa);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') reconectaYa();
+});
+
 function connect() {
+  if (state.socket && state.socket.readyState <= WebSocket.OPEN) return;
   let socket;
   try {
     socket = new WebSocket(`${RELAY_WS}/relay`);
@@ -2066,6 +2118,7 @@ function connect() {
     clearTimeout(perro);
     state.connected = true;
     state.relayIntentos = 0;
+    empezarLatido();
     pintaAvisoRelay();
     sendRaw({
       t: 'hello',
@@ -2085,11 +2138,12 @@ function connect() {
     state.connected = false;
     state.online.clear();
     state.relayIntentos += 1;
+    paraLatido();
     pintaAvisoRelay();
     renderMining();
     renderStatus();
     renderChats();
-    setTimeout(connect, 4000);
+    programaReconexion();
   });
 
   socket.addEventListener('error', () => {
@@ -2105,6 +2159,28 @@ function connect() {
     }
     handleRelayMessage(msg);
   });
+}
+
+function nuevoId() {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  return `m${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+}
+
+// Marca el estado real de un mensaje enviado: en cola, entregado o fallido.
+function marcarEntrega(peerId, ids, estado) {
+  if (!peerId || !ids || !ids.length) return;
+  const lista = state.messages[peerId] || [];
+  let tocado = false;
+  for (const m of lista) {
+    if (!ids.includes(m.id)) continue;
+    if (m.delivery === 'entregado') continue;
+    m.delivery = estado;
+    tocado = true;
+  }
+  if (!tocado) return;
+  writeStore(STORE.messages, state.messages);
+  if (state.activePeer === peerId) renderChat();
+  renderChats();
 }
 
 function sendRaw(obj) {
@@ -2138,6 +2214,19 @@ function handleRelayMessage(msg) {
       receiveMessage(msg).catch((err) => console.warn('Mensaje ilegible', err));
       break;
     }
+    case 'queued': {
+      marcarEntrega(msg.to, [msg.id], 'pendiente');
+      break;
+    }
+    case 'delivered': {
+      marcarEntrega(msg.from, msg.ids || [], 'entregado');
+      break;
+    }
+    case 'undelivered': {
+      marcarEntrega(msg.to, [msg.id], 'fallido');
+      toast('No entregado: el buzón de ese contacto está lleno', 6000);
+      break;
+    }
     case 'call': {
       recibirSenal(msg).catch((err) => console.warn('Señal de llamada ilegible', err));
       break;
@@ -2163,7 +2252,10 @@ function rememberPeer(id, name, agreePub, photo) {
 }
 
 function requestKey(peerId) {
-  if (state.keyCache[peerId]) return Promise.resolve(state.keyCache[peerId]);
+  // La clave del contacto no cambia: si ya la tenemos, no hace falta preguntar
+  // y se puede escribir aunque esté desconectado.
+  const conocida = state.keyCache[peerId] || state.peers[peerId]?.agreePub;
+  if (conocida) return Promise.resolve(conocida);
   return new Promise((resolve, reject) => {
     if (!sendRaw({ t: 'getkey', id: peerId })) {
       reject(new Error('Sin conexión con el relé'));
@@ -2192,6 +2284,8 @@ async function sendMessage() {
 
 // Guarda la entrada, repinta y la entrega cifrada al contacto.
 async function dispatchEntry(peerId, entry) {
+  if (!entry.id) entry.id = nuevoId();
+  entry.delivery = 'enviando';
   (state.messages[peerId] = state.messages[peerId] || []).push(entry);
   writeStore(STORE.messages, state.messages);
   renderChat();
@@ -2205,11 +2299,15 @@ async function dispatchEntry(peerId, entry) {
     else payload.text = entry.text;
     if (entry.caption) payload.text = entry.caption;
     const sealed = await encryptPayload(key, payload);
-    const ok = sendRaw({ t: 'msg', to: peerId, iv: sealed.iv, ct: sealed.ct });
+    const ok = sendRaw({ t: 'msg', id: entry.id, to: peerId, iv: sealed.iv, ct: sealed.ct });
     if (!ok) throw new Error('Sin conexión con el relé');
+    entry.delivery = 'enviado';
+    renderChat();
     state.relayUnits += 1;
     renderMining();
   } catch (err) {
+    entry.delivery = 'fallido';
+    if (state.activePeer === peerId) renderChat();
     toast(`No entregado: ${err.message}`);
   }
 }
@@ -2578,8 +2676,15 @@ async function receiveMessage(msg) {
   const key = await sessionKey(state.agreeKey, agreePub, state.identity.peerId, from);
   const data = await decryptPayload(key, msg.iv, msg.ct);
 
+  // El buzón puede reenviar si el acuse se perdió: se descarta el repetido.
+  if (msg.id && (state.messages[from] || []).some((m) => m.id === msg.id)) {
+    sendRaw({ t: 'ack', ids: [msg.id] });
+    return;
+  }
+
   rememberPeer(from, data.name, agreePub, data.photo);
   (state.messages[from] = state.messages[from] || []).push({
+    id: msg.id || null,
     from,
     text: data.text || '',
     kind: data.kind || null,
@@ -2588,6 +2693,8 @@ async function receiveMessage(msg) {
   });
   writeStore(STORE.messages, state.messages);
   state.relayUnits += 1;
+  // Acuse: mientras no llegue, el relé guarda el sobre y lo reintenta.
+  if (msg.id) sendRaw({ t: 'ack', ids: [msg.id] });
 
   if (state.activePeer === from) renderChat();
   else {
@@ -3751,6 +3858,8 @@ async function boot() {
   if (params.get('contestar') === '1') {
     avisoPendiente = { callId: params.get('llamada'), contestar: true };
   }
+  const chatPedido = params.get('chat');
+  if (chatPedido && state.peers[chatPedido]) openChat(chatPedido);
   connect();
   activarAvisosPush();
   pintaEstadoAvisos();
@@ -3760,6 +3869,10 @@ async function boot() {
   if (navigator.serviceWorker) {
     navigator.serviceWorker.addEventListener('message', (event) => {
       const dato = event.data || {};
+      if (dato.tipo === 'aviso-mensaje') {
+        if (dato.de && state.peers[dato.de]) openChat(dato.de);
+        return;
+      }
       if (dato.tipo !== 'aviso-llamada') return;
       if (!dato.contestar) return;
       if (call.maquina && call.maquina.estado === 'sonando') {

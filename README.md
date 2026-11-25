@@ -143,6 +143,34 @@ llamadas en curso se cortan. Un servicio siempre despierto consume ~730 de las
 { "t": "msg",      "from": "wt1…", "iv": "…", "ct": "…" }
 ```
 
+## Mensajes a quien no está conectado
+
+Un móvil con la app cerrada no mantiene la conexión: el sistema la corta. Para
+que eso no pierda mensajes, el relé guarda los sobres cifrados en un buzón y
+los entrega en cuanto el contacto vuelve a abrir Whataka.
+
+- El buzón aguarda **7 días** (`BUZON_TTL_MS`), hasta 200 mensajes y 2 MB por
+  contacto. Pasado el plazo se borran solos.
+- El sobre sigue cifrado de extremo a extremo: el relé guarda el mismo
+  criptograma que habría reenviado y no puede leerlo.
+- Mientras no llega el acuse del destinatario, el mensaje se reintenta en la
+  siguiente conexión. El acuse evita duplicados si el móvil se corta a medias.
+- En el chat el estado es real: reloj mientras espera en el buzón, una palomita
+  al salir, dos al confirmarse la entrega, y un triángulo rojo si no cupo.
+- Al guardar un mensaje el relé manda un aviso push (como mucho uno cada 30 s
+  por contacto) para que el teléfono se entere sin abrir la app.
+
+La clave pública del contacto se sirve también cuando está desconectado, así
+que se le puede escribir sin esperar a que aparezca. Se conserva en memoria
+mientras el relé viva y en el propio móvil, que ya la guardó del primer saludo.
+
+## Reconexión
+
+La app reconecta sola con espera progresiva (1, 2, 4… hasta 30 s) y al instante
+cuando el móvil vuelve a primer plano o recupera cobertura. Un latido cada 25 s
+mantiene viva la conexión a través de los NAT móviles, que cortan los enlaces
+mudos en menos de un minuto.
+
 ## Llamadas con la app cerrada
 
 El relé manda un aviso push al teléfono cuando alguien llama y el destinatario

@@ -844,3 +844,141 @@ test('la llamada guardada no se repite en la siguiente conexión', async () => {
   a.close();
   segunda.close();
 });
+
+// ── Buzón de mensajes ───────────────────────────────────────────────────────
+
+test('un mensaje a quien no está conectado se guarda y se entrega al abrir', async () => {
+  const a = await openSocket();
+  const idA = makePeerId('buzon-a');
+  const idB = makePeerId('buzon-b');
+
+  a.send(JSON.stringify({ t: 'hello', id: idA, name: 'Alicia', agreePub: 'AAA', signPub: 'SSS' }));
+  await nextMessage(a, 'presence');
+
+  a.send(JSON.stringify({ t: 'msg', id: 'sobre-1', to: idB, iv: 'iv-1', ct: 'criptograma-1' }));
+  const confirmacion = await nextMessage(a, 'queued');
+  assert.equal(confirmacion.id, 'sobre-1');
+  assert.equal(confirmacion.to, idB);
+
+  const b = await openSocket();
+  const recibido = await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('el mensaje no llegó')), 4000);
+    b.on('message', (raw) => {
+      const msg = JSON.parse(raw.toString());
+      if (msg.t !== 'msg') return;
+      clearTimeout(timer);
+      resolve(msg);
+    });
+    b.send(JSON.stringify({ t: 'hello', id: idB, name: 'Bruno', agreePub: 'BBB', signPub: 'TTT' }));
+  });
+
+  assert.equal(recibido.id, 'sobre-1');
+  assert.equal(recibido.from, idA);
+  assert.equal(recibido.ct, 'criptograma-1');
+
+  a.close();
+  b.close();
+});
+
+test('el acuse vacía el buzón y avisa al emisor de que llegó', async () => {
+  const a = await openSocket();
+  const idA = makePeerId('acuse-a');
+  const idB = makePeerId('acuse-b');
+
+  a.send(JSON.stringify({ t: 'hello', id: idA, name: 'Alicia', agreePub: 'AAA', signPub: 'SSS' }));
+  await nextMessage(a, 'presence');
+  a.send(JSON.stringify({ t: 'msg', id: 'sobre-2', to: idB, iv: 'iv-2', ct: 'criptograma-2' }));
+  await nextMessage(a, 'queued');
+
+  const b = await openSocket();
+  await new Promise((resolve) => {
+    b.on('message', (raw) => {
+      const msg = JSON.parse(raw.toString());
+      if (msg.t === 'msg' && msg.id === 'sobre-2') resolve();
+    });
+    b.send(JSON.stringify({ t: 'hello', id: idB, name: 'Bruno', agreePub: 'BBB', signPub: 'TTT' }));
+  });
+
+  const acuse = nextMessage(a, 'delivered');
+  b.send(JSON.stringify({ t: 'ack', ids: ['sobre-2'] }));
+  const aviso = await acuse;
+  assert.equal(aviso.from, idB);
+  assert.deepEqual(aviso.ids, ['sobre-2']);
+
+  // Ya acusado: al reconectar no debe volver a entregarse.
+  b.close();
+  await wait(200);
+  const otra = await openSocket();
+  const repetidos = [];
+  otra.on('message', (raw) => {
+    const msg = JSON.parse(raw.toString());
+    if (msg.t === 'msg') repetidos.push(msg);
+  });
+  otra.send(JSON.stringify({ t: 'hello', id: idB, name: 'Bruno', agreePub: 'BBB', signPub: 'TTT' }));
+  await wait(600);
+  assert.equal(repetidos.length, 0);
+
+  a.close();
+  otra.close();
+});
+
+test('sin acuse el mensaje se reintenta en la siguiente conexión', async () => {
+  const a = await openSocket();
+  const idA = makePeerId('reintento-a');
+  const idB = makePeerId('reintento-b');
+
+  a.send(JSON.stringify({ t: 'hello', id: idA, name: 'Alicia', agreePub: 'AAA', signPub: 'SSS' }));
+  await nextMessage(a, 'presence');
+  a.send(JSON.stringify({ t: 'msg', id: 'sobre-3', to: idB, iv: 'iv-3', ct: 'criptograma-3' }));
+  await nextMessage(a, 'queued');
+
+  for (const intento of [1, 2]) {
+    const b = await openSocket();
+    const llegado = await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error(`sin entrega en el intento ${intento}`)), 4000);
+      b.on('message', (raw) => {
+        const msg = JSON.parse(raw.toString());
+        if (msg.t === 'msg' && msg.id === 'sobre-3') {
+          clearTimeout(timer);
+          resolve(true);
+        }
+      });
+      b.send(JSON.stringify({ t: 'hello', id: idB, name: 'Bruno', agreePub: 'BBB', signPub: 'TTT' }));
+    });
+    assert.equal(llegado, true);
+    b.close();
+    await wait(150);
+  }
+
+  a.close();
+});
+
+test('la clave pública se sirve aunque el contacto esté desconectado', async () => {
+  const b = await openSocket();
+  const idB = makePeerId('directorio-b');
+  b.send(JSON.stringify({ t: 'hello', id: idB, name: 'Bruno', agreePub: 'CLAVE-PUBLICA-B', signPub: 'TTT' }));
+  await nextMessage(b, 'presence');
+  b.close();
+  await wait(300);
+
+  const a = await openSocket();
+  const clave = nextMessage(a, 'key');
+  a.send(JSON.stringify({ t: 'getkey', id: idB }));
+  const respuesta = await clave;
+  assert.equal(respuesta.agreePub, 'CLAVE-PUBLICA-B');
+
+  const desconocido = nextMessage(a, 'key');
+  a.send(JSON.stringify({ t: 'getkey', id: makePeerId('nadie') }));
+  const vacio = await desconocido;
+  assert.equal(vacio.agreePub, null);
+
+  a.close();
+});
+
+test('el latido del cliente recibe respuesta', async () => {
+  const a = await openSocket();
+  const pong = nextMessage(a, 'pong');
+  a.send(JSON.stringify({ t: 'ping' }));
+  await pong;
+  a.close();
+});

@@ -1,4 +1,4 @@
-const CACHE = 'whataka-v65';
+const CACHE = 'whataka-v66';
 const ASSETS = [
   './',
   './index.html',
@@ -44,9 +44,22 @@ self.addEventListener('push', (event) => {
   } catch {
     datos = {};
   }
-  if (datos.tipo !== 'llamada') return;
-
   const nombre = datos.nombre || 'Alguien';
+
+  if (datos.tipo === 'mensaje') {
+    event.waitUntil(
+      self.registration.showNotification(`Mensaje de ${nombre}`, {
+        body: 'Toca para abrir Whataka',
+        tag: `mensaje-${datos.de || 'alguien'}`,
+        icon: './icons/icon-192.png',
+        badge: './icons/icon-192.png',
+        vibrate: [200, 100, 200],
+        data: datos,
+      }),
+    );
+    return;
+  }
+  if (datos.tipo !== 'llamada') return;
   event.waitUntil(
     self.registration.showNotification(
       datos.video ? `Videollamada de ${nombre}` : `Llamada de ${nombre}`,
@@ -75,6 +88,19 @@ self.addEventListener('notificationclick', (event) => {
 
   const contestar = event.action === 'contestar';
   const url = new URL('./index.html', self.registration.scope);
+  if (datos.tipo === 'mensaje') {
+    if (datos.de) url.searchParams.set('chat', datos.de);
+    event.waitUntil((async () => {
+      const ventanas = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      for (const ventana of ventanas) {
+        if (new URL(ventana.url).origin !== self.location.origin) continue;
+        ventana.postMessage({ ...datos, tipo: 'aviso-mensaje' });
+        return ventana.focus();
+      }
+      return self.clients.openWindow(url.toString());
+    })());
+    return;
+  }
   if (datos.callId) url.searchParams.set('llamada', datos.callId);
   if (datos.de) url.searchParams.set('de', datos.de);
   url.searchParams.set('video', datos.video ? '1' : '0');

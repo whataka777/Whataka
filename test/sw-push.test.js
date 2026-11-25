@@ -106,9 +106,9 @@ test('una videollamada se anuncia como videollamada', async () => {
   assert.equal(notificaciones[0].titulo, 'Videollamada de Ana');
 });
 
-test('un push que no es de llamada no muestra nada', async () => {
+test('un push que no es de llamada ni de mensaje no muestra nada', async () => {
   const { manejadores, notificaciones } = cargarSW();
-  const { event, listo } = eventoPush({ tipo: 'mensaje' });
+  const { event, listo } = eventoPush({ tipo: 'otra-cosa' });
 
   manejadores.get('push')(event);
   await listo();
@@ -186,4 +186,52 @@ test('con la app ya abierta se le manda el aviso en vez de abrir otra', async ()
   assert.equal(mensajes.length, 1);
   assert.equal(mensajes[0].tipo, 'aviso-llamada');
   assert.equal(mensajes[0].contestar, true);
+});
+
+// ── Avisos de mensaje ───────────────────────────────────────────────────────
+
+test('un push de mensaje avisa sin botones de llamada', async () => {
+  const { manejadores, notificaciones } = cargarSW();
+  const { event, listo } = eventoPush({ tipo: 'mensaje', de: 'wt1abc', nombre: 'Bruno' });
+
+  manejadores.get('push')(event);
+  await listo();
+
+  assert.equal(notificaciones.length, 1);
+  const { titulo, opciones } = notificaciones[0];
+  assert.equal(titulo, 'Mensaje de Bruno');
+  assert.equal(opciones.tag, 'mensaje-wt1abc');
+  assert.equal(opciones.actions, undefined, 'un mensaje no se contesta desde el aviso');
+});
+
+test('tocar el aviso de mensaje abre la conversación', async () => {
+  const { manejadores, abiertas } = cargarSW();
+  const { event, listo, cerrada } = eventoClick('', { tipo: 'mensaje', de: 'wt1abc', nombre: 'Bruno' });
+
+  manejadores.get('notificationclick')(event);
+  await listo();
+
+  assert.equal(cerrada(), true);
+  const url = new URL(abiertas[0]);
+  assert.equal(url.searchParams.get('chat'), 'wt1abc');
+  assert.equal(url.searchParams.get('llamada'), null);
+});
+
+test('con la app abierta el aviso de mensaje abre ese chat sin recargar', async () => {
+  const { manejadores, ventanas, abiertas } = cargarSW();
+  const mensajes = [];
+  ventanas.push({
+    url: `${ORIGEN}/index.html`,
+    focus: async () => 'enfocada',
+    postMessage: (dato) => mensajes.push(dato),
+  });
+
+  const { event, listo } = eventoClick('', { tipo: 'mensaje', de: 'wt1zzz', nombre: 'Ana' });
+  manejadores.get('notificationclick')(event);
+  await listo();
+
+  assert.equal(abiertas.length, 0);
+  assert.equal(mensajes.length, 1);
+  assert.equal(mensajes[0].tipo, 'aviso-mensaje');
+  assert.equal(mensajes[0].de, 'wt1zzz');
 });

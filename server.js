@@ -16,6 +16,7 @@ const voucher = require('./lib/voucher');
 const donaciones = require('./lib/donaciones');
 const referidos = require('./lib/referidos');
 const push = require('./lib/push');
+const buzon = require('./lib/buzon');
 
 const PORT = Number(process.env.PORT) || 10000;
 const MAX_FRAME = 512 * 1024;
@@ -81,6 +82,7 @@ const ledger = new Map();         // peerId -> { score, reports, lastReportAt }
 const wallets = new Map();        // peerId -> { address, peerId, registeredAt }
 const mining = new Map();         // peerId -> unidades medidas por el relé
 const referrals = new Map();      // invitado(peerId) -> { padrino, at }
+const directorio = new Map();     // peerId -> { name, agreePub, signPub, at } (sobrevive a la desconexión)
 const startedAt = Date.now();
 
 // ── Unidades de minería medidas por el relé ─────────────────────────────────
@@ -708,35 +710,63 @@ wss.on('connection', (socket) => {
         peer.sockets.add(socket);
         peers.set(msg.id, peer);
         openMiningSession(msg.id);
+        directorio.set(msg.id, {
+          name: peer.name || '',
+          agreePub: peer.agreePub || null,
+          signPub: peer.signPub || null,
+          at: Date.now(),
+        });
         sendPresence();
         // Llamadas que entraron mientras la app estaba cerrada.
         for (const pendiente of push.tomarPendientes(msg.id)) {
           socket.send(JSON.stringify(pendiente));
         }
+        // Mensajes guardados mientras el móvil estaba dormido.
+        for (const sobre of buzon.pendientes(msg.id)) {
+          socket.send(JSON.stringify({ t: 'msg', ...sobre }));
+        }
         break;
       }
       case 'getkey': {
+        // La clave pública se sirve aunque el contacto esté desconectado: si no,
+        // no se le podría escribir precisamente cuando hace falta el buzón.
         const target = peers.get(msg.id);
-        if (target && target.agreePub) {
-          socket.send(JSON.stringify({ t: 'key', id: msg.id, agreePub: target.agreePub }));
-        } else {
-          socket.send(JSON.stringify({ t: 'key', id: msg.id, agreePub: null, error: 'peer offline' }));
-        }
+        const guardada = directorio.get(String(msg.id || ''));
+        const agreePub = (target && target.agreePub) || (guardada && guardada.agreePub) || null;
+        socket.send(JSON.stringify({
+          t: 'key',
+          id: msg.id,
+          agreePub,
+          error: agreePub ? undefined : 'peer desconocido',
+        }));
         break;
       }
       case 'msg': {
         if (!socket.peerId) return;
-        const target = peers.get(msg.to);
-        if (!target || !target.sockets.size) {
-          socket.send(JSON.stringify({ t: 'undelivered', to: msg.to }));
-          return;
-        }
-        const envelope = JSON.stringify({
-          t: 'msg',
+        const destino = String(msg.to || '');
+        const id = typeof msg.id === 'string' && msg.id ? msg.id.slice(0, 64) : crypto.randomUUID();
+        const sobre = {
+          id,
           from: socket.peerId,
           iv: String(msg.iv || '').slice(0, 128),
           ct: String(msg.ct || '').slice(0, 400000),
-        });
+        };
+        const target = peers.get(destino);
+        if (!target || !target.sockets.size) {
+          // El móvil no está: se guarda y se avisa al dueño por push.
+          const guardado = buzon.guardar(destino, sobre);
+          socket.send(JSON.stringify({ t: guardado ? 'queued' : 'undelivered', to: destino, id }));
+          if (guardado) {
+            const emisor = peers.get(socket.peerId) || {};
+            push.avisar(destino, {
+              tipo: 'mensaje',
+              de: socket.peerId,
+              nombre: emisor.name || '',
+            }).catch(() => {});
+          }
+          return;
+        }
+        const envelope = JSON.stringify({ t: 'msg', ...sobre });
         for (const s of target.sockets) {
           if (s.readyState === 1) s.send(envelope);
         }
@@ -789,6 +819,25 @@ wss.on('connection', (socket) => {
           }).catch(() => {});
         } else if (kind === 'ice' && push.hayPendiente(callId)) {
           push.guardarCandidato(callId, msg.payload);
+        }
+        break;
+      }
+      case 'ping': {
+        // Latido del cliente: mantiene viva la conexión a través de los NAT
+        // móviles, que cortan los enlaces mudos en menos de un minuto.
+        socket.send(JSON.stringify({ t: 'pong' }));
+        break;
+      }
+      case 'ack': {
+        if (!socket.peerId) return;
+        const quitados = buzon.acusar(socket.peerId, msg.ids);
+        for (const sobre of quitados) {
+          const emisor = peers.get(sobre.from);
+          if (!emisor) continue;
+          const aviso = JSON.stringify({ t: 'delivered', to: sobre.from, from: socket.peerId, ids: [sobre.id] });
+          for (const s of emisor.sockets) {
+            if (s.readyState === 1) s.send(aviso);
+          }
         }
         break;
       }
