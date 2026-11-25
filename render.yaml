@@ -35,6 +35,15 @@ services:
         sync: false
       - key: ICE_TURN_CREDENTIAL
         sync: false
+      # Claves VAPID de los avisos push: sin ellas el móvil no puede recibir
+      # una llamada con la app cerrada. Se generan una vez con
+      #   npx web-push generate-vapid-keys
+      # y se pegan en el panel de Render. Si faltan, el relé las inventa al
+      # arrancar y las suscripciones dejan de valer en cada reinicio.
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
       # Dominio único de la app: el subdominio de Render redirige aquí para que
       # nadie acabe con dos identidades (localStorage es por origen).
       - key: CANONICAL_HOST

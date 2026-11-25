@@ -663,6 +663,13 @@
       transition: background 0.12s ease;
     }
     .quantum-setting-item:last-child { border-bottom: none; }
+    /* Avisos apagados: sin ellos no llega ninguna llamada con la app cerrada. */
+    .quantum-setting-item.pendiente {
+      box-shadow: inset 0 0 0 1px rgba(255, 193, 7, 0.45);
+      background: rgba(255, 193, 7, 0.06);
+    }
+    .quantum-setting-item.pendiente .quantum-setting-icon { color: #ffc107; }
+    .quantum-setting-item.pendiente .quantum-setting-content p { color: #ffd54f; }
     .quantum-setting-item:active {
       background: rgba(255,255,255,0.04);
     }
@@ -1539,7 +1546,7 @@
               <div class="quantum-setting-icon"><i class="fa-regular fa-bell"></i></div>
               <div class="quantum-setting-content">
                 <h4>NOTIFICATIONS</h4>
-                <p>Message, group & call tones</p>
+                <p id="avisos-estado">Comprobando avisos de llamada…</p>
               </div>
             </div>
 
@@ -1760,12 +1767,12 @@
   </div>
 
   <script src="./vendor/ethers.umd.min.js"></script>
-  <script src="./lib/niveles.js?v=53"></script>
-  <script src="./lib/referidos.js?v=53"></script>
-  <script src="./lib/donaciones.js?v=53"></script>
-  <script src="./lib/stickers.js?v=53"></script>
-  <script src="./lib/llamadas.js?v=53"></script>
-  <script src="./lib/relay-url.js?v=53"></script>
-  <script src="./app.js?v=53"></script>
+  <script src="./lib/niveles.js?v=55"></script>
+  <script src="./lib/referidos.js?v=55"></script>
+  <script src="./lib/donaciones.js?v=55"></script>
+  <script src="./lib/stickers.js?v=55"></script>
+  <script src="./lib/llamadas.js?v=55"></script>
+  <script src="./lib/relay-url.js?v=55"></script>
+  <script src="./app.js?v=55"></script>
 </body>
 </html>

@@ -15,6 +15,7 @@ const { WebSocketServer } = require('ws');
 const voucher = require('./lib/voucher');
 const donaciones = require('./lib/donaciones');
 const referidos = require('./lib/referidos');
+const push = require('./lib/push');
 
 const PORT = Number(process.env.PORT) || 10000;
 const MAX_FRAME = 512 * 1024;
@@ -605,6 +606,26 @@ app.get('/api/mining/:peerId', (req, res) => {
   res.json(entry);
 });
 
+// Avisos push: con la app cerrada el único camino para que suene el teléfono.
+app.get('/api/push/key', (req, res) => {
+  res.json({ key: push.clavePublica(), efimeras: push.efimeras });
+});
+
+app.post('/api/push/subscribe', (req, res) => {
+  const { peerId, subscription } = req.body || {};
+  if (!validatePeerId(String(peerId || ''))) return res.status(400).json({ error: 'peerId inválido' });
+  if (!push.suscribir(String(peerId), subscription)) {
+    return res.status(400).json({ error: 'suscripción inválida' });
+  }
+  res.json({ ok: true, avisos: push.cuantas(String(peerId)) });
+});
+
+app.post('/api/push/unsubscribe', (req, res) => {
+  const { peerId, endpoint } = req.body || {};
+  push.desuscribir(String(peerId || ''), endpoint ? String(endpoint) : null);
+  res.json({ ok: true });
+});
+
 // Copia de respaldo de la app, servida desde el propio relé. Sirve para los
 // navegadores internos de las wallets (MetaMask, Brave), que a veces no abren
 // github.io. Solo se exponen los ficheros del frontend, nunca el código del
@@ -688,6 +709,10 @@ wss.on('connection', (socket) => {
         peers.set(msg.id, peer);
         openMiningSession(msg.id);
         sendPresence();
+        // Llamadas que entraron mientras la app estaba cerrada.
+        for (const pendiente of push.tomarPendientes(msg.id)) {
+          socket.send(JSON.stringify(pendiente));
+        }
         break;
       }
       case 'getkey': {
@@ -723,23 +748,48 @@ wss.on('connection', (socket) => {
       // reenvían los mensajes de negociación (offer/answer/ICE).
       case 'call': {
         if (!socket.peerId) return;
-        const target = peers.get(msg.to);
-        if (!target || !target.sockets.size) {
-          socket.send(JSON.stringify({ t: 'call', to: msg.to, kind: 'offline', callId: msg.callId }));
-          return;
-        }
-        const frame = JSON.stringify({
+        const destino = String(msg.to || '');
+        const kind = String(msg.kind || '').slice(0, 16);
+        const callId = typeof msg.callId === 'string' ? msg.callId.slice(0, 64) : '';
+        const frame = {
           t: 'call',
           from: socket.peerId,
-          callId: typeof msg.callId === 'string' ? msg.callId.slice(0, 64) : '',
-          kind: String(msg.kind || '').slice(0, 16),
+          callId,
+          kind,
           video: !!msg.video,
           payload: msg.payload && typeof msg.payload === 'object' ? msg.payload : null,
-        });
-        for (const s of target.sockets) {
-          if (s.readyState === 1) s.send(frame);
+        };
+        const target = peers.get(destino);
+        if (target && target.sockets.size) {
+          const texto = JSON.stringify(frame);
+          for (const s of target.sockets) {
+            if (s.readyState === 1) s.send(texto);
+          }
+          push.olvidarLlamada(callId);
+          miningEntry(socket.peerId).call += 1n;
+          return;
         }
-        miningEntry(socket.peerId).call += 1n;
+        // Nadie conectado: puede que el teléfono esté apagado o con la app
+        // cerrada. Se guarda la oferta y se manda un aviso push para que el
+        // sistema lo despierte.
+        if (kind === 'offer') {
+          push.guardarLlamada(callId, { to: destino, from: socket.peerId, frame });
+          socket.send(JSON.stringify({ t: 'call', to: destino, kind: 'offline', callId }));
+          const emisor = peers.get(socket.peerId) || {};
+          push.enviar(destino, {
+            tipo: 'llamada',
+            de: socket.peerId,
+            callId,
+            video: !!msg.video,
+            nombre: emisor.name || '',
+          }).then((entregados) => {
+            if (!entregados) {
+              socket.send(JSON.stringify({ t: 'call', to: destino, kind: 'sin_aviso', callId }));
+            }
+          }).catch(() => {});
+        } else if (kind === 'ice' && push.hayPendiente(callId)) {
+          push.guardarCandidato(callId, msg.payload);
+        }
         break;
       }
       default:

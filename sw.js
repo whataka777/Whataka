@@ -1,4 +1,4 @@
-const CACHE = 'whataka-v63';
+const CACHE = 'whataka-v65';
 const ASSETS = [
   './',
   './index.html',
@@ -31,6 +31,64 @@ self.addEventListener('activate', (event) => {
       .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
+});
+
+// ── Avisos de llamada ───────────────────────────────────────────────────────
+// Con la app cerrada este es el único camino para que el teléfono suene: el
+// relé manda el push, el sistema despierta el service worker y aquí se muestra
+// la notificación con vibración. Al tocarla se abre la llamada.
+self.addEventListener('push', (event) => {
+  let datos = {};
+  try {
+    datos = event.data ? event.data.json() : {};
+  } catch {
+    datos = {};
+  }
+  if (datos.tipo !== 'llamada') return;
+
+  const nombre = datos.nombre || 'Alguien';
+  event.waitUntil(
+    self.registration.showNotification(
+      datos.video ? `Videollamada de ${nombre}` : `Llamada de ${nombre}`,
+      {
+        body: 'Toca para contestar en Whataka',
+        tag: `llamada-${datos.callId || 'sin-id'}`,
+        requireInteraction: true,
+        renotify: true,
+        vibrate: [600, 300, 600, 300, 600, 300, 600],
+        icon: './icons/icon-192.png',
+        badge: './icons/icon-192.png',
+        data: datos,
+        actions: [
+          { action: 'contestar', title: 'Contestar' },
+          { action: 'rechazar', title: 'Rechazar' },
+        ],
+      },
+    ),
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  const datos = event.notification.data || {};
+  event.notification.close();
+  if (event.action === 'rechazar') return;
+
+  const contestar = event.action === 'contestar';
+  const url = new URL('./index.html', self.registration.scope);
+  if (datos.callId) url.searchParams.set('llamada', datos.callId);
+  if (datos.de) url.searchParams.set('de', datos.de);
+  url.searchParams.set('video', datos.video ? '1' : '0');
+  url.searchParams.set('contestar', contestar ? '1' : '0');
+
+  event.waitUntil((async () => {
+    const ventanas = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const ventana of ventanas) {
+      if (new URL(ventana.url).origin !== self.location.origin) continue;
+      ventana.postMessage({ ...datos, tipo: 'aviso-llamada', contestar });
+      return ventana.focus();
+    }
+    return self.clients.openWindow(url.toString());
+  })());
 });
 
 // Estrategia "red primero": con conexión siempre se sirve la última versión fresca

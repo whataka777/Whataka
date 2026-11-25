@@ -2871,6 +2871,8 @@ const call = {
   icePendientes: [], // candidatos ICE que llegaron antes de tener la conexión
   hayTurn: false, // el relé publicó un servidor TURN
 };
+// Aviso tocado en la notificación del sistema antes de que llegue la oferta.
+let avisoPendiente = null;
 
 const CALL_RING_SECONDS = 45;
 const RTC_CONFIG = {
@@ -3056,11 +3058,18 @@ async function iniciarLlamada(video) {
   await pc.setLocalDescription(offer);
   enviaSenal('offer', { sdp: pc.localDescription });
 
+  esperaRespuesta(CALL_RING_SECONDS);
+}
+
+// Con la app cerrada el teléfono necesita despertar, abrir el navegador y
+// conectar: se le da más margen que a una llamada a alguien ya conectado.
+function esperaRespuesta(segundos) {
+  if (call.esperandoRespuesta) clearTimeout(call.esperandoRespuesta);
   call.esperandoRespuesta = setTimeout(() => {
     if (call.maquina && call.maquina.estado === 'llamando') {
       terminaLlamada('sin_conexion', 'El contacto no contestó');
     }
-  }, CALL_RING_SECONDS * 1000);
+  }, segundos * 1000);
 }
 
 async function aceptarLlamada() {
@@ -3138,6 +3147,12 @@ async function recibirSenal(msg) {
     ringtone();
     vibrarTimbre();
     avisarLlamadaEntrante(msg.from, msg.video);
+    // Se abrió la app tocando "Contestar" en el aviso del sistema.
+    if (avisoPendiente && avisoPendiente.contestar
+      && (!avisoPendiente.callId || avisoPendiente.callId === msg.callId)) {
+      avisoPendiente = null;
+      setTimeout(() => { aceptarLlamada().catch(() => {}); }, 400);
+    }
     return;
   }
   if (kind === 'answer') {
@@ -3162,7 +3177,18 @@ async function recibirSenal(msg) {
   if (kind === 'reject') { terminaLlamada('rechazada', 'El contacto rechazó la llamada'); return; }
   if (kind === 'busy') { terminaLlamada('rechazada', 'El contacto está en otra llamada'); return; }
   if (kind === 'hangup') { terminaLlamada('terminada', 'El contacto colgó'); return; }
-  if (kind === 'offline') { terminaLlamada('sin_conexion', 'El contacto no está en línea'); return; }
+  if (kind === 'offline') {
+    // El teléfono puede estar cerrado: el relé ya le está mandando el aviso.
+    setEstadoLlamada('Avisando al contacto…');
+    esperaRespuesta(90);
+    return;
+  }
+  if (kind === 'sin_aviso') {
+    setEstadoLlamada('Esperando a que abra Whataka…');
+    toast('Ese contacto no tiene avisos activados: tiene que abrir Whataka una vez para poder recibir llamadas.', 9000);
+    esperaRespuesta(90);
+    return;
+  }
 }
 
 function activarLlamada() {
@@ -3432,10 +3458,79 @@ async function requestNotificationPermission() {
   if (Notification.permission === 'denied') { toast('Los avisos están bloqueados en el navegador'); return; }
   try {
     const result = await Notification.requestPermission();
-    toast(result === 'granted' ? 'Avisos activados' : 'Avisos no concedidos');
+    if (result === 'granted') {
+      const ok = await activarAvisosPush();
+      pintaEstadoAvisos();
+      toast(ok ? 'Avisos activados: te llamarán con la app cerrada' : 'Avisos concedidos, pero no se pudieron registrar');
+      return;
+    }
+    toast('Avisos no concedidos');
   } catch {
     toast('No se pudo pedir el permiso de avisos');
   }
+}
+
+// La clave VAPID llega en base64url; PushManager la exige en bytes.
+function claveEnBytes(texto) {
+  const relleno = '='.repeat((4 - (texto.length % 4)) % 4);
+  const limpio = atob((texto + relleno).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from(limpio, (c) => c.charCodeAt(0));
+}
+
+// Sin esta suscripción el relé no puede despertar el teléfono cuando la app
+// está cerrada: solo llegan llamadas con la pestaña abierta.
+async function activarAvisosPush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
+  if (!('Notification' in window) || Notification.permission !== 'granted') return false;
+  try {
+    const registro = await navigator.serviceWorker.ready;
+    const res = await fetch(`${RELAY_HTTP}/api/push/key`, { cache: 'no-store' });
+    if (!res.ok) return false;
+    const { key } = await res.json();
+    if (!key) return false;
+    let sub = await registro.pushManager.getSubscription();
+    // Si el relé arrancó con otras claves, la suscripción vieja ya no entrega
+    // nada: se tira y se pide una nueva.
+    if (sub && sub.options && sub.options.applicationServerKey) {
+      const actual = btoa(String.fromCharCode(...new Uint8Array(sub.options.applicationServerKey)))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      if (actual !== key) {
+        await sub.unsubscribe();
+        sub = null;
+      }
+    }
+    if (!sub) {
+      sub = await registro.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: claveEnBytes(key),
+      });
+    }
+    const guardado = await fetch(`${RELAY_HTTP}/api/push/subscribe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ peerId: state.identity.peerId, subscription: sub.toJSON() }),
+    });
+    return guardado.ok;
+  } catch (err) {
+    console.warn('No se pudieron activar los avisos de llamada', err);
+    return false;
+  }
+}
+
+// Sin permiso de avisos el relé no puede despertar el teléfono: la fila de
+// ajustes lo dice en claro en vez de quedarse con un texto genérico.
+function pintaEstadoAvisos() {
+  const fila = document.getElementById('btn-permissions');
+  const texto = document.getElementById('avisos-estado');
+  if (!fila || !texto) return;
+  const permiso = 'Notification' in window ? Notification.permission : 'no-soportado';
+  if (permiso === 'granted') {
+    texto.textContent = 'Avisos de llamada activados: te llaman con la app cerrada';
+    fila.classList.remove('pendiente');
+    return;
+  }
+  texto.textContent = 'Toca aquí para recibir llamadas con la app cerrada';
+  fila.classList.add('pendiente');
 }
 
 async function showPermissions() {
@@ -3652,7 +3747,28 @@ async function boot() {
   }
 
   await adoptarRelayPropio();
+  // Antes de conectar: la oferta guardada llega nada más saludar el relé.
+  if (params.get('contestar') === '1') {
+    avisoPendiente = { callId: params.get('llamada'), contestar: true };
+  }
   connect();
+  activarAvisosPush();
+  pintaEstadoAvisos();
+
+  // Si la app ya estaba abierta, el aviso del sistema llega por aquí en vez de
+  // por la URL: se contesta igual.
+  if (navigator.serviceWorker) {
+    navigator.serviceWorker.addEventListener('message', (event) => {
+      const dato = event.data || {};
+      if (dato.tipo !== 'aviso-llamada') return;
+      if (!dato.contestar) return;
+      if (call.maquina && call.maquina.estado === 'sonando') {
+        aceptarLlamada().catch(() => {});
+      } else {
+        avisoPendiente = { callId: dato.callId, contestar: true };
+      }
+    });
+  }
   pintaAvisoRelay();
   setInterval(renderMining, 30000);
   cargarIceServers();

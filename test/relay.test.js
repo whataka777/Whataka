@@ -704,3 +704,143 @@ test('el dominio propio sirve la app sin redirección', async () => {
   const res = await pedirCon('whataka.vip', '/', 'text/html');
   assert.equal(res.status, 200);
 });
+
+// ── Avisos push y llamadas con la app cerrada ───────────────────────────────
+
+const SUSCRIPCION = {
+  endpoint: 'https://fcm.googleapis.com/fcm/send/ejemplo-para-pruebas',
+  expirationTime: null,
+  keys: { p256dh: 'BOr8'.repeat(20), auth: 'aB3d'.repeat(6) },
+};
+
+test('el relé publica su clave VAPID para que el móvil pueda suscribirse', async () => {
+  const res = await fetch(`${BASE}/api/push/key`);
+  assert.equal(res.status, 200);
+  const { key } = await res.json();
+  // Clave pública P-256 sin comprimir: 65 bytes en base64url.
+  assert.equal(Buffer.from(key, 'base64url').length, 65);
+});
+
+test('una suscripción push mal formada se rechaza', async () => {
+  const sinClaves = await fetch(`${BASE}/api/push/subscribe`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ peerId: makePeerId('push-malo'), subscription: { endpoint: 'https://x' } }),
+  });
+  assert.equal(sinClaves.status, 400);
+
+  const peerMalo = await fetch(`${BASE}/api/push/subscribe`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ peerId: 'nada', subscription: SUSCRIPCION }),
+  });
+  assert.equal(peerMalo.status, 400);
+});
+
+test('suscribirse dos veces no duplica el aviso del mismo móvil', async () => {
+  const peerId = makePeerId('push-bueno');
+  const cuerpo = (sub) => JSON.stringify({ peerId, subscription: sub });
+  const cabeceras = { 'Content-Type': 'application/json' };
+  const primera = await fetch(`${BASE}/api/push/subscribe`, { method: 'POST', headers: cabeceras, body: cuerpo(SUSCRIPCION) });
+  assert.equal(primera.status, 200);
+  const segunda = await fetch(`${BASE}/api/push/subscribe`, { method: 'POST', headers: cabeceras, body: cuerpo(SUSCRIPCION) });
+  assert.equal(segunda.status, 200);
+  assert.equal((await segunda.json()).avisos, 1);
+});
+
+test('una llamada a quien tiene la app cerrada se guarda y se entrega al abrir', async () => {
+  const a = await openSocket();
+  const idA = makePeerId('cerrada-a');
+  const idB = makePeerId('cerrada-b');
+  const callId = 'llamada-de-prueba-1';
+
+  a.send(JSON.stringify({ t: 'hello', id: idA, name: 'Alicia', agreePub: 'AAA', signPub: 'SSS' }));
+  await nextMessage(a, 'presence');
+
+  const recibidos = [];
+  a.on('message', (raw) => {
+    try {
+      const msg = JSON.parse(raw.toString());
+      if (msg.t === 'call') recibidos.push(msg);
+    } catch { /* ignora */ }
+  });
+
+  // B no está conectado: A llama y el relé avisa de que hay que despertarlo.
+  a.send(JSON.stringify({ t: 'call', to: idB, callId, kind: 'offer', video: false, payload: { sdp: 'v=0' } }));
+  await wait(300);
+  const offline = recibidos.find((m) => m.kind === 'offline');
+  assert.ok(offline, 'el llamante debe saber que el destino estaba desconectado');
+
+  // Los candidatos ICE que llegan mientras B duerme no se tiran.
+  a.send(JSON.stringify({ t: 'call', to: idB, callId, kind: 'ice', payload: { candidate: 'candidato-1' } }));
+  a.send(JSON.stringify({ t: 'call', to: idB, callId, kind: 'ice', payload: { candidate: 'candidato-2' } }));
+  await wait(200);
+
+  // B abre la app: primero la oferta y después sus candidatos.
+  const b = await openSocket();
+  const llegada = [];
+  b.on('message', (raw) => {
+    try {
+      const msg = JSON.parse(raw.toString());
+      if (msg.t === 'call') llegada.push(msg);
+    } catch { /* ignora */ }
+  });
+  b.send(JSON.stringify({ t: 'hello', id: idB, name: 'Bruno', agreePub: 'BBB', signPub: 'TTT' }));
+
+  const deadline = Date.now() + 4000;
+  while (llegada.length < 3 && Date.now() < deadline) await wait(50);
+
+  assert.equal(llegada.length, 3, 'debe recibir oferta y dos candidatos');
+  assert.equal(llegada[0].kind, 'offer');
+  assert.equal(llegada[0].callId, callId);
+  assert.equal(llegada[0].from, idA);
+  assert.equal(llegada[1].kind, 'ice');
+  assert.equal(llegada[1].payload.candidate, 'candidato-1');
+  assert.equal(llegada[2].payload.candidate, 'candidato-2');
+
+  a.close();
+  b.close();
+});
+
+test('la llamada guardada no se repite en la siguiente conexión', async () => {
+  const a = await openSocket();
+  const idA = makePeerId('repetida-a');
+  const idB = makePeerId('repetida-b');
+  const callId = 'llamada-de-prueba-2';
+
+  a.send(JSON.stringify({ t: 'hello', id: idA, name: 'Alicia', agreePub: 'AAA', signPub: 'SSS' }));
+  await nextMessage(a, 'presence');
+  a.send(JSON.stringify({ t: 'call', to: idB, callId, kind: 'offer', video: false, payload: { sdp: 'v=0' } }));
+  await wait(300);
+
+  const primera = await openSocket();
+  const vistos = [];
+  primera.on('message', (raw) => {
+    try {
+      const msg = JSON.parse(raw.toString());
+      if (msg.t === 'call') vistos.push(msg);
+    } catch { /* ignora */ }
+  });
+  primera.send(JSON.stringify({ t: 'hello', id: idB, name: 'Bruno', agreePub: 'BBB', signPub: 'TTT' }));
+  const deadline = Date.now() + 3000;
+  while (vistos.length === 0 && Date.now() < deadline) await wait(50);
+  assert.equal(vistos.length, 1, 'la primera conexión recibe la llamada');
+
+  // Al reconectar no debe volver a sonar la misma llamada.
+  primera.close();
+  await wait(200);
+  const segunda = await openSocket();
+  const repetidos = [];
+  segunda.on('message', (raw) => {
+    try {
+      const msg = JSON.parse(raw.toString());
+      if (msg.t === 'call') repetidos.push(msg);
+    } catch { /* ignora */ }
+  });
+  segunda.send(JSON.stringify({ t: 'hello', id: idB, name: 'Bruno', agreePub: 'BBB', signPub: 'TTT' }));
+  await wait(600);
+  assert.equal(repetidos.length, 0, 'la llamada ya entregada no se repite');
+
+  a.close();
+  segunda.close();
+});

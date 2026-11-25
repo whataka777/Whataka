@@ -124,6 +124,9 @@ llamadas en curso se cortan. Un servicio siempre despierto consume ~730 de las
 | `GET` | `/api/peers` | Lista de nodos en línea. |
 | `POST` | `/api/mining/report` | Reporte de minería firmado; devuelve `score` y `reward`. |
 | `GET` | `/api/mining/:peerId` | Acumulado del nodo. |
+| `GET` | `/api/push/key` | Clave pública VAPID para suscribir el móvil. |
+| `POST` | `/api/push/subscribe` | Guarda la suscripción push de un Peer ID. |
+| `POST` | `/api/push/unsubscribe` | Borra la suscripción de un dispositivo. |
 | `WS` | `/relay` | Presencia, `getkey` y reenvío de sobres. |
 
 ### Protocolo WebSocket
@@ -139,6 +142,34 @@ llamadas en curso se cortan. Un servicio siempre despierto consume ~730 de las
 { "t": "key",      "id": "wt1…", "agreePub": "…" }
 { "t": "msg",      "from": "wt1…", "iv": "…", "ct": "…" }
 ```
+
+## Llamadas con la app cerrada
+
+El relé manda un aviso push al teléfono cuando alguien llama y el destinatario
+no está conectado. El sistema despierta el service worker, muestra la llamada
+con vibración y, al tocar **Contestar**, abre Whataka con la oferta que el relé
+dejó guardada (75 segundos). El llamante ya no cuelga al instante: se queda
+esperando y ve "Avisando al contacto…".
+
+Para que funcione en un móvil de verdad hacen falta tres cosas:
+
+1. **Claves VAPID en el relé.** Se generan una vez y se pegan en Render:
+   `npx web-push generate-vapid-keys` → `VAPID_PUBLIC_KEY` y
+   `VAPID_PRIVATE_KEY`. Sin ellas el relé inventa claves al arrancar y cada
+   reinicio invalida los avisos (la app las renueva al abrirse, pero mientras
+   tanto nadie recibe llamadas).
+2. **Permiso de avisos concedido** en la app (menú de permisos).
+3. **La app instalada en la pantalla de inicio** en iPhone: iOS solo entrega
+   push a PWAs instaladas y desde iOS 16.4.
+
+Límites que no se pueden saltar desde la web: en iPhone el aviso es una
+notificación del sistema, no una pantalla de llamada a pantalla completa como
+WhatsApp (eso requiere CallKit y una app nativa). En Android el aviso llega con
+vibración y botones, pero tampoco puede ocupar la pantalla. Además, si el
+teléfono tiene la app cerrada y **nunca** la abrió con los avisos concedidos, el
+relé no tiene a dónde mandar el push: esa persona tiene que abrir Whataka una
+vez. Y si el relé está dormido (plan gratuito de Render), el aviso sale cuando
+el llamante lo despierta al conectar.
 
 ## Alcance y límites
 
