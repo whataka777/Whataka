@@ -661,3 +661,46 @@ test('consultar un Peer ID inválido responde 400', async () => {
   const res = await fetch(`${BASE}/api/referrals/no-es-peer`);
   assert.equal(res.status, 400);
 });
+
+// ── Dominio único ────────────────────────────────────────────────────────────
+// La identidad vive en localStorage, que es por origen: si la app responde en
+// dos direcciones, cada una crea un Peer ID distinto. Las páginas que llegan
+// por el subdominio de Render deben acabar en whataka.vip; el WebSocket y la
+// API no se tocan, porque la app de GitHub Pages depende de ellos.
+function pedirCon(host, ruta, accept) {
+  return new Promise((resolve, reject) => {
+    const { request } = require('node:http');
+    const req = request(
+      { host: '127.0.0.1', port: PORT, path: ruta, method: 'GET', headers: { host, accept } },
+      (res) => {
+        res.resume();
+        res.on('end', () => resolve({ status: res.statusCode, location: res.headers.location }));
+      },
+    );
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+test('una página pedida por el subdominio de Render va al dominio propio', async () => {
+  const res = await pedirCon('whataka-relay.onrender.com', '/index.html?x=1', 'text/html,*/*');
+  assert.equal(res.status, 301);
+  assert.equal(res.location, 'https://whataka.vip/index.html?x=1');
+});
+
+test('los archivos estáticos del subdominio de Render no se redirigen', async () => {
+  const res = await pedirCon('whataka-relay.onrender.com', '/app.js', '*/*');
+  assert.equal(res.status, 200);
+});
+
+test('el WebSocket y la API no se redirigen aunque pidan HTML', async () => {
+  const relay = await pedirCon('whataka-relay.onrender.com', '/relay', 'text/html');
+  const api = await pedirCon('whataka-relay.onrender.com', '/api/ice', 'text/html');
+  assert.notEqual(relay.status, 301);
+  assert.notEqual(api.status, 301);
+});
+
+test('el dominio propio sirve la app sin redirección', async () => {
+  const res = await pedirCon('whataka.vip', '/', 'text/html');
+  assert.equal(res.status, 200);
+});

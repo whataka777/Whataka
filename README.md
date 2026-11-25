@@ -106,6 +106,15 @@ cualquier nodo sin recompilar. Sin parámetro se usa el relé de Render.
 - Start: `npm start`
 - Health check: `/health`
 - `autoDeploy: true` (cada push a `main` redespliega el relé)
+- `CANONICAL_HOST` (por defecto `whataka.vip`): las páginas que llegan por el
+  subdominio `*.onrender.com` se redirigen al dominio propio. La identidad vive
+  en `localStorage`, que es por origen, así que dos direcciones para la misma
+  app significan dos Peer ID distintos y contactos que "desaparecen".
+
+El flujo `.github/workflows/keep-alive.yml` saluda al relé cada 5 minutos para
+que el plan gratuito de Render no lo duerma: al despertar tarda 30-60 s y las
+llamadas en curso se cortan. Un servicio siempre despierto consume ~730 de las
+750 horas mensuales del plan gratuito.
 
 ## API del relé
 

@@ -36,9 +36,27 @@ const CLAIM_COOLDOWN_SECONDS = Number(process.env.CLAIM_COOLDOWN_SECONDS) || 600
 // que cambiar este valor en Render y volver a desplegar.
 const DONATION_WALLET = (process.env.DONATION_WALLET || '').trim();
 
+// Un solo dominio para la app. La identidad vive en localStorage, que es por
+// origen: si la misma app responde en whataka.vip y en el subdominio de Render,
+// cada dirección crea un Peer ID distinto y los contactos "desaparecen" al
+// cambiar de enlace. Solo se redirigen las páginas; /relay y /api siguen
+// atendiendo a la app de GitHub Pages, que habla con este host.
+const CANONICAL_HOST = (process.env.CANONICAL_HOST || 'whataka.vip').trim().toLowerCase();
+
 const app = express();
 app.disable('x-powered-by');
 app.use(express.json({ limit: '32kb' }));
+
+app.use((req, res, next) => {
+  if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+  if (!/text\/html/i.test(req.headers.accept || '')) return next();
+  if (req.path === '/relay' || req.path.startsWith('/api/')) return next();
+  const host = String(req.headers['x-forwarded-host'] || req.headers.host || '')
+    .split(',')[0].trim().toLowerCase().replace(/:\d+$/, '');
+  const esSubdominioRender = host.endsWith('.onrender.com');
+  if (!esSubdominioRender || host === CANONICAL_HOST) return next();
+  return res.redirect(301, `https://${CANONICAL_HOST}${req.originalUrl}`);
+});
 
 // El frontend puede vivir en otro origen (GitHub Pages) o dentro del propio relé.
 app.use((req, res, next) => {

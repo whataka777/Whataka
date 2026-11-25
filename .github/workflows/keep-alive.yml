@@ -1,0 +1,49 @@
+# Render apaga la instancia gratuita a los ~15 min sin tráfico. Cuando eso pasa,
+# quien abre la app espera 30-60 s y las llamadas en curso se cortan. Un saludo
+# cada 5 minutos mantiene el relé despierto.
+#
+# Aviso: el plan gratuito da 750 horas de instancia al mes y un mes tiene ~730,
+# así que un servicio siempre despierto entra justo. Si algún día se añaden más
+# servicios, hay que pasar al plan Starter o desactivar este flujo.
+name: Mantener el relé despierto
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: keep-alive
+  cancel-in-progress: true
+
+jobs:
+  saludar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Despertar el relé
+        run: |
+          for intento in 1 2 3; do
+            if curl -fsS -m 25 https://whataka-relay.onrender.com/health; then
+              echo "relé despierto"
+              exit 0
+            fi
+            echo "sin respuesta (intento $intento)"
+            sleep 10
+          done
+          echo "el relé no respondió; se reintentará en el siguiente ciclo"
+
+      # Un relé arrancado sin REPORT_SIGNER_KEY sigue chateando pero devuelve
+      # 503 al pedir vales de minería. El fallo es silencioso para el usuario,
+      # así que el vigilante lo convierte en un aviso visible.
+      - name: Comprobar que la minería tiene firmante
+        run: |
+          cuerpo=$(curl -fsS -m 25 https://whataka-relay.onrender.com/api/mining/config) || exit 0
+          case "$cuerpo" in
+            *'"configured":true'*)
+              echo "minería operativa"
+              ;;
+            *)
+              echo "::error::El relé no tiene REPORT_SIGNER_KEY: la minería devolverá 503."
+              exit 1
+              ;;
+          esac

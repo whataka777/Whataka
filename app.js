@@ -73,8 +73,26 @@ if (relayParam) {
   history.replaceState(null, '', location.pathname + (qs ? `?${qs}` : ''));
 }
 
-const RELAY_HTTP = (readStore(STORE.relay, DEFAULT_RELAY) || DEFAULT_RELAY).replace(/\/+$/, '');
-const RELAY_WS = RELAY_HTTP.replace(/^http/, 'ws');
+const RELAY_URL = window.WhaTakaRelayUrl || {
+  normalizar: () => '',
+  analizar: () => ({ utilizable: false, url: '', motivo: 'Recarga la app: falta el módulo de configuración del relé' }),
+};
+const RELAY_OFICIAL = DEFAULT_RELAY;
+// En local (desarrollo) sí tiene sentido apuntar a localhost; en el móvil no.
+const PAGINA_LOCAL = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+const OPCIONES_RELAY = { protocolo: location.protocol, oficial: RELAY_OFICIAL, permiteLocal: PAGINA_LOCAL };
+
+// Una dirección guardada que el navegador no puede usar dejaba la app muda y
+// desconectada; aquí se descarta y se avisa.
+const relayGuardado = readStore(STORE.relay, '');
+const relayAjustado = RELAY_URL.normalizar(relayGuardado, OPCIONES_RELAY);
+if (relayGuardado && !relayAjustado) localStorage.removeItem(STORE.relay);
+else if (relayGuardado && relayAjustado !== String(relayGuardado).replace(/\/+$/, '')) {
+  writeStore(STORE.relay, relayAjustado);
+}
+
+let RELAY_HTTP = (relayAjustado || RELAY_OFICIAL).replace(/\/+$/, '');
+let RELAY_WS = RELAY_HTTP.replace(/^http/, 'ws');
 
 const E2E_INFO = 'whataka-e2e-v1';
 
@@ -344,6 +362,7 @@ const state = {
   relayUnits: 0,
   storeUnits: 0,
   pendingKeys: new Map(),
+  relayIntentos: 0,
   // Web3
   wallet: null,
   miningConfig: null,
@@ -821,12 +840,12 @@ async function ensureChain(wallet, chainId) {
 // ─────────────────────────────────────────────────────────────
 
 let toastTimer = null;
-function toast(msg) {
+function toast(msg, ms = 2600) {
   const el = $('#toast');
   el.textContent = msg;
   el.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+  toastTimer = setTimeout(() => el.classList.remove('show'), ms);
 }
 
 // Timbre de llamada entrante, generado con WebAudio (sin archivos externos).
@@ -1927,6 +1946,51 @@ function verCafe() {
 // Red
 // ─────────────────────────────────────────────────────────────
 
+// Aviso permanente de estado del relé: sin él, un relé inalcanzable solo se
+// notaba en la consola y las llamadas no sonaban sin explicación.
+function pintaAvisoRelay() {
+  const banner = $('#net-banner');
+  if (!banner) return;
+  if (state.connected) {
+    banner.hidden = true;
+    return;
+  }
+  const texto = $('#net-banner-text');
+  const fix = $('#net-fix');
+  const personalizado = Boolean(readStore(STORE.relay, ''));
+  banner.hidden = false;
+  if (texto) {
+    texto.textContent = state.relayIntentos >= 2
+      ? (personalizado
+        ? 'No se puede conectar con el relé configurado. Las llamadas y mensajes no funcionarán.'
+        : 'No se puede conectar con el relé. Reintentando… (el servidor gratuito puede tardar hasta un minuto en despertar)')
+      : 'Conectando con el relé…';
+  }
+  if (fix) fix.hidden = !(personalizado && state.relayIntentos >= 2);
+}
+
+// Si la propia página la sirve el relé (whataka.vip), se usa su mismo origen:
+// así la conexión no depende del subdominio de Render. En GitHub Pages el
+// sondeo responde 404 al instante y se mantiene el relé oficial.
+async function adoptarRelayPropio() {
+  // Se consulta el valor actual: ?relay= ya se guardó antes de llegar aquí.
+  if (readStore(STORE.relay, '')) return;
+  if (location.protocol !== 'https:' && location.protocol !== 'http:') return;
+  const origen = location.origin;
+  if (!origen || origen === RELAY_HTTP) return;
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 2500);
+    const res = await fetch(`${origen}/health`, { cache: 'no-store', signal: ctrl.signal });
+    clearTimeout(timer);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data || data.service !== 'whataka-relay') return;
+    RELAY_HTTP = origen;
+    RELAY_WS = origen.replace(/^http/, 'ws');
+  } catch {}
+}
+
 function connect() {
   let socket;
   try {
@@ -1937,8 +2001,19 @@ function connect() {
   }
   state.socket = socket;
 
+  // El relé gratuito tarda hasta un minuto en despertar y el navegador puede
+  // dejar el saludo colgado sin avisar: si no abre en 15 s, se reintenta.
+  const perro = setTimeout(() => {
+    if (socket.readyState !== WebSocket.OPEN) {
+      try { socket.close(); } catch {}
+    }
+  }, 15000);
+
   socket.addEventListener('open', () => {
+    clearTimeout(perro);
     state.connected = true;
+    state.relayIntentos = 0;
+    pintaAvisoRelay();
     sendRaw({
       t: 'hello',
       id: state.identity.peerId,
@@ -1953,8 +2028,11 @@ function connect() {
   });
 
   socket.addEventListener('close', () => {
+    clearTimeout(perro);
     state.connected = false;
     state.online.clear();
+    state.relayIntentos += 1;
+    pintaAvisoRelay();
     renderMining();
     renderStatus();
     renderChats();
@@ -2635,15 +2713,15 @@ function askRelay() {
     </div>`);
   $('#relay-cancel').addEventListener('click', closeModal);
   $('#relay-save').addEventListener('click', () => {
-    const value = $('#relay-input').value.trim().replace(/\/+$/, '');
-    if (value && !/^https?:\/\//.test(value)) {
-      toast('La dirección debe empezar por http:// o https://');
+    const res = RELAY_URL.analizar($('#relay-input').value, OPCIONES_RELAY);
+    if (!res.utilizable) {
+      toast(res.motivo || 'Esa dirección no sirve para conectar');
       return;
     }
-    if (value) writeStore(STORE.relay, value);
+    if (res.url) writeStore(STORE.relay, res.url);
     else localStorage.removeItem(STORE.relay);
     closeModal();
-    toast('Reconectando…');
+    toast(res.motivo || 'Reconectando…');
     setTimeout(() => location.reload(), 600);
   });
 }
@@ -2712,7 +2790,10 @@ function askStatus() {
 }
 
 function voiceCall(video = false) {
-  iniciarLlamada(video);
+  iniciarLlamada(video).catch((err) => {
+    console.error('Llamada', err);
+    toast('No se pudo iniciar la llamada');
+  });
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -2735,6 +2816,7 @@ const call = {
   mediosListos: false, // llegó al menos una pista remota
   descripcionRemota: false, // ya aplicamos offer/answer
   icePendientes: [], // candidatos ICE que llegaron antes de tener la conexión
+  hayTurn: false, // el relé publicó un servidor TURN
 };
 
 const CALL_RING_SECONDS = 45;
@@ -2746,14 +2828,20 @@ const RTC_CONFIG = {
 };
 
 // Pide al relé los servidores ICE (incluye TURN si está configurado). Si falla,
-// se usan los STUN de arriba.
+// se usan los STUN de arriba. Se llama antes de cada llamada: al arrancar el
+// relé gratuito puede estar dormido y entonces la sesión se quedaba sin TURN.
 async function cargarIceServers() {
   try {
-    const res = await fetch(`${RELAY_HTTP}/api/ice`, { cache: 'no-store' });
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 6000);
+    const res = await fetch(`${RELAY_HTTP}/api/ice`, { cache: 'no-store', signal: ctrl.signal });
+    clearTimeout(timer);
     if (!res.ok) return;
     const data = await res.json();
     if (data && Array.isArray(data.iceServers) && data.iceServers.length) {
       RTC_CONFIG.iceServers = data.iceServers;
+      call.hayTurn = data.iceServers.some((s) => String(s.urls || '').includes('turn:')
+        || (Array.isArray(s.urls) && s.urls.some((u) => String(u).includes('turn:'))));
     }
   } catch {}
 }
@@ -2843,7 +2931,14 @@ function creaPeerConnection(peerId) {
     quizasActivarLlamada();
   };
   pc.onconnectionstatechange = () => {
-    if (pc.connectionState === 'failed') terminaLlamada('sin_conexion', 'No se pudo conectar la llamada');
+    if (pc.connectionState === 'failed') {
+      // Sin TURN, dos redes móviles o NAT estricto no pueden abrir el canal
+      // directo: el usuario merece saber por qué y qué hace falta.
+      const pista = call.hayTurn
+        ? 'No se pudo conectar la llamada. Prueba con otra red (Wi-Fi).'
+        : 'No se pudo conectar la llamada: tu red no permite el enlace directo y el relé no tiene TURN configurado.';
+      terminaLlamada('sin_conexion', pista);
+    }
     if (pc.connectionState === 'disconnected' || pc.connectionState === 'closed') {
       if (call.maquina && call.maquina.estado === 'activa') terminaLlamada('terminada', 'Llamada finalizada');
     }
@@ -2865,6 +2960,7 @@ function aplicarIcePendientes() {
 }
 
 async function iniciarLlamada(video) {
+  if (!LL) { toast('El módulo de llamadas no cargó. Recarga la app.'); return; }
   const peerId = state.activePeer;
   if (!peerId) { toast('Abre un chat para llamar a alguien'); return; }
   if (!state.connected) { toast('Sin conexión con el relé'); return; }
@@ -2882,6 +2978,7 @@ async function iniciarLlamada(video) {
     return;
   }
 
+  await cargarIceServers();
   call.maquina = LL.crear();
   call.video = !!video;
   call.esLlamante = true;
@@ -2929,6 +3026,7 @@ async function aceptarLlamada() {
   pintaVideoLocal();
   sincronizaBotonesLlamada();
 
+  await cargarIceServers();
   const pc = creaPeerConnection(call.maquina.peer);
   // La oferta ya la guardamos al recibirla.
   if (call._offerSdp) {
@@ -2953,6 +3051,7 @@ function colgarLlamada() {
 }
 
 async function recibirSenal(msg) {
+  if (!LL) return;
   const kind = msg.kind;
   if (kind === 'offer') {
     // Si ya hay una llamada activa, avisamos de que está ocupado.
@@ -3073,7 +3172,7 @@ function terminaLlamada(motivo, aviso) {
   const o = callEl('call-overlay'); if (o) o.classList.remove('has-remote', 'local-on');
   mostrarOverlayLlamada(false);
   if (typeof stopRingtone === 'function') stopRingtone();
-  if (aviso) toast(aviso);
+  if (aviso) toast(aviso, 6000);
   call.maquina = LL ? LL.crear() : null;
 }
 
@@ -3331,6 +3430,15 @@ function bindEvents() {
     btn.addEventListener('click', () => switchTab(btn.dataset.target));
   });
 
+  const netFix = $('#net-fix');
+  if (netFix) {
+    netFix.addEventListener('click', () => {
+      localStorage.removeItem(STORE.relay);
+      toast('Usando el relé oficial…');
+      setTimeout(() => location.reload(), 400);
+    });
+  }
+
   $('#btn-scan-peer').addEventListener('click', () => askAddPeer());
   $('#fab-new-chat').addEventListener('click', () => askAddPeer());
   $('#btn-open-security').addEventListener('click', showSecurity);
@@ -3423,15 +3531,40 @@ function bindEvents() {
   });
 }
 
+// Abre las claves de una identidad guardada. Devuelve null si el contenido está
+// corrupto o viene de una versión incompatible: antes, un solo byte malo en
+// localStorage dejaba la app sin arrancar y sin conexión para siempre.
+async function importIdentity(identity) {
+  if (!identity || typeof identity.peerId !== 'string' || !/^wt1[1-9A-HJ-NP-Za-km-z]{20,60}$/.test(identity.peerId)) {
+    return null;
+  }
+  try {
+    const signKey = await importSignPrivate(identity.signPriv);
+    const agreeKey = await importAgreePrivate(identity.agreePriv);
+    return { signKey, agreeKey };
+  } catch {
+    return null;
+  }
+}
+
 async function boot() {
+  let avisoIdentidad = '';
   let identity = readStore(STORE.identity, null);
-  if (!identity || !identity.peerId) {
+  let keys = identity ? await importIdentity(identity) : null;
+  if (!keys) {
+    if (identity) {
+      // Se conserva una copia por si el usuario quiere recuperarla a mano.
+      writeStore(`${STORE.identity}.rota`, identity);
+      avisoIdentidad = 'Tu identidad guardada estaba dañada: se ha creado una nueva. Tus contactos tendrán que añadir tu nuevo Peer ID.';
+    }
     identity = await createIdentity();
     writeStore(STORE.identity, identity);
+    keys = await importIdentity(identity);
   }
+  if (!keys) throw new Error('No se pudo crear la identidad');
   state.identity = identity;
-  state.signKey = await importSignPrivate(identity.signPriv);
-  state.agreeKey = await importAgreePrivate(identity.agreePriv);
+  state.signKey = keys.signKey;
+  state.agreeKey = keys.agreeKey;
   state.wallet = readStore(STORE.wallet, null);
 
   const savedDirectKey = readStore(STORE.directKey, null);
@@ -3455,10 +3588,14 @@ async function boot() {
   registrarPadrino().then(refrescarReferidos);
 
   if (params.get('relay')) {
-    writeStore(STORE.relay, params.get('relay'));
+    const limpio = RELAY_URL.normalizar(params.get('relay'), OPCIONES_RELAY);
+    if (limpio) writeStore(STORE.relay, limpio);
+    else localStorage.removeItem(STORE.relay);
   }
 
+  await adoptarRelayPropio();
   connect();
+  pintaAvisoRelay();
   setInterval(renderMining, 30000);
   cargarIceServers();
 
@@ -3467,6 +3604,8 @@ async function boot() {
   }
 
   hideSplash();
+  // El aviso espera a que se retire la pantalla de bienvenida, que va encima.
+  if (avisoIdentidad) setTimeout(() => toast(avisoIdentidad, 9000), 1000);
 }
 
 function hideSplash() {
@@ -3480,8 +3619,11 @@ function hideSplash() {
 boot().catch((err) => {
   console.error('Fallo al iniciar WhaTaka', err);
   hideSplash();
+  const pista = location.protocol === 'https:'
+    ? 'Recarga la app; si sigue igual, borra los datos del sitio en los ajustes del navegador.'
+    : 'Abre la app por HTTPS: sin conexión segura el navegador bloquea las claves.';
   document.body.insertAdjacentHTML(
     'beforeend',
-    '<div class="toast show">No se pudo iniciar el almacén criptográfico. Abre la app por HTTPS.</div>',
+    `<div class="toast show">No se pudo iniciar WhaTaka. ${escapeHtml(pista)}</div>`,
   );
 });

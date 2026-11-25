@@ -1,9 +1,14 @@
-const CACHE = 'whataka-v60';
+const CACHE = 'whataka-v61';
 const ASSETS = [
   './',
   './index.html',
   './app.js',
   './lib/llamadas.js',
+  './lib/niveles.js',
+  './lib/referidos.js',
+  './lib/donaciones.js',
+  './lib/stickers.js',
+  './lib/relay-url.js',
   './vendor/ethers.umd.min.js',
   './manifest.webmanifest',
   './icons/icon-192.png',
@@ -39,10 +44,24 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     fetch(request, { cache: 'no-cache' })
       .then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE).then((cache) => cache.put(request, copy)).catch(() => {});
+        // No se guardan respuestas de error: un 404 durante un despliegue se
+        // quedaría cacheado y se serviría para siempre sin conexión.
+        if (res && res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then((cache) => cache.put(request, copy)).catch(() => {});
+        }
         return res;
       })
-      .catch(() => caches.match(request).then((hit) => hit || caches.match('./index.html'))),
+      .catch(async () => {
+        const hit = await caches.match(request, { ignoreSearch: true });
+        if (hit) return hit;
+        // Solo una navegación puede caer a index.html: devolver HTML a una
+        // petición de script la rompe con un error de sintaxis.
+        if (request.mode === 'navigate') {
+          const index = await caches.match('./index.html');
+          if (index) return index;
+        }
+        return Response.error();
+      }),
   );
 });

@@ -26,3 +26,16 @@ services:
       # Polygon real. Mientras esté vacía, la app usa su valor de respaldo.
       - key: DONATION_WALLET
         sync: false
+      # TURN para las llamadas. Sin TURN, dos móviles con NAT estricto (4G/5G)
+      # no pueden abrir el canal directo y la llamada se queda en "Conectando…".
+      # El relé publica estos valores en /api/ice; no se incrustan en la app.
+      - key: ICE_TURN_URL
+        sync: false
+      - key: ICE_TURN_USERNAME
+        sync: false
+      - key: ICE_TURN_CREDENTIAL
+        sync: false
+      # Dominio único de la app: el subdominio de Render redirige aquí para que
+      # nadie acabe con dos identidades (localStorage es por origen).
+      - key: CANONICAL_HOST
+        value: whataka.vip
