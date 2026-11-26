@@ -1549,6 +1549,10 @@ function verReferidos() {
       Bronce, Plata, Oro, Platino o Diamante <strong>sin pagar nada</strong>.
     </p>
 
+    <button class="primary-btn" id="ref-manual" style="width:100%; margin:6px 0 12px;">
+      <i class="fa-solid fa-book-open"></i> Abrir el manual de uso
+    </button>
+
     <div style="text-align:center; margin:12px 0;">
       <div style="font-size:26px; color:${e.color};">${e.emoji} ${e.nombre}</div>
       <div style="font-size:12px; opacity:.8;">${e.frase}</div>
@@ -1581,6 +1585,10 @@ function verReferidos() {
       Los referidos solo dan estatus y posición dentro de Whataka: no son una inversión,
       no dan tokens ni dinero y no prometen ganancias.
     </p>`);
+
+  $('#ref-manual').addEventListener('click', () => {
+    window.open(new URL('manual.html', location.href).href, '_blank', 'noopener');
+  });
 
   const compartir = async () => {
     const texto = api.textoCompartir(peerId, baseUrlApp());
@@ -3861,7 +3869,7 @@ async function activarAvisosPush() {
 // Un solo número para todo: el de las URL de index.html, la caché del service
 // worker y esta pantalla. Sirve para saber de un vistazo qué copia se está
 // usando cuando algo no cuadra. Lo comprueba test/version.test.js.
-const WHATAKA_BUILD = '74';
+const WHATAKA_BUILD = '75';
 
 const AVISO_LLAMADAS_CLAVE = 'whataka-aviso-llamadas-oculto';
 const AVISO_LLAMADAS_DIAS = 3;
