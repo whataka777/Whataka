@@ -3146,6 +3146,10 @@ function marcaEfectosActivos() {
   document.querySelectorAll('#call-efectos-filtros [data-efecto]').forEach((b) => {
     b.classList.toggle('activo', b.dataset.efecto === filtro);
   });
+  // El lápiz se enciende cuando hay algo puesto: si no, nadie recuerda que
+  // lleva un fondo detrás.
+  const lapiz = callEl('call-efectos-btn');
+  if (lapiz) lapiz.classList.toggle('activo', fondo !== 'ninguno' || filtro !== 'normal');
 }
 
 function pintaBotonesEfectos() {
