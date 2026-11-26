@@ -10,11 +10,12 @@ const indice = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8')
 const app = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
 const server = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
 
-test('el manual está en español y tiene las trece secciones', () => {
+test('el manual está en español y tiene las catorce secciones', () => {
   assert.match(manual, /<html lang="es">/);
   const secciones = [
     'que-es', 'cuenta', 'primeros', 'contactos', 'llamadas', 'mineria',
     'cartera', 'donaciones', 'cambio', 'niveles', 'seguridad', 'problemas', 'glosario',
+    'futuro',
   ];
   for (const id of secciones) {
     assert.match(manual, new RegExp(`id="${id}"`), `falta la sección ${id}`);

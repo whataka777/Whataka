@@ -159,6 +159,7 @@
     <li><a href="#seguridad">Seguridad y privacidad</a></li>
     <li><a href="#problemas">Problemas frecuentes</a></li>
     <li><a href="#glosario">Glosario</a></li>
+    <li><a href="#futuro">Lo que viene: minería y cambio de verdad</a></li>
   </ol>
 </nav>
 
@@ -476,7 +477,8 @@ firma antes de pagar.</p>
 En esta versión el contrato está desplegado en la red de pruebas de Polygon
 (Amoy) y el relé todavía no firma vales, así que la minería responde
 «no configurada». Sirve para ver cómo funciona, no para ganar dinero. Cuando se
-active, esta pantalla empezará a pagar de verdad y lo avisaremos aquí.
+active, esta pantalla empezará a pagar de verdad y lo avisaremos aquí. Todo lo que
+falta para encenderla está en el capítulo 14.
 </div>
 
 <h2 id="cartera"><span class="num">7</span> La cartera: conectar y cambiar</h2>
@@ -610,7 +612,8 @@ tu cartera, y la app no toca tus fondos ni cobra comisión.</p>
 El contrato vive en Polygon Amoy (cadena 80002), que es una red de ensayo: su
 WTK no vale dinero y no se cambia por USDT real. El botón del DEX abre QuickSwap
 en Polygon real, así que hasta que el token se despliegue en la red principal, no
-hay nada que cambiar allí. Cuando se publique, se avisará en la app.
+hay nada que cambiar allí. Cuando se publique, se avisará en la app. Los pasos
+que faltan están en el capítulo 14.
 </div>
 
 <h2 id="niveles"><span class="num">10</span> Niveles y referidos</h2>
@@ -695,6 +698,78 @@ mensajes. Y como vive en memoria, al reiniciar se olvida de casi todo.</p>
       firma por ti. Whataka no la controla.</td></tr>
   <tr><td><strong>DEX</strong></td><td>Casa de cambio sin dueño (QuickSwap) donde
       tú cambias un token por otro.</td></tr>
+</table>
+
+<h2 id="futuro"><span class="num">14</span> Lo que viene: minería y cambio de verdad</h2>
+
+<p><strong>Sí, las dos cosas van a funcionar como están escritas.</strong> No son
+promesas de folleto: la maquinaria ya está construida y lo que falta son pasos
+concretos, no inventos. Este capítulo dice exactamente cuáles, para que sepas qué
+mirar y cuándo.</p>
+
+<h3>Lo que ya está hecho</h3>
+<table>
+  <tr><th>Pieza</th><th>Estado</th></tr>
+  <tr><td>El contrato de minería, con halving y tope anual de emisión</td><td>Desplegado y funcionando en la red de pruebas de Polygon (Amoy)</td></tr>
+  <tr><td>El vale firmado: el relé mide, firma y el contrato paga</td><td>Programado en las dos partes; falta la clave del firmante en el servidor</td></tr>
+  <tr><td>La pantalla de minería, el registro de cartera y la firma</td><td>Terminados y probados</td></tr>
+  <tr><td>La sala de donaciones en WTK y el enlace al DEX</td><td>Terminados y probados</td></tr>
+  <tr><td>La herramienta para desplegar el token</td><td>Terminada (Ajustes → DEPLOY TOKEN)</td></tr>
+</table>
+
+<h3>Los cuatro pasos que faltan</h3>
+<ol class="pasos">
+  <li><strong>Poner la clave del firmante en el relé.</strong> Es un dato, no
+      código: el contrato ya tiene grabada la dirección que puede firmar vales
+      (<span class="mono">0xa5f1711dc508fe8b256f1a8a834cff2a47f41186</span>).
+      En cuanto el servidor la tenga, la minería paga en la red de pruebas y se
+      puede comprobar de punta a punta con dinero de juguete.</li>
+  <li><strong>Desplegar el token en Polygon de verdad</strong> (cadena 137), con su
+      suministro inicial y su tope. Es la misma herramienta que ya está en la app,
+      apuntando a la red principal en lugar de a la de pruebas.</li>
+  <li><strong>Poner liquidez en un DEX.</strong> Este es el paso que de verdad
+      decide si se puede cambiar WTK por USDT: hay que crear el par WTK/USDT (o
+      WTK/POL) en QuickSwap y meter monedas dentro. Sin liquidez no hay precio, y
+      sin precio no hay cambio, por mucha app que tengamos.</li>
+  <li><strong>Apuntar la app y el relé a la red principal</strong> y avisar aquí y
+      en la pantalla de minería.</li>
+</ol>
+
+<h3>Qué podrás hacer cuando estén los cuatro</h3>
+<ul>
+  <li>Minar de verdad: usar la app, pulsar <strong>Minar</strong> y recibir WTK en
+      tu cartera, con el contrato pagando según tu actividad medida.</li>
+  <li>Recibir WTK de otra persona, donarlo o guardarlo, como cualquier token.</li>
+  <li>Cambiarlo por USDT o POL en QuickSwap, tú mismo, con tu cartera.</li>
+  <li>Verlo todo en el explorador de Polygon, transacción por transacción.</li>
+</ul>
+
+<div class="aviso bien"><b>Lo que sí te puedo prometer</b>
+Que la minería pagará, que el vale no se podrá falsificar y que el cambio se podrá
+hacer sin pedir permiso a nadie, porque el par estará abierto en un DEX público.
+Eso es mecánica, y la mecánica se cumple.
+</div>
+
+<div class="aviso peligro"><b>Lo que nadie serio te puede prometer</b>
+Cuánto valdrá un WTK. El precio lo pone la gente comprando y vendiendo en ese par:
+si hay poca liquidez, el cambio será malo; si no hay demanda, no habrá precio. La
+app no compra, no vende, no garantiza valor y no promete ganancias. Cualquiera que
+te diga lo contrario te está vendiendo humo.
+</div>
+
+<h3>Por qué no hay fecha</h3>
+<p>Porque los tres primeros pasos dependen de cosas que cuestan dinero real y de
+decisiones que se toman con calma: la clave del firmante, el gas del despliegue y
+las monedas que van dentro del par de liquidez. Poner una fecha y no cumplirla es
+peor que no ponerla. Cuando cada paso esté hecho, este manual lo dirá en este mismo
+capítulo, con la fecha al lado.</p>
+
+<table>
+  <tr><th>Cuándo</th><th>Qué verás</th></tr>
+  <tr><td>Ahora</td><td>La minería mide, pero no paga. El token no se cambia.</td></tr>
+  <tr><td>Al encender la minería</td><td>La pantalla de minería deja de decir «no configurada» y empieza a pagar en la red de pruebas.</td></tr>
+  <tr><td>Al pasar a la red principal</td><td>El WTK que mines será real, con su registro público en Polygon.</td></tr>
+  <tr><td>Al abrir el par de liquidez</td><td>El botón del DEX tendrá algo que cambiar y verás el precio en QuickSwap.</td></tr>
 </table>
 
 <p style="text-align:center;margin-top:30px">
