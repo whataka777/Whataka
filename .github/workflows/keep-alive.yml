@@ -33,8 +33,9 @@ jobs:
           echo "el relé no respondió; se reintentará en el siguiente ciclo"
 
       # Un relé arrancado sin REPORT_SIGNER_KEY sigue chateando pero devuelve
-      # 503 al pedir vales de minería. El fallo es silencioso para el usuario,
-      # así que el vigilante lo convierte en un aviso visible.
+      # 503 al pedir vales de minería. Se avisa, no se rompe el flujo: mientras
+      # falte la clave, un fallo cada cinco minutos solo enseña a ignorar el
+      # rojo. El aviso sale igual como anotación del flujo.
       - name: Comprobar que la minería tiene firmante
         run: |
           cuerpo=$(curl -fsS -m 25 https://whataka-relay.onrender.com/api/mining/config) || exit 0
@@ -43,7 +44,6 @@ jobs:
               echo "minería operativa"
               ;;
             *)
-              echo "::error::El relé no tiene REPORT_SIGNER_KEY: la minería devolverá 503."
-              exit 1
+              echo "::warning::El relé no tiene REPORT_SIGNER_KEY: la minería devuelve 503."
               ;;
           esac
