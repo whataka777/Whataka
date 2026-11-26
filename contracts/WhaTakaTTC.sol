@@ -55,8 +55,8 @@ contract WhaTakaTTC is IERC20 {
     // ERC-20
     // ─────────────────────────────────────────────────────────────
 
-    string public constant name = "WhaTaka Coin";
-    string public constant symbol = "WTK";
+    string public constant name = "whataka coin";
+    string public constant symbol = "wtk";
     uint8 public constant decimals = 18;
 
     uint256 public totalSupply;

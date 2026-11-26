@@ -26,6 +26,7 @@
     .status.busy { background:#2c1638; color:var(--glow); }
     label { display:block; font-size:12.5px; color:var(--muted); margin-top:10px; margin-bottom:4px; }
     input { width:100%; padding:12px; border-radius:10px; border:1px solid #2c3b44; background:var(--bg); color:#fff; font-size:14px; font-family:ui-monospace,Menlo,monospace; }
+  #in-signer { font-size:11.5px; }
     details { margin-top:6px; }
     summary { color:var(--muted); font-size:13px; cursor:pointer; padding:8px 0; }
     .addr { font-family:ui-monospace,Menlo,monospace; font-size:13px; word-break:break-all; background:var(--bg); padding:12px; border-radius:10px; margin:8px 0; border:1px solid var(--purple); color:var(--glow); }
@@ -45,21 +46,22 @@
     <div class="row"><span class="k">Cuenta</span><span class="v" id="w-acc">—</span></div>
     <div class="row"><span class="k">Red</span><span class="v" id="w-net">—</span></div>
     <div class="row"><span class="k">Saldo gas</span><span class="v" id="w-bal">—</span></div>
+    <div class="row"><span class="k">Coste estimado</span><span class="v" id="w-cost">—</span></div>
     <button id="btn-connect">Conectar wallet</button>
   </div>
 
   <div class="card hide" id="card-deploy">
     <h2>2 · Despliega el token</h2>
-    <div class="row"><span class="k">Nombre</span><span class="v">WhaTaka Coin</span></div>
-    <div class="row"><span class="k">Símbolo</span><span class="v">WTK</span></div>
-    <div class="row"><span class="k">Fondo inicial</span><span class="v">1.000.000 WTK</span></div>
+    <div class="row"><span class="k">Nombre</span><span class="v">whataka coin</span></div>
+    <div class="row"><span class="k">Símbolo</span><span class="v">wtk</span></div>
+    <div class="row"><span class="k">Fondo inicial</span><span class="v">100.000.000 WTK</span></div>
     <label>Dirección del oráculo (firmante de pagos)</label>
-    <input id="in-signer" value="0xA5f1711DC508Fe8b256F1a8A834CFf2a47f41186">
-    <p class="step">Déjalo como está. Es la dirección que autoriza los pagos de minería.</p>
+    <input id="in-signer" value="0x2a7F39bDF3dAe21c240536C4d26c05De0087127a">
+    <p class="step">Déjalo como está. Es la dirección del relé que autoriza los vales de minería.</p>
     <details>
       <summary>Opciones avanzadas</summary>
       <label>Suministro inicial (WTK)</label>
-      <input id="in-supply" value="1000000">
+      <input id="in-supply" value="100000000">
       <label>Segundos por halving (31536000 = 1 año)</label>
       <input id="in-halving" value="31536000">
       <label>Factor de recompensa (WTK por punto)</label>
@@ -67,6 +69,11 @@
       <label>Tope de emisión anual (WTK)</label>
       <input id="in-cap" value="100000000">
     </details>
+    <p class="step" id="owner-note" style="margin-top:10px">
+      La cuenta que despliega queda como <strong>dueña</strong> del contrato: solo ella podrá
+      cambiar pesos, factor o firmante, y pausarlo. Los 100 millones entran directos al
+      fondo de minería, no a tu cartera.
+    </p>
     <button id="btn-deploy">Desplegar token</button>
     <div id="st-deploy" class="status hide"></div>
   </div>
@@ -97,8 +104,9 @@
     <h2>Si el saldo de gas es 0</h2>
     <p class="step" style="margin-bottom:8px">Necesitas POL de prueba (gratis). Pide en un faucet:</p>
     <ol>
-      <li><a href="https://faucets.chain.link/polygon-amoy" target="_blank">faucets.chain.link/polygon-amoy</a> — pega tu dirección, pulsa Send</li>
-      <li><a href="https://faucet.polygon.technology" target="_blank">faucet.polygon.technology</a> — conecta tu wallet</li>
+      <li><a href="https://portal.polygon.technology/faucet" target="_blank">portal.polygon.technology/faucet</a> — el oficial de Polygon</li>
+      <li><a href="https://www.alchemy.com/faucets/polygon-amoy" target="_blank">alchemy.com/faucets/polygon-amoy</a> — con cuenta gratuita</li>
+      <li><a href="https://faucet.quicknode.com/polygon/amoy" target="_blank">faucet.quicknode.com/polygon/amoy</a> — con cuenta gratuita</li>
     </ol>
     <p class="step" style="margin-top:8px">Luego vuelve aquí y pulsa Conectar wallet otra vez.</p>
   </div>
@@ -177,6 +185,24 @@
       }
     }
 
+    async function estimarCoste() {
+      const art = window.WHATAKA_TTC_ARTIFACT;
+      if (!art || !account) return 0n;
+      const tipos = constructorTypes();
+      const valores = [
+        $('#in-signer').value.trim(),
+        ethers.parseUnits($('#in-supply').value.trim() || '0', 18),
+        BigInt($('#in-halving').value.trim() || '31536000'),
+        ethers.parseUnits($('#in-factor').value.trim() || '0.001', 18),
+        ethers.parseUnits($('#in-cap').value.trim() || '0', 18),
+      ];
+      const datos = art.bytecode + ethers.AbiCoder.defaultAbiCoder().encode(tipos, valores).slice(2);
+      const gas = await provider.send('eth_estimateGas', [{ from: account, data: datos }]);
+      const tarifa = await provider.getFeeData();
+      const precio = tarifa.maxFeePerGas || tarifa.gasPrice || 0n;
+      return BigInt(gas) * precio;
+    }
+
     async function connect() {
       const eth = getInjected();
       if (!eth) {
@@ -206,9 +232,22 @@
         const balStr = ethers.formatEther(bal);
         $('#w-bal').textContent = balStr.slice(0, 8) + ' POL';
 
+        $('#w-cost').textContent = 'calculando…';
+        let coste = 0n;
+        try {
+          coste = await estimarCoste();
+          $('#w-cost').textContent = '≈ ' + ethers.formatEther(coste).slice(0, 6) + ' POL';
+        } catch {
+          $('#w-cost').textContent = '≈ 0,25 POL';
+          coste = ethers.parseEther('0.25');
+        }
+
         $('#card-deploy').classList.remove('hide');
         if (bal === 0n) {
           setStatus('#st-deploy', 'Tu cuenta no tiene POL de prueba. Pide gas gratis en un faucet (abajo) y vuelve a conectar.', 'err');
+          $('#btn-deploy').disabled = true;
+        } else if (coste > 0n && bal < coste) {
+          setStatus('#st-deploy', 'Tienes ' + balStr.slice(0, 6) + ' POL y el despliegue cuesta unos ' + ethers.formatEther(coste).slice(0, 6) + ' POL. Pide un poco más de gas en un faucet.', 'err');
           $('#btn-deploy').disabled = true;
         } else {
           $('#st-deploy').classList.add('hide');
@@ -246,7 +285,8 @@
         setStatus('#st-deploy', 'Transacción enviada: ' + short(tx.hash, 10, 8) + '\nEsperando confirmación (unos 5-15 segundos)…', 'busy');
 
         const receipt = await tx.wait();
-        const address = await contract.getAddress();
+        // El recibo manda: es lo que quedó escrito en la cadena.
+        const address = receipt.contractAddress || (await contract.getAddress());
 
         store.set('whataka.mining.deployment', JSON.stringify({ address, chainId: AMOY, txHash: tx.hash, reportSigner: signerAddr, at: new Date().toISOString() }));
         lastArgs = { signerAddr, supply, halving, factor, cap };

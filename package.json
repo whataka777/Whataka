@@ -27,6 +27,7 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
-    "playwright": "^1.65.1"
+    "playwright": "^1.65.1",
+    "solc": "^0.8.38"
   }
 }
