@@ -473,12 +473,25 @@ firma antes de pagar.</p>
       confirmas la transacción. Pagas solo la comisión de red de Polygon.</li>
 </ol>
 
-<div class="aviso ojo"><b>Estado actual: en pruebas</b>
-En esta versión el contrato está desplegado en la red de pruebas de Polygon
-(Amoy) y el relé todavía no firma vales, así que la minería responde
-«no configurada». Sirve para ver cómo funciona, no para ganar dinero. Cuando se
-active, esta pantalla empezará a pagar de verdad y lo avisaremos aquí. Todo lo que
-falta para encenderla está en el capítulo 14.
+<div class="aviso bien"><b>Estado actual: la minería ya paga, en la red de pruebas</b>
+Desde el 26 de noviembre la minería está encendida. El contrato vive en la red de
+pruebas de Polygon (Amoy), en la dirección
+<span class="mono">0x57c997a406a0295deb8a16117969873aaf4b41fb</span>, y tiene
+<strong>100.000.000 wtk</strong> dentro como fondo para pagar.
+
+<table>
+  <tr><th>Concepto</th><th>Valor</th></tr>
+  <tr><td>Recompensa inicial</td><td>0,001 wtk por punto</td></tr>
+  <tr><td>Tope por cobro</td><td>5 wtk</td></tr>
+  <tr><td>Espera entre cobros</td><td>10 minutos</td></tr>
+  <tr><td>Halving</td><td>la recompensa se parte a la mitad cada año</td></tr>
+</table>
+
+Dos avisos que importan. Primero: estos wtk son <strong>de prueba y no valen
+dinero</strong>; sirven para comprobar que todo funciona. Segundo: la comisión de
+la red la pagas tú, así que necesitas un poco de POL de prueba en tu cartera para
+cobrar. El día que el token salte a Polygon de verdad, esta misma pantalla pagará
+wtk reales; lo que queda para ese día está en el capítulo 14.
 </div>
 
 <h2 id="cartera"><span class="num">7</span> La cartera: conectar y cambiar</h2>
@@ -710,27 +723,24 @@ mirar y cuándo.</p>
 <h3>Lo que ya está hecho</h3>
 <table>
   <tr><th>Pieza</th><th>Estado</th></tr>
-  <tr><td>El contrato de minería, con halving y tope anual de emisión</td><td>Desplegado y funcionando en la red de pruebas de Polygon (Amoy)</td></tr>
-  <tr><td>El vale firmado: el relé mide, firma y el contrato paga</td><td>Programado en las dos partes; falta la clave del firmante en el servidor</td></tr>
+  <tr><td>El contrato del token y de la minería, con halving y tope anual</td><td>Desplegado el 26 de noviembre en Amoy: <span class="mono">0x57c9…41fb</span></td></tr>
+  <tr><td>El vale firmado: el relé mide, firma y el contrato paga</td><td>Encendido. La firma del relé coincide con el firmante grabado en el contrato</td></tr>
   <tr><td>La pantalla de minería, el registro de cartera y la firma</td><td>Terminados y probados</td></tr>
-  <tr><td>La sala de donaciones en WTK y el enlace al DEX</td><td>Terminados y probados</td></tr>
-  <tr><td>La herramienta para desplegar el token</td><td>Terminada (Ajustes → DEPLOY TOKEN)</td></tr>
+  <tr><td>La sala de donaciones en wtk y el enlace al DEX</td><td>Terminados y probados</td></tr>
+  <tr><td>La herramienta para desplegar el token</td><td>Terminada y probada (<span class="mono">whataka.vip/deploy.html</span>)</td></tr>
 </table>
 
-<h3>Los cuatro pasos que faltan</h3>
+<h3>Los tres pasos que faltan</h3>
 <ol class="pasos">
-  <li><strong>Poner la clave del firmante en el relé.</strong> Es un dato, no
-      código: el contrato ya tiene grabada la dirección que puede firmar vales
-      (<span class="mono">0xa5f1711dc508fe8b256f1a8a834cff2a47f41186</span>).
-      En cuanto el servidor la tenga, la minería paga en la red de pruebas y se
-      puede comprobar de punta a punta con dinero de juguete.</li>
   <li><strong>Desplegar el token en Polygon de verdad</strong> (cadena 137), con su
-      suministro inicial y su tope. Es la misma herramienta que ya está en la app,
-      apuntando a la red principal en lugar de a la de pruebas.</li>
-  <li><strong>Poner liquidez en un DEX.</strong> Este es el paso que de verdad
-      decide si se puede cambiar WTK por USDT: hay que crear el par WTK/USDT (o
-      WTK/POL) en QuickSwap y meter monedas dentro. Sin liquidez no hay precio, y
-      sin precio no hay cambio, por mucha app que tengamos.</li>
+      suministro inicial y su tope. Es la misma herramienta del punto anterior,
+      apuntando a la red principal en lugar de a la de pruebas, y cuesta gas de
+      verdad: unos céntimos de POL.</li>
+  <li><strong>Poner liquidez en un DEX.</strong> Este es el paso que decide si se
+      puede cambiar wtk por USDT: hay que crear el par wtk/USDT (o wtk/POL) en
+      QuickSwap y meter monedas dentro. Sin liquidez no hay precio, y sin precio no
+      hay cambio, por mucha app que tengamos. Es el único paso que exige dinero
+      real de verdad.</li>
   <li><strong>Apuntar la app y el relé a la red principal</strong> y avisar aquí y
       en la pantalla de minería.</li>
 </ol>
@@ -758,17 +768,16 @@ te diga lo contrario te está vendiendo humo.
 </div>
 
 <h3>Por qué no hay fecha</h3>
-<p>Porque los tres primeros pasos dependen de cosas que cuestan dinero real y de
-decisiones que se toman con calma: la clave del firmante, el gas del despliegue y
-las monedas que van dentro del par de liquidez. Poner una fecha y no cumplirla es
+<p>Porque lo que queda depende de cosas que cuestan dinero real y de decisiones que
+se toman con calma: el gas del despliegue en la red principal y las monedas que van
+dentro del par de liquidez. Poner una fecha y no cumplirla es
 peor que no ponerla. Cuando cada paso esté hecho, este manual lo dirá en este mismo
 capítulo, con la fecha al lado.</p>
 
 <table>
   <tr><th>Cuándo</th><th>Qué verás</th></tr>
-  <tr><td>Ahora</td><td>La minería mide, pero no paga. El token no se cambia.</td></tr>
-  <tr><td>Al encender la minería</td><td>La pantalla de minería deja de decir «no configurada» y empieza a pagar en la red de pruebas.</td></tr>
-  <tr><td>Al pasar a la red principal</td><td>El WTK que mines será real, con su registro público en Polygon.</td></tr>
+  <tr><td>26/11/2026</td><td>La minería paga en la red de pruebas: usas la app, pulsas Minar y recibes wtk de prueba en tu cartera.</td></tr>
+  <tr><td>Al pasar a la red principal</td><td>El wtk que mines será real, con su registro público en Polygon.</td></tr>
   <tr><td>Al abrir el par de liquidez</td><td>El botón del DEX tendrá algo que cambiar y verás el precio en QuickSwap.</td></tr>
 </table>
 

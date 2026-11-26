@@ -33,7 +33,7 @@ Hay que separar dos cosas:
 ## 2. La prueba (leída de la blockchain de Amoy)
 
 ```
-contrato        : 0x4b0C9d8233DeFa8EcDF28D7a2bAa3EDaa4C8252B
+contrato        : 0x57C997a406a0295dEb8A16117969873AAf4B41Fb
 totalSupply     : 100.000.000 WTK      ← la oferta total, congelada
 fondo           :  90.000.000 WTK      ← lo que queda por repartir
 annualMintCap   : 0                    ← NADIE puede acuñar más, nunca

@@ -63,7 +63,7 @@ QuickSwap en lugar del pool de prueba.
 
 | Pieza | Dirección en Amoy | Estado |
 | --- | --- | --- |
-| Token WTK (minable) | `0x4b0C9d8233DeFa8EcDF28D7a2bAa3EDaa4C8252B` | ✅ Desplegado y congelado |
+| Token WTK (minable) | `0x57C997a406a0295dEb8A16117969873AAf4B41Fb` | ✅ Desplegado y congelado |
 | Pool de ensayo WTK/TUSD | `0x732F63C050a2d78F6fD75e1b0394d2e1B703aA95` | ✅ Liquidez de prueba |
 | Config "valiosa" (escasez) | `annualMintCap=0`, `autoMintTopUp=false` | ✅ Aplicada on-chain |
 

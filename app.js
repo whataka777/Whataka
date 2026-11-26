@@ -1639,7 +1639,7 @@ function verReferidos() {
 const DONACION_PAYPAL = 'https://www.paypal.me/whataka';
 
 // Donaciones en WTK: transferencia ERC-20 directa, sin custodia.
-const WTK_CONTRACT = '0x4b0C9d8233DeFa8EcDF28D7a2bAa3EDaa4C8252B';
+const WTK_CONTRACT = '0x57C997a406a0295dEb8A16117969873AAf4B41Fb';
 
 // Dirección del token WTK en uso. Se prefiere la que anuncia el relé (así al
 // pasar de Amoy a Polygon real solo hay que cambiar MINING_CONTRACT en Render,
@@ -3869,7 +3869,7 @@ async function activarAvisosPush() {
 // Un solo número para todo: el de las URL de index.html, la caché del service
 // worker y esta pantalla. Sirve para saber de un vistazo qué copia se está
 // usando cuando algo no cuadra. Lo comprueba test/version.test.js.
-const WHATAKA_BUILD = '77';
+const WHATAKA_BUILD = '78';
 
 const AVISO_LLAMADAS_CLAVE = 'whataka-aviso-llamadas-oculto';
 const AVISO_LLAMADAS_DIAS = 3;

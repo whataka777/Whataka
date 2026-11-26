@@ -46,7 +46,7 @@ async function main() {
   const KEY = (process.env.DEPLOYER_KEY || '').trim();
   if (!RPC_URL || !KEY) throw new Error('Faltan RPC_URL y DEPLOYER_KEY.');
 
-  const WTK = (process.env.WTK_CONTRACT || '0x4b0C9d8233DeFa8EcDF28D7a2bAa3EDaa4C8252B').trim();
+  const WTK = (process.env.WTK_CONTRACT || '0x57C997a406a0295dEb8A16117969873AAf4B41Fb').trim();
   const WTK_FOR_POOL = ethers.parseUnits(process.env.WTK_FOR_POOL || '10000000', 18); // 10M WTK
   const TUSD_FOR_POOL = ethers.parseUnits(process.env.TUSD_FOR_POOL || '1000', 18);   // 1000 TUSD
 

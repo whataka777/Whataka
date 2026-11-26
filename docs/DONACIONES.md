@@ -198,7 +198,7 @@ Datos on-chain usados (Polygon Amoy, cadena 80002):
 
 | Dato | Valor |
 | --- | --- |
-| Token WTK (`WhaTaka Coin`) | `0x4b0C9d8233DeFa8EcDF28D7a2bAa3EDaa4C8252B` |
+| Token WTK (`whataka coin`) | `0x57C997a406a0295dEb8A16117969873AAf4B41Fb` |
 | Decimales | 18 |
 | Cartera que recibe (dueño del contrato) | `0xAdd0f33B4680289892F001BAC049b9579548b5d9` |
 

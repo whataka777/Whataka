@@ -35,7 +35,7 @@ const ABI = [
 
 async function main() {
   const RPC_URL = process.env.RPC_URL || 'https://polygon-amoy-bor-rpc.publicnode.com';
-  const CONTRACT = process.env.WTK_CONTRACT || '0x4b0C9d8233DeFa8EcDF28D7a2bAa3EDaa4C8252B';
+  const CONTRACT = process.env.WTK_CONTRACT || '0x57C997a406a0295dEb8A16117969873AAf4B41Fb';
   const KEY = (process.env.OWNER_KEY || '').trim();
   const DRY_RUN = process.env.DRY_RUN === '1';
   const MIN_GWEI = BigInt(process.env.MIN_GAS_PRICE_GWEI || 25);

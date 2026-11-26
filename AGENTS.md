@@ -61,18 +61,23 @@ teléfono suene con la app cerrada.
 
 ## Estado de la cadena (26/11)
 
-El WTK desplegado en Amoy (`0x4b0C9d8233DeFa8EcDF28D7a2bAa3EDaa4C8252B`)
-tiene el firmante de vales en `0xA5f1711DC508Fe8b256F1a8A834CFf2a47f41186` y el
-dueño en `0xAdd0f33B4680289892F001BAC049b9579548b5d9`. **Ninguna de las dos
-claves está disponible**, así que ese contrato no se puede reconfigurar y sus 90
-millones de WTK quedan congelados (son de prueba, sin valor).
+El token vivo es **whataka coin (wtk)**, desplegado el 26/11/2026 en Amoy:
+`0x57C997a406a0295dEb8A16117969873AAf4B41Fb`, 18 decimales, 100.000.000 de
+suministro **dentro del propio contrato** como fondo de minería.
 
-Plan acordado: desplegar un WTK nuevo en Amoy con `scripts/deploy.js`, donde el
-desplegador es a la vez firmante, y apuntar `MINING_CONTRACT` y
-`REPORT_SIGNER_KEY` a ese contrato. La clave del firmante nuevo vive en la
-variable `REPORT_SIGNER_KEY_PENDIENTE` de Render hasta que exista el contrato.
-Dirección: `0x2a7F39bDF3dAe21c240536C4d26c05De0087127a`. Solo falta gas de
-prueba; el despliegue simulado ya devuelve código.
+| Dato | Valor |
+|---|---|
+| Dueño | `0x8416Ca157c5f24c188F06673eBF37FB902B767c2` (cartera del usuario) |
+| Firmante de vales | `0x2a7F39bDF3dAe21c240536C4d26c05De0087127a` (clave en Render) |
+| Render | `MINING_CONTRACT` y `REPORT_SIGNER_KEY` apuntan aquí |
+
+El contrato anterior (`0x4b0C9d8233DeFa8EcDF28D7a2bAa3EDaa4C8252B`) quedó muerto:
+su firmante (`0xA5f1…1186`) y su dueño (`0xAdd0…b5d9`) perdieron la clave, así que
+no se puede reconfigurar y sus 90 millones están congelados. Era dinero de prueba.
+
+La clave del firmante también vive en `REPORT_SIGNER_KEY_PENDIENTE` como copia.
+`whataka.vip/deploy.html` despliega el token desde el móvil y deja dueño a quien
+firma; `npm run compile` necesita `solc` (ya está en devDependencies).
 
 ## El manual
 
