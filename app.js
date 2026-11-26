@@ -3861,7 +3861,7 @@ async function activarAvisosPush() {
 // Un solo número para todo: el de las URL de index.html, la caché del service
 // worker y esta pantalla. Sirve para saber de un vistazo qué copia se está
 // usando cuando algo no cuadra. Lo comprueba test/version.test.js.
-const WHATAKA_BUILD = '70';
+const WHATAKA_BUILD = '71';
 
 const AVISO_LLAMADAS_CLAVE = 'whataka-aviso-llamadas-oculto';
 const AVISO_LLAMADAS_DIAS = 3;

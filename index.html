@@ -2,6 +2,16 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
+  <script>
+    // La copia de GitHub Pages sale en otro origen: otra identidad guardada y sin
+    // /api detrás, así que los avisos y el TURN no funcionan. Se manda al dominio
+    // oficial antes de que arranque nada.
+    if (location.hostname === 'whataka777.github.io') {
+      location.replace('https://whataka.vip'
+        + location.pathname.replace(/^\/Whataka/, '')
+        + location.search + location.hash);
+    }
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#0d2238">
   <meta name="description" content="Whataka — mensajería P2P cifrada de extremo a extremo, sin servidores centrales.">
@@ -1864,13 +1874,13 @@
   </div>
 
   <script src="./vendor/ethers.umd.min.js"></script>
-  <script src="./lib/niveles.js?v=70"></script>
-  <script src="./lib/referidos.js?v=70"></script>
-  <script src="./lib/donaciones.js?v=70"></script>
-  <script src="./lib/stickers.js?v=70"></script>
-  <script src="./lib/llamadas.js?v=70"></script>
-  <script src="./lib/efectos.js?v=70"></script>
-  <script src="./lib/relay-url.js?v=70"></script>
-  <script src="./app.js?v=70"></script>
+  <script src="./lib/niveles.js?v=71"></script>
+  <script src="./lib/referidos.js?v=71"></script>
+  <script src="./lib/donaciones.js?v=71"></script>
+  <script src="./lib/stickers.js?v=71"></script>
+  <script src="./lib/llamadas.js?v=71"></script>
+  <script src="./lib/efectos.js?v=71"></script>
+  <script src="./lib/relay-url.js?v=71"></script>
+  <script src="./app.js?v=71"></script>
 </body>
 </html>
