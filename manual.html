@@ -151,7 +151,8 @@
     <li><a href="#primeros">Primeros pasos en el teléfono</a></li>
     <li><a href="#contactos">Añadir contactos y chatear</a></li>
     <li><a href="#llamadas">Llamadas y videollamadas</a></li>
-    <li><a href="#mineria">Cómo funciona la minería</a></li>
+    <li><a href="#mineria">Cómo funciona la minería</a>
+      <ol><li><a href="#practicar">Cómo practicar sin dinero</a></li></ol></li>
     <li><a href="#cartera">La cartera: conectar y cambiar</a></li>
     <li><a href="#donaciones">Donaciones</a></li>
     <li><a href="#cambio">Cambiar WTK por dinero</a></li>
@@ -494,6 +495,54 @@ cobrar. El día que el token salte a Polygon de verdad, esta misma pantalla paga
 wtk reales; lo que queda para ese día está en el capítulo 14.
 </div>
 
+<h3 id="practicar">Cómo practicar sin arriesgar dinero</h3>
+<p>Todo lo que la app hace con wtk se puede probar hoy, gratis, en la red de
+pruebas de Polygon. Se llama <strong>Amoy</strong> y funciona igual que la de
+verdad, con una diferencia: las monedas no valen nada y se piden en grifos. Es el
+sitio para aprender, equivocarse y repetir sin que cueste un céntimo.</p>
+
+<ol class="pasos">
+  <li><strong>Instala MetaMask</strong> en el teléfono o en el ordenador. Guarda la
+      frase secreta en papel, nunca en una foto ni en un mensaje.</li>
+  <li><strong>Añade la red de pruebas.</strong> En MetaMask: Redes → Añadir red, y
+      rellena estos datos:
+      <table>
+        <tr><th>Campo</th><th>Valor</th></tr>
+        <tr><td>Nombre</td><td>Polygon Amoy</td></tr>
+        <tr><td>Nueva URL de RPC</td><td><span class="mono">https://polygon-amoy-bor-rpc.publicnode.com</span></td></tr>
+        <tr><td>ID de cadena</td><td>80002</td></tr>
+        <tr><td>Símbolo</td><td>POL</td></tr>
+        <tr><td>Explorador</td><td><span class="mono">https://amoy.polygonscan.com</span></td></tr>
+      </table></li>
+  <li><strong>Pide POL de prueba.</strong> Son gratis. Prueba en el grifo oficial
+      (<span class="mono">faucet.polygon.technology</span>) o en el de Alchemy
+      (<span class="mono">alchemy.com/faucets/polygon-amoy</span>). Te pedirán una
+      cuenta y te darán unas décimas, que dan para decenas de cobros.</li>
+  <li><strong>Añade el token.</strong> En MetaMask: Importar token → dirección
+      <span class="mono">0x57c997a406a0295deb8a16117969873aaf4b41fb</span>, símbolo
+      <span class="mono">wtk</span>, 18 decimales. Así ves el saldo cuando cobres.</li>
+  <li><strong>Usa la app con normalidad</strong> un rato: chatea, haz una llamada,
+      deja la app abierta. Eso sube tus unidades y tu Score.</li>
+  <li><strong>Cobra.</strong> Minería → <em>Firmar y Reclamar WTK on-chain</em> →
+      confirmas en MetaMask. El wtk aparece en tu cartera en segundos.</li>
+  <li><strong>Repite.</strong> Hay 10 minutos de espera entre cobros y un tope de
+      5 wtk por cobro. Con eso aprendes el ciclo completo sin gastar dinero.</li>
+</ol>
+
+<table>
+  <tr><th>Qué</th><th>Ahora (práctica)</th><th>Cuando salga en Polygon</th></tr>
+  <tr><td>La moneda de la comisión</td><td>POL de prueba, gratis en un grifo</td><td>POL de verdad, se compra</td></tr>
+  <tr><td>Los wtk que cobras</td><td>De prueba, no valen nada</td><td>Reales, con registro público</td></tr>
+  <tr><td>Cambiarlos por dinero</td><td>No se puede, no hay mercado</td><td>En un intercambio, si hay liquidez</td></tr>
+  <tr><td>Lo que aprendes</td><td>Todo: conectar, minar, cobrar, ver el saldo</td><td>Lo mismo, con valor</td></tr>
+</table>
+
+<div class="aviso peligro"><b>Dos cosas que nunca se hacen</b>
+Nadie te cobra por darte POL de prueba: si alguien te pide dinero o tu frase
+secreta para «activarte la wallet», es un robo. Y la frase secreta no se comparte
+con nadie, ni con quien dice ser del equipo de Whataka.
+</div>
+
 <h2 id="cartera"><span class="num">7</span> La cartera: conectar y cambiar</h2>
 <p>La cartera es tuya y solo tuya: Whataka no crea cuentas ni guarda claves. Lo
 que hace es pedirle permiso a <strong>MetaMask</strong> (u otra cartera del
@@ -745,7 +794,37 @@ mirar y cuándo.</p>
       en la pantalla de minería.</li>
 </ol>
 
-<h3>Qué podrás hacer cuando estén los cuatro</h3>
+<h3 id="cuanto-dinero">Cuánto dinero hace falta para abrir el par</h3>
+<p>La comisión de red no es el problema: crear el par, aprobar y añadir liquidez
+cuesta menos de dos céntimos de dólar. Lo que cuesta es <strong>la liquidez</strong>,
+y ahí hay una regla que conviene entender antes de poner un euro.</p>
+
+<p>El par necesita las dos mitades a la vez: tanto USDT y tanto wtk. La
+<strong>proporción</strong> entre las dos decide el precio, y la <strong>cantidad</strong>
+decide cuánta compra aguanta el precio sin dispararse. Si pones 10 $ y 100.000 wtk,
+el precio es 0,0001 $ por wtk, y una compra de 2 $ lo mueve un 17 %.</p>
+
+<table>
+  <tr><th>Lo que pones</th><th>wtk que van dentro</th><th>Precio por wtk</th><th>Cuánto aguanta</th></tr>
+  <tr><td>10 $</td><td>100.000</td><td>0,0001 $</td><td>Casi nada: una compra de 2 $ mueve el precio un 16 %</td></tr>
+  <tr><td>50 $</td><td>500.000</td><td>0,0001 $</td><td>Para probar con amigos: una compra de 5 $ mueve un 9 %</td></tr>
+  <tr><td>100 $</td><td>1.000.000</td><td>0,0001 $</td><td>Una comunidad pequeña: una compra de 5 $ mueve un 5 %</td></tr>
+  <tr><td>500 $</td><td>5.000.000</td><td>0,0001 $</td><td>Compras de 25 $ sin destrozar el precio</td></tr>
+</table>
+
+<p>Ese dinero <strong>no se gasta</strong>: se deposita en el par y se puede retirar
+cuando quieras. Pero su valor cambia con el precio, y si el wtk baja mucho te
+quedas con más wtk y menos USDT. Se llama pérdida por divergencia y es el precio de
+ser el que pone la liquidez.</p>
+
+<div class="aviso"><b>Consejo honesto</b>
+Empezar con 10 $ sirve para comprobar que el par funciona y que el wtk se puede
+comprar y vender. Para que el precio signifique algo, mejor 100 $ o más. Y no hace
+falta poner los 100 millones de wtk: solo los que correspondan a la proporción que
+elijas.
+</div>
+
+<h3>Qué podrás hacer cuando estén los tres</h3>
 <ul>
   <li>Minar de verdad: usar la app, pulsar <strong>Minar</strong> y recibir WTK en
       tu cartera, con el contrato pagando según tu actividad medida.</li>

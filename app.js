@@ -3869,7 +3869,7 @@ async function activarAvisosPush() {
 // Un solo número para todo: el de las URL de index.html, la caché del service
 // worker y esta pantalla. Sirve para saber de un vistazo qué copia se está
 // usando cuando algo no cuadra. Lo comprueba test/version.test.js.
-const WHATAKA_BUILD = '78';
+const WHATAKA_BUILD = '79';
 
 const AVISO_LLAMADAS_CLAVE = 'whataka-aviso-llamadas-oculto';
 const AVISO_LLAMADAS_DIAS = 3;
@@ -4166,6 +4166,9 @@ function bindEvents() {
     }
   });
   $('#btn-send-report').addEventListener('click', sendMiningReport);
+  $('#btn-practicar').addEventListener('click', () => {
+    window.open(new URL('manual.html#practicar', location.href).href, '_blank', 'noopener');
+  });
   $('#connect-wallet-box').addEventListener('click', connectWallet);
   $('#btn-connect-wallet').addEventListener('click', connectWallet);
   $('#btn-ver-niveles').addEventListener('click', verNiveles);
