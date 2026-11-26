@@ -53,6 +53,10 @@ app.use((req, res, next) => {
   if (req.method !== 'GET' && req.method !== 'HEAD') return next();
   if (!/text\/html/i.test(req.headers.accept || '')) return next();
   if (req.path === '/relay' || req.path.startsWith('/api/')) return next();
+  // Rescate de cuentas creadas cuando la app se abría desde este subdominio: el
+  // código vive en el almacén de este origen y hay que poder leerlo antes de
+  // mandar al dominio oficial.
+  if (req.path === '/recuperar.html') return next();
   const host = String(req.headers['x-forwarded-host'] || req.headers.host || '')
     .split(',')[0].trim().toLowerCase().replace(/:\d+$/, '');
   const esSubdominioRender = host.endsWith('.onrender.com');
@@ -646,7 +650,7 @@ app.post('/api/push/unsubscribe', (req, res) => {
 // servidor ni node_modules.
 const PUBLIC_FILES = new Set([
   '/', '/index.html', '/app.js', '/sw.js', '/manifest.webmanifest',
-  '/deploy.html', '/contract-artifact.js',
+  '/deploy.html', '/contract-artifact.js', '/recuperar.html',
 ]);
 const PUBLIC_DIRS = ['/vendor/', '/icons/', '/lib/'];
 app.use((req, res, next) => {

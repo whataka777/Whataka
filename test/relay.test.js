@@ -46,6 +46,17 @@ function openSocket() {
   });
 }
 
+// La presencia llega a todos los sockets, incluidos los que aún no se han
+// presentado: esperar el primer 'presence' puede leer el de otro par.
+async function waitForPresence(ws, id, timeoutMs = 6000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const msg = await nextMessage(ws, 'presence', Math.max(200, deadline - Date.now()));
+    if ((msg.peers || []).some((p) => p.id === id)) return msg;
+  }
+  throw new Error(`sin presencia de ${id}`);
+}
+
 function nextMessage(ws, type, timeoutMs = 4000) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(`sin mensaje ${type}`)), timeoutMs);
@@ -132,6 +143,23 @@ test('el relé difunde presencia entre pares', async () => {
   b.close();
 });
 
+test('la página de rescate se sirve desde el subdominio viejo sin redirigir', async () => {
+  const comoViejo = {
+    headers: { accept: 'text/html', 'x-forwarded-host': 'whataka-relay.onrender.com' },
+    redirect: 'manual',
+  };
+  // Todo lo demás sigue yendo al dominio oficial.
+  const portada = await fetch(`${BASE}/`, comoViejo);
+  assert.equal(portada.status, 301);
+  assert.match(portada.headers.get('location'), /^https:\/\/whataka\.vip\//);
+
+  // El rescate tiene que abrirse ahí mismo: el código vive en ese origen.
+  const rescate = await fetch(`${BASE}/recuperar.html`, comoViejo);
+  assert.equal(rescate.status, 200);
+  const html = await rescate.text();
+  assert.match(html, /WHATAKA-CUENTA-1\./);
+});
+
 test('getkey entrega la clave pública del par en línea', async () => {
   const a = await openSocket();
   const b = await openSocket();
@@ -140,9 +168,9 @@ test('getkey entrega la clave pública del par en línea', async () => {
   const idB = makePeerId('key-b');
 
   a.send(JSON.stringify({ t: 'hello', id: idA, name: 'A', agreePub: 'PUB-A', signPub: 'S-A' }));
-  await nextMessage(a, 'presence');
+  await waitForPresence(a, idA);
   b.send(JSON.stringify({ t: 'hello', id: idB, name: 'B', agreePub: 'PUB-B', signPub: 'S-B' }));
-  await nextMessage(b, 'presence');
+  await waitForPresence(b, idB);
 
   a.send(JSON.stringify({ t: 'getkey', id: idB }));
   const key = await nextMessage(a, 'key');

@@ -419,6 +419,16 @@
     }
     .setting-item:last-child { border-bottom: none; }
     .setting-item:active { background-color: rgba(255,255,255,.03); }
+    .aviso-permiso {
+      background: rgba(255,193,7,.12);
+      border: 1px solid rgba(255,193,7,.4);
+      color: #ffd54f;
+      padding: 12px;
+      border-radius: 12px;
+      font-size: 13.5px;
+      line-height: 1.45;
+      margin: 12px 0;
+    }
     .setting-item > i { font-size: 19px; color: var(--accent); width: 26px; text-align: center; flex-shrink: 0; }
     .setting-item h4 { font-size: 15.5px; color: var(--text-main); font-weight: 500; }
     .setting-item p { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
@@ -1624,7 +1634,16 @@
               <div class="quantum-setting-icon"><i class="fa-solid fa-shield-halved"></i></div>
               <div class="quantum-setting-content">
                 <h4>ACCOUNT</h4>
-                <p>Privacy, security, number change</p>
+                <p>Privacidad, seguridad, cambio de código</p>
+              </div>
+            </div>
+
+            <!-- Copia de la cuenta: el código del teléfono se pierde al reinstalar -->
+            <div class="quantum-setting-item" id="btn-copia-cuenta">
+              <div class="quantum-setting-icon"><i class="fa-solid fa-key"></i></div>
+              <div class="quantum-setting-content">
+                <h4>COPIA DE CUENTA</h4>
+                <p>Guarda tu código o recupéralo en otro teléfono</p>
               </div>
             </div>
 
@@ -1874,13 +1893,13 @@
   </div>
 
   <script src="./vendor/ethers.umd.min.js"></script>
-  <script src="./lib/niveles.js?v=71"></script>
-  <script src="./lib/referidos.js?v=71"></script>
-  <script src="./lib/donaciones.js?v=71"></script>
-  <script src="./lib/stickers.js?v=71"></script>
-  <script src="./lib/llamadas.js?v=71"></script>
-  <script src="./lib/efectos.js?v=71"></script>
-  <script src="./lib/relay-url.js?v=71"></script>
-  <script src="./app.js?v=71"></script>
+  <script src="./lib/niveles.js?v=72"></script>
+  <script src="./lib/referidos.js?v=72"></script>
+  <script src="./lib/donaciones.js?v=72"></script>
+  <script src="./lib/stickers.js?v=72"></script>
+  <script src="./lib/llamadas.js?v=72"></script>
+  <script src="./lib/efectos.js?v=72"></script>
+  <script src="./lib/relay-url.js?v=72"></script>
+  <script src="./app.js?v=72"></script>
 </body>
 </html>

@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Recuperar mi cuenta · Whataka</title>
+<style>
+  body { margin:0; font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:#0b1a2b; color:#eaf2fb;
+         padding:24px; line-height:1.5; }
+  h1 { font-size:20px; text-transform:uppercase; letter-spacing:2px; }
+  p { font-size:15px; color:#b9cbdd; }
+  textarea { width:100%; box-sizing:border-box; font-family:monospace; font-size:12px; padding:10px;
+             border-radius:10px; border:1px solid rgba(255,255,255,.15); background:#16283c; color:#eaf2fb; }
+  button, a.boton { display:block; text-align:center; margin-top:12px; padding:14px; border-radius:12px;
+             border:0; background:#22b573; color:#04220f; font-weight:700; font-size:15px;
+             text-decoration:none; }
+  .aviso { background:rgba(255,193,7,.12); border:1px solid rgba(255,193,7,.4); color:#ffd54f;
+           padding:12px; border-radius:10px; font-size:14px; }
+  .oculto { display:none; }
+</style>
+</head>
+<body>
+<h1>Recuperar mi cuenta</h1>
+
+<div id="sin-cuenta" class="oculto">
+  <p>Este navegador no tiene ninguna cuenta de Whataka guardada. Si tu código está en
+  otro teléfono, ábrelo allí y saca la copia desde <b>Ajustes → Copia de cuenta</b>.</p>
+  <a class="boton" href="https://whataka.vip">Ir a Whataka</a>
+</div>
+
+<div id="con-cuenta" class="oculto">
+  <p>Aquí está el código de cuenta que tiene guardado este navegador:</p>
+  <textarea id="codigo" rows="6" readonly></textarea>
+  <button id="copiar">Copiar mi código</button>
+  <a class="boton" id="continuar" href="https://whataka.vip">Abrir Whataka en el dominio oficial</a>
+  <div class="aviso" style="margin-top:16px">
+    Guarda ese texto en un sitio privado. Es tu cuenta: quien lo tenga puede usarla.
+    En la app oficial entra en <b>Ajustes → Copia de cuenta</b> y pégalo en
+    <b>Recuperar en este teléfono</b> para volver a tu código de siempre.
+  </div>
+</div>
+
+<script>
+  (function () {
+    var PREFIJO = 'WHATAKA-CUENTA-1.';
+    var texto = document.getElementById('codigo');
+    var crudo = null;
+    try { crudo = localStorage.getItem('whataka.identity'); } catch (e) { crudo = null; }
+    var datos = null;
+    try { datos = crudo ? JSON.parse(crudo) : null; } catch (e) { datos = null; }
+    if (!datos || !datos.peerId) {
+      document.getElementById('sin-cuenta').classList.remove('oculto');
+      return;
+    }
+    var bytes = new TextEncoder().encode(JSON.stringify(datos));
+    var bin = '';
+    for (var i = 0; i < bytes.length; i += 1) bin += String.fromCharCode(bytes[i]);
+    texto.value = PREFIJO + btoa(bin);
+    document.getElementById('con-cuenta').classList.remove('oculto');
+    document.getElementById('copiar').addEventListener('click', function () {
+      navigator.clipboard.writeText(texto.value).then(function () {
+        document.getElementById('copiar').textContent = 'Copiado ✓';
+      }).catch(function () { texto.select(); });
+    });
+    document.getElementById('continuar').addEventListener('click', function () {
+      navigator.clipboard.writeText(texto.value).catch(function () {});
+    });
+  })();
+</script>
+</body>
+</html>

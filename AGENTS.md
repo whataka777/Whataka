@@ -59,6 +59,27 @@ Después de desplegar, cada persona tiene que abrir la app y tocar **Activar**
 en la franja de avisos una vez; sin ese gesto el navegador no deja que el
 teléfono suene con la app cerrada.
 
+## Cuentas de los teléfonos
+
+El Peer ID se genera en el móvil y vive en `localStorage` (`whataka.identity`),
+sin ataduras a la versión: **actualizar la app no cambia el código**. Se pierde
+al borrar los datos del sitio, al desinstalar la app o al cambiar de dirección
+web, porque cada origen tiene su propio almacén. Ahí es donde el usuario ve que
+"le han dado otro código".
+
+Por eso existe **Ajustes → Copia de cuenta**: genera un texto
+`WHATAKA-CUENTA-1.<base64>` con el Peer ID y sus claves, y lo restaura con
+`restaurarCuenta()`. El Peer ID suelto no sirve para recuperar nada: identifica
+la cuenta pero no lleva las claves privadas.
+
+`recuperar.html` se sirve a propósito desde el subdominio de Render, sin la
+redirección al dominio oficial, para que quien tenga la cuenta guardada en ese
+origen pueda sacarla antes de mudarse.
+
+Los datos del relé (`peers`, `ledger`, `wallets`, `mining`, `referrals`) están en
+memoria: **cada despliegue o arranque en frío los borra**. Es la razón de fondo
+por la que lo minado no se puede prometer a largo plazo todavía.
+
 ## Dominio
 
 DNS en Porkbun: el apex va por A a `216.24.57.18` y `216.24.57.16`, y

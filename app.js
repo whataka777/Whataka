@@ -3861,7 +3861,7 @@ async function activarAvisosPush() {
 // Un solo número para todo: el de las URL de index.html, la caché del service
 // worker y esta pantalla. Sirve para saber de un vistazo qué copia se está
 // usando cuando algo no cuadra. Lo comprueba test/version.test.js.
-const WHATAKA_BUILD = '71';
+const WHATAKA_BUILD = '72';
 
 const AVISO_LLAMADAS_CLAVE = 'whataka-aviso-llamadas-oculto';
 const AVISO_LLAMADAS_DIAS = 3;
@@ -3935,10 +3935,40 @@ function pintaEstadoAvisos() {
   fila.classList.add('pendiente');
 }
 
+// Dentro de WhatsApp, Instagram o Facebook la cámara y el micrófono no existen:
+// su navegador incrustado los niega sin preguntar y no hay ajuste que lo cambie.
+function navegadorIncrustado() {
+  const ua = navigator.userAgent;
+  const m = ua.match(/FBAN|FBAV|Instagram|Line\/|WhatsApp|TikTok|Snapchat/i);
+  if (!m) return '';
+  return /FBAN|FBAV|Facebook/i.test(m[0]) ? 'Facebook' : m[0].replace(/\/$/, '');
+}
+
+// "Bloqueado" no se arregla tocando otra vez: el navegador ya no pregunta y hay
+// que devolver el permiso desde sus ajustes. Cada sistema lo esconde en un sitio.
+function pasosPermiso() {
+  if (esIPhone()) {
+    return estaInstalada()
+      ? 'Ajustes del iPhone → baja hasta Whataka → activa Cámara y Micrófono.'
+      : 'Ajustes del iPhone → Safari → Cámara y Micrófono → Preguntar.';
+  }
+  if (/Android/i.test(navigator.userAgent)) {
+    return 'Toca el candado que está junto a la dirección → Permisos → Cámara y Micrófono → Permitir. Después recarga la app.';
+  }
+  return 'Toca el candado que está junto a la dirección → Permisos del sitio → Cámara y Micrófono → Permitir. Después recarga la app.';
+}
+
 async function showPermissions() {
   const [cam, mic] = await Promise.all([permissionState('camera'), permissionState('microphone')]);
   const notif = ('Notification' in window) ? Notification.permission : 'unsupported';
+  const incrustado = navegadorIncrustado();
+  const bloqueados = [];
+  if (cam === 'denied') bloqueados.push('cámara');
+  if (mic === 'denied') bloqueados.push('micrófono');
   openModal('Permisos', `
+    ${incrustado ? `<div class="aviso-permiso">Estás abriendo Whataka dentro de ${escapeHtml(incrustado)}.
+      Ese navegador no deja usar la cámara ni el micrófono. Abre el enlace en Chrome o en Safari
+      y las llamadas funcionarán.</div>` : ''}
     <p>Whataka necesita estos permisos para las llamadas y los avisos.</p>
     <div class="settings-list">
       <div class="setting-item" id="perm-camera">
@@ -3954,10 +3984,107 @@ async function showPermissions() {
         <div><h4>Avisos de mensajes</h4><p>Para enterarte de un mensaje nuevo · ${permissionBadge(notif)}</p></div>
       </div>
     </div>
-    <p class="hint-text">Si algo aparece bloqueado, ábrelo en los ajustes del navegador para este sitio.</p>`);
+    ${bloqueados.length ? `<div class="aviso-permiso">La ${escapeHtml(bloqueados.join(' y el '))} está bloqueada
+      para este sitio y el navegador ya no vuelve a preguntar. Para desbloquearla: ${escapeHtml(pasosPermiso())}</div>` : ''}
+    <p class="hint-text">Sin estos permisos la app abre igual, pero no se pueden hacer llamadas ni notas de voz.</p>`);
   $('#perm-camera').addEventListener('click', () => requestMediaPermission('camera'));
   $('#perm-microphone').addEventListener('click', () => requestMediaPermission('microphone'));
   $('#perm-notifications').addEventListener('click', () => requestNotificationPermission());
+}
+
+// ─────────────────────────────────────────────────────────────
+// Copia de la cuenta
+// ─────────────────────────────────────────────────────────────
+// El Peer ID vive en el almacén de este navegador. Se conserva entre
+// actualizaciones, pero se pierde si se borran los datos del sitio, si se
+// reinstala la app o si se entra desde otra dirección. Con una copia a mano se
+// recupera el mismo código: los contactos y lo minado siguen a nombre de él.
+const PREFIJO_CUENTA = 'WHATAKA-CUENTA-1.';
+
+function aTextoB64(texto) {
+  const bytes = new TextEncoder().encode(texto);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 1) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+
+function deTextoB64(b64) {
+  const bin = atob(b64);
+  const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+function codigoDeCuenta() {
+  const id = state.identity;
+  if (!id || !id.peerId) return '';
+  const { peerId, signPriv, signPub, agreePriv, agreePub } = id;
+  return PREFIJO_CUENTA + aTextoB64(JSON.stringify({ peerId, signPriv, signPub, agreePriv, agreePub }));
+}
+
+async function restaurarCuenta(texto) {
+  const limpio = String(texto || '').replace(/\s+/g, '');
+  if (!limpio) { toast('Pega primero el código de la copia'); return; }
+  if (!limpio.startsWith(PREFIJO_CUENTA)) { toast('Ese texto no es una copia de Whataka'); return; }
+  let datos;
+  try {
+    datos = JSON.parse(deTextoB64(limpio.slice(PREFIJO_CUENTA.length)));
+  } catch {
+    toast('La copia está cortada o dañada');
+    return;
+  }
+  const identidad = {
+    peerId: datos.peerId,
+    signPriv: datos.signPriv,
+    signPub: datos.signPub,
+    agreePriv: datos.agreePriv,
+    agreePub: datos.agreePub,
+  };
+  if (!(await importIdentity(identidad))) { toast('La copia no es válida'); return; }
+  if (state.identity && state.identity.peerId === identidad.peerId) {
+    toast('Ya estás usando esa cuenta');
+    return;
+  }
+  if (state.identity) writeStore(`${STORE.identity}.antes`, state.identity);
+  writeStore(STORE.identity, identidad);
+  toast('Cuenta restaurada. Recargando…');
+  setTimeout(() => location.reload(), 900);
+}
+
+function showCopiaCuenta() {
+  const codigo = codigoDeCuenta();
+  const peerId = (state.identity && state.identity.peerId) || '';
+  openModal('🔑 Copia de cuenta', `
+    <p>Este teléfono tiene el código <b class="mono-text">${escapeHtml(shortPeer(peerId, 14, 8))}</b>.</p>
+    <p>Ese código vive solo en este navegador. Se mantiene al actualizar la app, pero
+    se pierde si borras los datos del sitio, si desinstalas la app o si entras desde
+    otra dirección. Cuando eso pasa, tus contactos y lo minado quedan a nombre del
+    código viejo.</p>
+    <p><b>Guarda esta copia</b> en un sitio privado: quien la tenga puede usar tu cuenta.</p>
+    <textarea id="copia-texto" rows="5" readonly
+      style="width:100%;font-family:monospace;font-size:12px;background:var(--surface-2,#16283c);color:var(--text-main);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:10px">${escapeHtml(codigo)}</textarea>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="primary-btn" id="btn-guardar-copia" style="flex:1">Copiar mi código</button>
+    </div>
+    <p style="margin-top:22px"><b>Recuperar en este teléfono</b></p>
+    <p>Pega aquí el código de la copia y la app vuelve al código anterior.</p>
+    <textarea id="copia-entrada" rows="4" placeholder="WHATAKA-CUENTA-1.…"
+      style="width:100%;font-family:monospace;font-size:12px;background:var(--surface-2,#16283c);color:var(--text-main);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:10px"></textarea>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="primary-btn" id="btn-restaurar-copia" style="flex:1">Restaurar cuenta</button>
+    </div>
+    <p class="hint-text">Al restaurar, la app se recarga con el código recuperado. Después
+    hay que volver a tocar Activar en los avisos.</p>
+  `);
+  $('#btn-guardar-copia').addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(codigo);
+      toast('Código copiado: guárdalo en un sitio privado');
+    } catch {
+      $('#copia-texto').select();
+      toast('Copia el texto a mano');
+    }
+  });
+  $('#btn-restaurar-copia').addEventListener('click', () => restaurarCuenta($('#copia-entrada').value));
 }
 
 // Aviso del sistema al recibir un mensaje cuando la app no está a la vista.
@@ -4047,6 +4174,8 @@ function bindEvents() {
   $('#coffee-card').addEventListener('click', verCafe);
   $('#btn-walletconnect').addEventListener('click', askWalletConnect);
   $('#btn-permissions').addEventListener('click', showPermissions);
+  const btnCopiaCuenta = $('#btn-copia-cuenta');
+  if (btnCopiaCuenta) btnCopiaCuenta.addEventListener('click', showCopiaCuenta);
   $('#btn-referidos').addEventListener('click', verReferidos);
 
   // Eventos de la pestaña Dashboard (estilo QuantumCall / Whataka)
