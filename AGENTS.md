@@ -29,36 +29,48 @@ que es lo que se le pregunta al usuario para saber qué copia tiene.
 ## Despliegue
 
 Producción es `https://whataka.vip`, servida por Render desde `main` de
-`github.com/whataka777/Whataka` (servicio `whataka-relay`). El servicio dice
-`autoDeploy: true`, pero en la práctica **el push no dispara el despliegue**:
-el repositorio no tiene webhook de Render. Después de empujar hay que lanzar el
-despliegue a mano, desde el panel o por la API:
-
-```bash
-curl -X POST -H "Authorization: Bearer $RENDER_API_KEY" \
-     -H "Content-Type: application/json" \
-     https://api.render.com/v1/services/srv-dbrneam7bikc73b2iu2g/deploys \
-     -d '{"clearCache":"do_not_clear"}'
-```
-
-Y comprobar que queda `live` antes de decir que está publicado.
+`github.com/whataka777/Whataka` (servicio `whataka-relay`,
+`srv-dbrneam7bikc73b2iu2g`). El push es todo lo que hace falta: el despliegue lo
+lanza `.github/workflows/deploy-render.yml`, porque el webhook de Render hacia el
+repositorio nunca llegó. Ese flujo usa el secreto `RENDER_API_KEY`; si se rota la
+clave de Render hay que actualizarlo o los envíos se quedan sin publicar con un
+401 silencioso (así estuvo producción congelada en la versión 50 durante días).
 
 El token de la app de OpenHands (`ghu_…`) es de **solo lectura**: `git push` da
-403. Para publicar hace falta un PAT con *Contents: Read and write* sobre ese
-repositorio.
+403. Para publicar hace falta un PAT con *Contents: Read and write*.
+
+`.github/workflows/keep-alive.yml` saluda al relé cada cinco minutos: el plan
+gratuito de Render duerme la instancia a los ~15 minutos sin tráfico y entonces
+la app tarda medio minuto en abrir y las llamadas en curso se cortan.
 
 Variables de entorno que importan en Render:
 
 - `VAPID_SEED` — sin ella el relé inventa claves nuevas al arrancar y **todas
   las suscripciones push dejan de valer** en cada despliegue. Con ella,
-  `/api/push/key` responde `efimeras: false`. Ya está puesta.
-- `CANONICAL_HOST` — el dominio único; sin él se acaba con dos identidades
-  porque `localStorage` es por origen.
-- `ICE_TURN_*` — solo si hace falta TURN para redes móviles estrictas.
+  `/api/push/key` responde `efimeras: false`.
+- `CANONICAL_HOST` — el dominio único (`whataka.vip`); sin él se acaba con dos
+  identidades porque `localStorage` es por origen.
+- `REPORT_SIGNER_KEY` — la clave del firmante de vales de minería. **Falta**, así
+  que `/api/mining/config` dice `configured: false` y los vales devuelven 503.
+  Tiene que ser la clave privada de `0xa5f1711dc508fe8b256f1a8a834cff2a47f41186`,
+  la que el contrato tiene como `reportSigner`.
 
 Después de desplegar, cada persona tiene que abrir la app y tocar **Activar**
 en la franja de avisos una vez; sin ese gesto el navegador no deja que el
 teléfono suene con la app cerrada.
+
+## Dominio
+
+DNS en Porkbun: el apex va por A a `216.24.57.18` y `216.24.57.16`, y
+`www` por CNAME a `whataka-relay.onrender.com`. Los dos están verificados en
+Render (`POST /v1/services/{id}/custom-domains/{nombre}/verify` fuerza la
+comprobación cuando se queda en `unverified`). No hay registros MX, así que
+`hola@whataka.vip` no recibe correo; es solo la dirección de contacto que el
+relé da a los servicios de avisos.
+
+GitHub Pages publica una copia en `https://whataka777.github.io/Whataka/`. Es
+otro origen: otra identidad guardada y sin `/api` detrás, así que `index.html`
+manda esa visita al dominio oficial en cuanto arranca.
 
 ## Efectos de vídeo
 
