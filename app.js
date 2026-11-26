@@ -3861,7 +3861,7 @@ async function activarAvisosPush() {
 // Un solo número para todo: el de las URL de index.html, la caché del service
 // worker y esta pantalla. Sirve para saber de un vistazo qué copia se está
 // usando cuando algo no cuadra. Lo comprueba test/version.test.js.
-const WHATAKA_BUILD = '72';
+const WHATAKA_BUILD = '73';
 
 const AVISO_LLAMADAS_CLAVE = 'whataka-aviso-llamadas-oculto';
 const AVISO_LLAMADAS_DIAS = 3;
@@ -4173,6 +4173,10 @@ function bindEvents() {
   $('#btn-donar').addEventListener('click', verDonaciones);
   $('#coffee-card').addEventListener('click', verCafe);
   $('#btn-walletconnect').addEventListener('click', askWalletConnect);
+  const navManual = $('#nav-manual');
+  if (navManual) navManual.addEventListener('click', () => {
+    window.open(new URL('manual.html', location.href).href, '_blank', 'noopener');
+  });
   $('#btn-permissions').addEventListener('click', showPermissions);
   const btnCopiaCuenta = $('#btn-copia-cuenta');
   if (btnCopiaCuenta) btnCopiaCuenta.addEventListener('click', showCopiaCuenta);

@@ -160,6 +160,14 @@ test('la página de rescate se sirve desde el subdominio viejo sin redirigir', a
   assert.match(html, /WHATAKA-CUENTA-1\./);
 });
 
+test('el manual de uso se sirve y está en español', async () => {
+  const res = await fetch(`${BASE}/manual.html`);
+  assert.equal(res.status, 200);
+  const html = await res.text();
+  assert.match(html, /Manual de uso/);
+  assert.match(html, /lang="es"/);
+});
+
 test('getkey entrega la clave pública del par en línea', async () => {
   const a = await openSocket();
   const b = await openSocket();

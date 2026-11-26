@@ -650,7 +650,7 @@ app.post('/api/push/unsubscribe', (req, res) => {
 // servidor ni node_modules.
 const PUBLIC_FILES = new Set([
   '/', '/index.html', '/app.js', '/sw.js', '/manifest.webmanifest',
-  '/deploy.html', '/contract-artifact.js', '/recuperar.html',
+  '/deploy.html', '/contract-artifact.js', '/recuperar.html', '/manual.html',
 ]);
 const PUBLIC_DIRS = ['/vendor/', '/icons/', '/lib/'];
 app.use((req, res, next) => {

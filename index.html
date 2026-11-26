@@ -321,7 +321,8 @@
       flex: 1; padding: 6px 0;
       position: relative;
     }
-    .nav-item i { font-size: 19px; }
+    .nav-item i, .nav-item .nav-emoji { font-size: 19px; line-height: 1; }
+    .nav-item .nav-emoji { filter: saturate(1.1); }
     .nav-item.active { color: var(--accent); font-weight: 600; }
     .nav-item.active i { color: var(--accent); }
     .nav-item .nav-badge {
@@ -1720,11 +1721,11 @@
       <nav class="bottom-nav">
         <button class="nav-item active" data-target="tab-dashboard">
           <i class="fa-solid fa-house"></i>
-          <span>Dashboard</span>
+          <span>Inicio</span>
         </button>
         <button class="nav-item" data-target="tab-chats">
           <i class="fa-solid fa-comment"></i>
-          <span>Chat</span>
+          <span>Chats</span>
         </button>
         <button class="nav-item" data-target="tab-calls">
           <i class="fa-solid fa-phone"></i>
@@ -1736,7 +1737,12 @@
         </button>
         <button class="nav-item" data-target="tab-settings">
           <i class="fa-solid fa-gear"></i>
-          <span>Settings</span>
+          <span>Ajustes</span>
+        </button>
+        <!-- El manual de uso, al final y siempre a mano -->
+        <button class="nav-item" id="nav-manual" type="button" aria-label="Manual de uso">
+          <span class="nav-emoji">📖</span>
+          <span>Manual</span>
         </button>
       </nav>
     </div>
@@ -1893,13 +1899,13 @@
   </div>
 
   <script src="./vendor/ethers.umd.min.js"></script>
-  <script src="./lib/niveles.js?v=72"></script>
-  <script src="./lib/referidos.js?v=72"></script>
-  <script src="./lib/donaciones.js?v=72"></script>
-  <script src="./lib/stickers.js?v=72"></script>
-  <script src="./lib/llamadas.js?v=72"></script>
-  <script src="./lib/efectos.js?v=72"></script>
-  <script src="./lib/relay-url.js?v=72"></script>
-  <script src="./app.js?v=72"></script>
+  <script src="./lib/niveles.js?v=73"></script>
+  <script src="./lib/referidos.js?v=73"></script>
+  <script src="./lib/donaciones.js?v=73"></script>
+  <script src="./lib/stickers.js?v=73"></script>
+  <script src="./lib/llamadas.js?v=73"></script>
+  <script src="./lib/efectos.js?v=73"></script>
+  <script src="./lib/relay-url.js?v=73"></script>
+  <script src="./app.js?v=73"></script>
 </body>
 </html>

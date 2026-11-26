@@ -1,0 +1,711 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Manual de uso · Whataka</title>
+<meta name="description" content="Cómo funciona Whataka: el código wt1, los chats cifrados, las llamadas, la minería, la cartera, las donaciones y el cambio de WTK.">
+<style>
+  :root {
+    --fondo: #081521;
+    --panel: #0f2437;
+    --panel-2: #16283c;
+    --texto: #eaf2fb;
+    --suave: #b9cbdd;
+    --verde: #22b573;
+    --morado: #8247e5;
+    --ambar: #ffd54f;
+    --rojo: #ef5b5b;
+    --linea: rgba(255,255,255,.12);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--fondo);
+    color: var(--texto);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+    font-size: 16px;
+  }
+  .hoja { max-width: 860px; margin: 0 auto; padding: 28px 20px 80px; }
+  header.portada {
+    text-align: center;
+    padding: 26px 0 10px;
+    border-bottom: 1px solid var(--linea);
+    margin-bottom: 26px;
+  }
+  header.portada h1 {
+    margin: 0;
+    font-size: 30px;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    font-weight: 800;
+  }
+  header.portada p { color: var(--suave); margin: 10px 0 0; font-size: 15px; }
+  h2 {
+    font-size: 22px;
+    margin: 46px 0 8px;
+    padding-top: 14px;
+    border-top: 1px solid var(--linea);
+  }
+  h2 .num {
+    display: inline-block;
+    min-width: 30px;
+    color: var(--verde);
+    font-variant-numeric: tabular-nums;
+  }
+  h3 { font-size: 17px; margin: 26px 0 6px; color: #d7e6f5; }
+  p, li { color: var(--suave); }
+  strong { color: var(--texto); }
+  a { color: #6fd3a4; }
+  .kbd, code, .mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: .92em;
+    background: var(--panel-2);
+    border: 1px solid var(--linea);
+    border-radius: 6px;
+    padding: 1px 6px;
+    color: #d9ecff;
+  }
+  /* Los códigos wt1 son largos y sin espacios: tienen que partirse solos o se
+     salen de la pantalla del móvil. */
+  .mono, code, .kbd { overflow-wrap: anywhere; word-break: break-word; max-width: 100%; }
+  body { overflow-wrap: break-word; }
+  .indice {
+    background: var(--panel);
+    border: 1px solid var(--linea);
+    border-radius: 14px;
+    padding: 16px 20px;
+  }
+  .indice ol { margin: 8px 0 0 18px; padding: 0; }
+  .indice li { margin: 3px 0; }
+  .indice a { text-decoration: none; }
+  .aviso {
+    border-radius: 12px;
+    padding: 13px 15px;
+    margin: 16px 0;
+    font-size: 14.5px;
+    border: 1px solid;
+  }
+  .aviso b { display: block; margin-bottom: 3px; }
+  .aviso.ojo { background: rgba(255,193,7,.10); border-color: rgba(255,193,7,.42); color: var(--ambar); }
+  .aviso.peligro { background: rgba(239,91,91,.10); border-color: rgba(239,91,91,.45); color: #ffb3b3; }
+  .aviso.bien { background: rgba(34,181,115,.10); border-color: rgba(34,181,115,.42); color: #c8f0d9; }
+  figure { margin: 22px 0; }
+  figure svg { display: block; width: 100%; height: auto; }
+  figcaption {
+    color: #93a9bd;
+    font-size: 13px;
+    text-align: center;
+    margin-top: 8px;
+  }
+  ol.pasos { margin: 10px 0 10px 20px; padding: 0; }
+  ol.pasos li { margin: 7px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 14.5px; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--linea); }
+  th { color: var(--texto); font-weight: 600; background: var(--panel); }
+  td { color: var(--suave); }
+  .cierre {
+    margin-top: 50px;
+    padding-top: 18px;
+    border-top: 1px solid var(--linea);
+    color: #8098ad;
+    font-size: 13.5px;
+    text-align: center;
+  }
+  .volver {
+    display: inline-block;
+    margin-top: 26px;
+    background: var(--verde);
+    color: #04220f;
+    font-weight: 700;
+    text-decoration: none;
+    padding: 13px 22px;
+    border-radius: 12px;
+  }
+  @media print {
+    body { background: #fff; color: #111; }
+    h2, h3, strong, th { color: #111; }
+    p, li, td, figcaption { color: #333; }
+    .aviso { border-color: #999; color: #333; background: #f6f6f6; }
+    figure, table { break-inside: avoid; }
+    h2 { break-after: avoid; }
+    .hoja { max-width: none; padding: 0; }
+    .volver { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="hoja">
+
+<header class="portada">
+  <h1>Whataka</h1>
+  <p>Manual de uso · todo lo que necesitas saber, desde el primer minuto</p>
+</header>
+
+<nav class="indice">
+  <strong>Contenido</strong>
+  <ol>
+    <li><a href="#que-es">Qué es Whataka</a></li>
+    <li><a href="#cuenta">Tu cuenta y tu código wt1</a></li>
+    <li><a href="#primeros">Primeros pasos en el teléfono</a></li>
+    <li><a href="#contactos">Añadir contactos y chatear</a></li>
+    <li><a href="#llamadas">Llamadas y videollamadas</a></li>
+    <li><a href="#mineria">Cómo funciona la minería</a></li>
+    <li><a href="#cartera">La cartera: conectar y cambiar</a></li>
+    <li><a href="#donaciones">Donaciones</a></li>
+    <li><a href="#cambio">Cambiar WTK por dinero</a></li>
+    <li><a href="#niveles">Niveles y referidos</a></li>
+    <li><a href="#seguridad">Seguridad y privacidad</a></li>
+    <li><a href="#problemas">Problemas frecuentes</a></li>
+    <li><a href="#glosario">Glosario</a></li>
+  </ol>
+</nav>
+
+<h2 id="que-es"><span class="num">1</span> Qué es Whataka</h2>
+<p>Whataka es una aplicación de mensajería que funciona en el navegador y se puede
+instalar en el teléfono como cualquier otra app. Tiene cuatro cosas: chats
+cifrados, llamadas y videollamadas, un sistema de minería con su propio token
+(WTK) y una sala para donaciones.</p>
+<p>No hay registro, ni contraseña, ni número de teléfono, ni correo. La app crea tu
+cuenta en el propio móvil la primera vez que la abres. Eso tiene una
+consecuencia que conviene entender desde el principio: <strong>tu cuenta vive en
+tu teléfono</strong>, así que hay que cuidarla (lo explicamos en el capítulo 2 y
+se resuelve con una copia).</p>
+
+<h2 id="cuenta"><span class="num">2</span> Tu cuenta y tu código wt1</h2>
+<p>Al abrir Whataka por primera vez, el teléfono genera dos claves matemáticas: una
+para firmar mensajes y otra para acordar el cifrado con cada contacto. De la
+clave pública sale tu <strong>Peer ID</strong>, que siempre empieza por
+<code>wt1</code> y tiene este aspecto:</p>
+<p class="mono" style="display:block;padding:10px 12px">wt1AoSpaso1PiUTECzPwAfd3jDPXmiQYA59fN8qw95ERBAJ</p>
+
+<figure>
+  <svg viewBox="0 0 720 300" role="img" aria-label="Un teléfono mostrando el código wt1 de la cuenta">
+    <rect width="720" height="300" fill="#081521"/>
+    <rect x="150" y="26" width="170" height="248" rx="24" fill="#0f2437" stroke="#2b4a66" stroke-width="2"/>
+    <rect x="205" y="36" width="60" height="8" rx="4" fill="#2b4a66"/>
+    <text x="235" y="86" text-anchor="middle" fill="#eaf2fb" font-size="15" font-family="system-ui" font-weight="700" letter-spacing="3">WHATAKA</text>
+    <circle cx="235" cy="126" r="26" fill="#22b573" opacity=".18"/>
+    <text x="235" y="132" text-anchor="middle" fill="#8fe3b8" font-size="14" font-family="monospace" font-weight="700">wt1</text>
+    <text x="235" y="172" text-anchor="middle" fill="#b9cbdd" font-size="11" font-family="system-ui">TU CÓDIGO</text>
+    <rect x="172" y="182" width="126" height="26" rx="7" fill="#16283c" stroke="#2b4a66"/>
+    <text x="235" y="200" text-anchor="middle" fill="#8fe3b8" font-size="11" font-family="monospace">wt1AoSpaso1…9E</text>
+    <text x="235" y="232" text-anchor="middle" fill="#7e93a8" font-size="10" font-family="system-ui">Ajustes → ABOUT</text>
+
+    <path d="M352 150 L432 150" stroke="#22b573" stroke-width="2" stroke-dasharray="6 6"/>
+    <path d="M432 150 l-10 -6 l0 12 z" fill="#22b573"/>
+
+    <rect x="452" y="70" width="230" height="160" rx="14" fill="#0f2437" stroke="#2b4a66"/>
+    <text x="470" y="96" fill="#eaf2fb" font-size="12.5" font-family="system-ui" font-weight="700">Es tu identidad</text>
+    <text x="470" y="118" fill="#b9cbdd" font-size="11.5" font-family="system-ui">· Te identifica ante tus contactos</text>
+    <text x="470" y="138" fill="#b9cbdd" font-size="11.5" font-family="system-ui">· No lleva tus claves privadas</text>
+    <text x="470" y="158" fill="#b9cbdd" font-size="11.5" font-family="system-ui">· Cualquiera que lo tenga debe</text>
+    <text x="478" y="174" fill="#b9cbdd" font-size="11.5" font-family="system-ui">estar en línea para darte su clave</text>
+    <rect x="462" y="188" width="212" height="26" rx="7" fill="rgba(255,193,7,.12)" stroke="rgba(255,193,7,.4)"/>
+    <text x="568" y="204" text-anchor="middle" fill="#ffd54f" font-size="9.2" font-family="system-ui">Guarda una copia: Ajustes → Copia de cuenta</text>
+  </svg>
+  <figcaption>Tu código de cuenta se ve en Ajustes. Es público: se lo das a quien quiera hablarte.</figcaption>
+</figure>
+
+<h3>Lo que sí y lo que no cambia tu código</h3>
+<table>
+  <tr><th>Situación</th><th>¿Cambia tu código?</th></tr>
+  <tr><td>Actualizar la app a una versión nueva</td><td>No. Se conserva solo.</td></tr>
+  <tr><td>Desinstalar la app o borrar los datos del sitio</td><td>Sí. El teléfono borra la cuenta.</td></tr>
+  <tr><td>Entrar desde otra dirección web</td><td>Sí. Cada dirección guarda su propia cuenta.</td></tr>
+  <tr><td>Usar navegación privada</td><td>Sí. No se guarda nada.</td></tr>
+  <tr><td>Restaurar una copia de cuenta</td><td>Vuelve el código que tenías en la copia.</td></tr>
+</table>
+
+<div class="aviso bien"><b>Haz esto hoy, te llevará un minuto</b>
+Ajustes → <strong>Copia de cuenta</strong> → <strong>Copiar mi código</strong> y guárdalo en
+tus notas o en un gestor de contraseñas. Ese texto empieza por
+<code>WHATAKA-CUENTA-1.</code> y es la única forma de recuperar tu cuenta en otro
+teléfono. Trátalo como la llave de tu casa: quien lo tenga puede usar tu cuenta.
+</div>
+
+<div class="aviso ojo"><b>No desinstales la app para actualizarla</b>
+Las actualizaciones llegan solas al abrirla. Desinstalar y volver a instalar es
+justo lo que borra la cuenta y te deja con un código nuevo.
+</div>
+
+<figure>
+  <svg viewBox="0 0 720 260" role="img" aria-label="Una copia de cuenta pasa de un teléfono a otro">
+    <rect width="720" height="260" fill="#081521"/>
+    <rect x="60" y="40" width="130" height="190" rx="20" fill="#0f2437" stroke="#2b4a66" stroke-width="2"/>
+    <text x="125" y="76" text-anchor="middle" fill="#eaf2fb" font-size="11" font-family="system-ui" font-weight="700">TELÉFONO VIEJO</text>
+    <rect x="78" y="96" width="94" height="118" rx="9" fill="#16283c" stroke="#22b573"/>
+    <text x="125" y="120" text-anchor="middle" fill="#8fe3b8" font-size="9" font-family="monospace">WHATAKA-</text>
+    <text x="125" y="134" text-anchor="middle" fill="#8fe3b8" font-size="9" font-family="monospace">CUENTA-1.</text>
+    <text x="125" y="148" text-anchor="middle" fill="#8fe3b8" font-size="9" font-family="monospace">eyJwZWVySWQi…</text>
+    <text x="125" y="172" text-anchor="middle" fill="#7e93a8" font-size="9" font-family="system-ui">Copia de cuenta</text>
+
+    <path d="M205 135 L475 135" stroke="#22b573" stroke-width="2" stroke-dasharray="7 7"/>
+    <path d="M475 135 l-11 -6 l0 12 z" fill="#22b573"/>
+    <rect x="268" y="108" width="140" height="24" rx="8" fill="rgba(34,181,115,.14)" stroke="rgba(34,181,115,.45)"/>
+    <text x="338" y="124" text-anchor="middle" fill="#8fe3b8" font-size="10.5" font-family="system-ui">lo guardas tú</text>
+
+    <rect x="490" y="40" width="130" height="190" rx="20" fill="#0f2437" stroke="#2b4a66" stroke-width="2"/>
+    <text x="555" y="76" text-anchor="middle" fill="#eaf2fb" font-size="11" font-family="system-ui" font-weight="700">TELÉFONO NUEVO</text>
+    <rect x="508" y="96" width="94" height="60" rx="9" fill="#16283c" stroke="#2b4a66"/>
+    <text x="555" y="120" text-anchor="middle" fill="#b9cbdd" font-size="9" font-family="system-ui">Restaurar</text>
+    <text x="555" y="136" text-anchor="middle" fill="#b9cbdd" font-size="9" font-family="system-ui">cuenta</text>
+    <text x="555" y="182" text-anchor="middle" fill="#8fe3b8" font-size="11" font-family="system-ui" font-weight="700">wt1AoSpaso…9E</text>
+    <text x="555" y="200" text-anchor="middle" fill="#7e93a8" font-size="9" font-family="system-ui">el mismo código de siempre</text>
+  </svg>
+  <figcaption>La copia funciona en otro teléfono y también si reinstalas en el mismo.</figcaption>
+</figure>
+
+<h2 id="primeros"><span class="num">3</span> Primeros pasos en el teléfono</h2>
+<ol class="pasos">
+  <li>Abre <strong>whataka.vip</strong> en Chrome (Android) o Safari (iPhone).</li>
+  <li>Instálala en la pantalla de inicio: en Android, menú <strong>⋮</strong> →
+      <em>Añadir a pantalla de inicio</em>; en iPhone, botón <strong>Compartir</strong> →
+      <em>Añadir a pantalla de inicio</em>. En iPhone es obligatorio si quieres que te
+      suene el teléfono con la app cerrada.</li>
+  <li>Toca la franja de avisos y pulsa <strong>Activar</strong>. El navegador pedirá
+      permiso para notificar; acéptalo. Sin esto la app abre, pero no te avisa de
+      llamadas.</li>
+  <li>Pon tu nombre y foto en <strong>Ajustes → PROFILE</strong> para que tus
+      contactos te reconozcan.</li>
+  <li>Haz la <strong>copia de cuenta</strong> del capítulo 2. Es el paso que más
+      gente se salta y el único que no se puede deshacer.</li>
+</ol>
+
+<div class="aviso ojo"><b>Permisos de cámara y micrófono</b>
+Se piden la primera vez que haces una llamada o mandas una nota de voz. Si en
+algún momento respondes <em>Bloquear</em>, el navegador no volverá a preguntar y
+la app no podrá usar la cámara. Se arregla así: en Android toca el
+<strong>candado</strong> junto a la dirección → Permisos → Cámara y Micrófono →
+Permitir; en iPhone, Ajustes del iPhone → Safari → Cámara → Preguntar. En
+Ajustes → NOTIFICATIONS puedes ver cómo están ahora mismo.
+</div>
+
+<h2 id="contactos"><span class="num">4</span> Añadir contactos y chatear</h2>
+<p>Whataka no tiene lista de teléfonos: para hablar con alguien hay que
+intercambiar el código <code>wt1…</code>. Los dos pasos clave:</p>
+<ol class="pasos">
+  <li>Cada uno copia su código en <strong>Ajustes → ABOUT</strong> (o en la ficha
+      de perfil) y se lo pasa al otro por donde quiera: WhatsApp, SMS, en persona.</li>
+  <li>En la pestaña de chats, pulsa <strong>Añadir contacto</strong>, pega el código
+      y acepta.</li>
+</ol>
+<div class="aviso ojo"><b>Los dos tenéis que estar conectados en ese momento</b>
+Al añadir un contacto, la app le pide su clave pública al relé. Si esa persona
+tiene la app cerrada, el relé no la tiene y el contacto se queda sin clave hasta
+que vuelva a entrar. Se arregla abriendo la app y volviendo a añadir el código.
+</div>
+
+<figure>
+  <svg viewBox="0 0 720 300" role="img" aria-label="Dos teléfonos intercambiando el código wt1 para añadirse">
+    <rect width="720" height="300" fill="#081521"/>
+    <rect x="52" y="46" width="150" height="212" rx="22" fill="#0f2437" stroke="#2b4a66" stroke-width="2"/>
+    <text x="127" y="80" text-anchor="middle" fill="#eaf2fb" font-size="11" font-family="system-ui" font-weight="700">TÚ</text>
+    <rect x="70" y="98" width="114" height="30" rx="8" fill="#16283c" stroke="#22b573"/>
+    <text x="127" y="118" text-anchor="middle" fill="#8fe3b8" font-size="10" font-family="monospace">wt1TuCódigo…</text>
+    <text x="127" y="150" text-anchor="middle" fill="#7e93a8" font-size="9.5" font-family="system-ui">1. Pasas tu código</text>
+    <path d="M127 164 v18" stroke="#22b573" stroke-width="2"/>
+    <path d="M127 182 l-5 -8 l10 0 z" fill="#22b573"/>
+    <text x="127" y="204" text-anchor="middle" fill="#b9cbdd" font-size="9.5" font-family="system-ui">2. Pegas el suyo</text>
+    <rect x="70" y="214" width="114" height="26" rx="7" fill="#16283c" stroke="#2b4a66"/>
+    <text x="127" y="231" text-anchor="middle" fill="#b9cbdd" font-size="9.5" font-family="monospace">wt1SuCódigo…</text>
+
+    <path d="M212 150 C 300 96, 420 96, 508 150" stroke="#22b573" stroke-width="2" fill="none" stroke-dasharray="6 6"/>
+    <path d="M508 150 l-11 -3 l5 10 z" fill="#22b573"/>
+    <path d="M508 150 C 420 204, 300 204, 212 150" stroke="#8247e5" stroke-width="2" fill="none" stroke-dasharray="6 6"/>
+    <path d="M212 150 l3 -10 l8 6 z" fill="#8247e5"/>
+    <text x="360" y="112" text-anchor="middle" fill="#8fe3b8" font-size="10.5" font-family="system-ui">tu código</text>
+    <text x="360" y="200" text-anchor="middle" fill="#c9a9ff" font-size="10.5" font-family="system-ui">su código</text>
+
+    <rect x="518" y="46" width="150" height="212" rx="22" fill="#0f2437" stroke="#2b4a66" stroke-width="2"/>
+    <text x="593" y="80" text-anchor="middle" fill="#eaf2fb" font-size="11" font-family="system-ui" font-weight="700">LA OTRA PERSONA</text>
+    <rect x="536" y="98" width="114" height="30" rx="8" fill="#16283c" stroke="#8247e5"/>
+    <text x="593" y="118" text-anchor="middle" fill="#c9a9ff" font-size="10" font-family="monospace">wt1SuCódigo…</text>
+    <rect x="536" y="150" width="114" height="88" rx="10" fill="#16283c" stroke="#2b4a66"/>
+    <text x="593" y="176" text-anchor="middle" fill="#b9cbdd" font-size="10" font-family="system-ui">Chat cifrado</text>
+    <rect x="548" y="188" width="66" height="16" rx="8" fill="#22b573" opacity=".35"/>
+    <rect x="558" y="208" width="80" height="16" rx="8" fill="#2b4a66" opacity=".8"/>
+  </svg>
+  <figcaption>Cada uno pega el código del otro. A partir de ahí, el chat es privado entre los dos.</figcaption>
+</figure>
+
+<h3>Qué significa “cifrado de extremo a extremo”</h3>
+<p>Cuando añades a alguien, tu teléfono y el suyo acuerdan una clave secreta que
+nunca viaja por la red. Los mensajes salen cifrados y el relé solo ve un sobre
+cerrado: no puede leerlos, y tampoco los guarda. Si un día la app te avisa de que
+la clave de un contacto cambió, para y comprueba por otra vía que es esa persona:
+puede ser un teléfono nuevo… o alguien haciéndose pasar por ella.</p>
+<p>En <strong>Ajustes → ACCOUNT</strong> puedes ver las claves de cada contacto
+(<em>Verificar claves</em>). Si los dos veis los mismos números, el canal es el
+vuestro.</p>
+
+<h2 id="llamadas"><span class="num">5</span> Llamadas y videollamadas</h2>
+<p>En una conversación, arriba, tienes dos botones: teléfono (solo voz) y cámara
+(vídeo). La llamada va <strong>directa entre los dos teléfonos</strong>: el relé
+solo hace de cartero al principio para que se encuentren. Cuando la red es muy
+cerrada, se usa un servidor de paso (TURN) que reenvía los paquetes sin poder
+verlos.</p>
+
+<figure>
+  <svg viewBox="0 0 720 300" role="img" aria-label="Pantalla de llamda entrante con botones de contestar, videollamada y efectos">
+    <rect width="720" height="300" fill="#081521"/>
+    <rect x="240" y="18" width="240" height="268" rx="26" fill="#0f2437" stroke="#2b4a66" stroke-width="2"/>
+    <circle cx="360" cy="86" r="30" fill="#22b573" opacity=".18"/>
+    <text x="360" y="95" text-anchor="middle" fill="#8fe3b8" font-size="18"
+          font-family="system-ui" font-weight="700">A</text>
+    <text x="360" y="136" text-anchor="middle" fill="#eaf2fb" font-size="14" font-family="system-ui" font-weight="700">Llamada entrante</text>
+    <text x="360" y="156" text-anchor="middle" fill="#b9cbdd" font-size="11.5" font-family="system-ui">Alicia · videollamada</text>
+
+    <circle cx="320" cy="196" r="20" fill="#ef5b5b"/>
+    <path d="M314 190 l12 12 M326 190 l-12 12" stroke="#2a0d0d" stroke-width="3"
+          stroke-linecap="round"/>
+    <circle cx="400" cy="196" r="20" fill="#22b573"/>
+    <rect x="393" y="190" width="12" height="11" rx="2" fill="#04220f"/>
+     <path d="M407 192 l5 -3 v9 l-5 -3 z" fill="#04220f"/>
+
+    <rect x="270" y="238" width="180" height="30" rx="15" fill="#16283c" stroke="#2b4a66"/>
+    <g fill="none" stroke="#b9cbdd" stroke-width="1.6" stroke-linecap="round">
+       <rect x="288" y="245" width="8" height="12" rx="4"/>
+       <path d="M285 253 v2 a7 7 0 0 0 14 0 v-2"/>
+       <path d="M338 245 l12 6 l-12 6 z"/>
+       <rect x="386" y="245" width="9" height="7" rx="1.5"/>
+       <path d="M397 247 l4 -2 v7 l-4 -2 z"/>
+       <path d="M430 253 l8 -8 l3 3 l-8 8 l-4 1 z"/>
+     </g>
+
+    <path d="M492 170 L560 170" stroke="#8247e5" stroke-width="2" stroke-dasharray="6 6"/>
+    <path d="M560 170 l-10 -6 l0 12 z" fill="#8247e5"/>
+    <rect x="566" y="120" width="132" height="104" rx="12" fill="#0f2437" stroke="#8247e5"/>
+    <text x="632" y="146" text-anchor="middle" fill="#c9a9ff" font-size="11" font-family="system-ui" font-weight="700">El lápiz</text>
+    <text x="632" y="166" text-anchor="middle" fill="#b9cbdd" font-size="10" font-family="system-ui">8 fondos y 8 filtros</text>
+    <text x="632" y="184" text-anchor="middle" fill="#b9cbdd" font-size="10" font-family="system-ui">se aplican a tu cámara</text>
+    <text x="632" y="202" text-anchor="middle" fill="#8fe3b8" font-size="10" font-family="system-ui">y el otro los ve</text>
+  </svg>
+  <figcaption>Contestar, silenciar, apagar cámara y efectos, todo desde la misma pantalla.</figcaption>
+</figure>
+
+<h3>Que suene con la app cerrada</h3>
+<ol class="pasos">
+  <li>Activa los avisos (capítulo 3).</li>
+  <li>Si tienes iPhone, la app <strong>tiene que estar añadida a la pantalla de
+      inicio</strong>: Safari no entrega avisos a webs sueltas.</li>
+  <li>Quien llama espera unos segundos más cuando el otro está desconectado: el
+      relé despierta el teléfono y abre la app.</li>
+</ol>
+
+<h2 id="mineria"><span class="num">6</span> Cómo funciona la minería</h2>
+<p>Whataka no pide que dejes el teléfono encendido calculando números. Lo que hace
+es <strong>medir lo que la app aporta a la red</strong> y pagarlo en WTK. El relé
+es el que mide, no tu teléfono, así que no se puede inflar desde la app.</p>
+
+<table>
+  <tr><th>Qué se mide</th><th>Peso</th><th>En cristiano</th></tr>
+  <tr><td>Llamadas (<code>call</code>)</td><td>10</td><td>Peso máximo: las llamadas son lo más caro de servir</td></tr>
+  <tr><td>Almacenamiento (<code>store</code>)</td><td>8</td><td>Guardar y reenviar mensajes de otros</td></tr>
+  <tr><td>Relé (<code>relay</code>)</td><td>5</td><td>Estar disponible para pasar mensajes</td></tr>
+  <tr><td>Reputación (<code>reputation</code>)</td><td>3</td><td>Portarse bien: sin spam ni cortes raros</td></tr>
+  <tr><td>Tiempo conectado (<code>uptime</code>)</td><td>1</td><td>Minutos con la app abierta</td></tr>
+</table>
+
+<p>El <strong>Score WTK</strong> que ves en la pantalla de minería es la suma de
+esas cinco unidades multiplicadas por su peso. Cuando pulsas <strong>Minar</strong>,
+la app pide al relé un <em>vale firmado</em> por ese score; el vale se manda al
+contrato en Polygon y el contrato paga el WTK a tu cartera. Tres candados de
+seguridad: el vale lo firma el relé (no tú), caduca, y el contrato comprueba la
+firma antes de pagar.</p>
+
+<figure>
+  <svg viewBox="0 0 720 300" role="img" aria-label="Flujo de la minería: cinco fuentes medidas por el relé, un vale firmado y el pago en la cadena">
+    <rect width="720" height="300" fill="#081521"/>
+    <g font-family="system-ui" font-size="10">
+      <rect x="24" y="40" width="122" height="34" rx="8" fill="#16283c" stroke="#2b4a66"/>
+      <circle cx="38" cy="57" r="3" fill="#22b573"/><text x="50" y="61" fill="#b9cbdd">Llamadas · 10</text>
+      <rect x="24" y="82" width="122" height="34" rx="8" fill="#16283c" stroke="#2b4a66"/>
+      <circle cx="38" cy="99" r="3" fill="#22b573"/><text x="50" y="103" fill="#b9cbdd">Almacén · 8</text>
+      <rect x="24" y="124" width="122" height="34" rx="8" fill="#16283c" stroke="#2b4a66"/>
+      <circle cx="38" cy="141" r="3" fill="#22b573"/><text x="50" y="145" fill="#b9cbdd">Relé · 5</text>
+      <rect x="24" y="166" width="122" height="34" rx="8" fill="#16283c" stroke="#2b4a66"/>
+      <circle cx="38" cy="183" r="3" fill="#22b573"/><text x="50" y="187" fill="#b9cbdd">Reputación · 3</text>
+      <rect x="24" y="208" width="122" height="34" rx="8" fill="#16283c" stroke="#2b4a66"/>
+      <circle cx="38" cy="225" r="3" fill="#22b573"/><text x="50" y="229" fill="#b9cbdd">Tiempo · 1</text>
+    </g>
+
+    <path d="M158 141 H206" stroke="#22b573" stroke-width="2"/>
+    <path d="M206 141 l-9 -5 l0 10 z" fill="#22b573"/>
+
+    <rect x="214" y="96" width="128" height="92" rx="12" fill="#0f2437" stroke="#22b573"/>
+    <text x="278" y="124" text-anchor="middle" fill="#eaf2fb" font-size="11" font-family="system-ui" font-weight="700">El relé mide</text>
+    <text x="278" y="144" text-anchor="middle" fill="#8fe3b8" font-size="10" font-family="system-ui">y suma el score</text>
+    <text x="278" y="166" text-anchor="middle" fill="#7e93a8" font-size="9.5" font-family="system-ui">no lo puede tocar tu móvil</text>
+
+    <path d="M350 141 H398" stroke="#22b573" stroke-width="2"/>
+    <path d="M398 141 l-9 -5 l0 10 z" fill="#22b573"/>
+
+    <rect x="406" y="104" width="126" height="76" rx="12" fill="#0f2437" stroke="#ffd54f"/>
+    <text x="469" y="130" text-anchor="middle" fill="#ffd54f" font-size="11" font-family="system-ui" font-weight="700">Vale firmado</text>
+    <text x="469" y="150" text-anchor="middle" fill="#b9cbdd" font-size="9.5" font-family="system-ui">caduca, no se reutiliza</text>
+    <text x="469" y="168" text-anchor="middle" fill="#b9cbdd" font-size="9.5" font-family="system-ui">y solo vale para ti</text>
+
+    <path d="M540 141 H588" stroke="#8247e5" stroke-width="2"/>
+    <path d="M588 141 l-9 -5 l0 10 z" fill="#8247e5"/>
+
+    <rect x="596" y="92" width="104" height="100" rx="12" fill="#0f2437" stroke="#8247e5"/>
+    <rect x="636" y="106" width="24" height="10" rx="5" fill="none" stroke="#c9a9ff" stroke-width="1.6"/>
+      <rect x="644" y="112" width="24" height="10" rx="5" fill="none" stroke="#c9a9ff" stroke-width="1.6"/>
+    <text x="648" y="142" text-anchor="middle" fill="#c9a9ff" font-size="10.5" font-family="system-ui" font-weight="700">Contrato</text>
+    <text x="648" y="160" text-anchor="middle" fill="#b9cbdd" font-size="9.5" font-family="system-ui">comprueba la firma</text>
+    <text x="648" y="178" text-anchor="middle" fill="#8fe3b8" font-size="10" font-family="system-ui">y paga WTK</text>
+
+    <text x="360" y="262" text-anchor="middle" fill="#7e93a8" font-size="10.5" font-family="system-ui">Tú pulsas «Minar» → el vale viaja a Polygon → el WTK aparece en tu cartera</text>
+  </svg>
+  <figcaption>La app mide, el relé firma, el contrato paga. Nadie puede inventarse unidades.</figcaption>
+</figure>
+
+<h3>Cómo minar, paso a paso</h3>
+<ol class="pasos">
+  <li>Abre la app y úsala con normalidad: llama, chatea, deja que otros te
+      encuentren. Eso sube tus unidades.</li>
+  <li>Conecta tu cartera (capítulo 7). Sin cartera no hay dónde pagarte.</li>
+  <li>Entra en la pantalla de minería y mira tu <strong>Score WTK</strong>.</li>
+  <li>Pulsa <strong>Minar</strong>. La app pide el vale, se abre tu cartera y
+      confirmas la transacción. Pagas solo la comisión de red de Polygon.</li>
+</ol>
+
+<div class="aviso ojo"><b>Estado actual: en pruebas</b>
+En esta versión el contrato está desplegado en la red de pruebas de Polygon
+(Amoy) y el relé todavía no firma vales, así que la minería responde
+«no configurada». Sirve para ver cómo funciona, no para ganar dinero. Cuando se
+active, esta pantalla empezará a pagar de verdad y lo avisaremos aquí.
+</div>
+
+<h2 id="cartera"><span class="num">7</span> La cartera: conectar y cambiar</h2>
+<p>La cartera es tuya y solo tuya: Whataka no crea cuentas ni guarda claves. Lo
+que hace es pedirle permiso a <strong>MetaMask</strong> (u otra cartera del
+navegador) para hablar con el contrato.</p>
+<ol class="pasos">
+  <li>Instala MetaMask y crea o importa una cartera. <strong>Guarda las 12
+      palabras en papel</strong>: sin ellas no hay recuperación posible, ni con
+      Whataka ni con nadie.</li>
+  <li>Añade la red. Para las pruebas: nombre <em>Polygon Amoy</em>, cadena
+      <code>80002</code>, moneda <code>POL</code>. Necesitas un poco de POL de
+      prueba (hay grifos gratuitos) para pagar comisiones.</li>
+  <li>En Whataka: <strong>Ajustes → WALLET &amp; WTK → Conectar</strong>. La app te
+      pedirá que firmes un mensaje. Ese mensaje no mueve dinero: solo demuestra
+      que la cartera es tuya.</li>
+  <li>Puedes cambiar de cartera cuando quieras repitiendo el paso anterior. La
+      dirección vieja deja de estar asociada a tu código.</li>
+</ol>
+
+<div class="aviso peligro"><b>Lo que nadie de Whataka te va a pedir nunca</b>
+Ni las 12 palabras de tu cartera, ni tu clave privada, ni que firmes algo que no
+entiendes. Si alguien te escribe pidiéndolo, es un fraude, aunque diga que es del
+equipo. La app solo firma dos cosas: el registro de tu cartera y el cobro de tus
+vales de minería.
+</div>
+
+<h3>Crear tu propio token</h3>
+<p>En <strong>Ajustes → DEPLOY TOKEN</strong> hay una página aparte para desplegar
+tu propio token en Polygon, con suministro inicial, halving y tope anual. Es una
+herramienta para quien quiera montar su moneda de minería; no hace falta para usar
+Whataka y cuesta gas real. Si solo quieres usar la app, ignórala.</p>
+
+<h2 id="donaciones"><span class="num">8</span> Donaciones</h2>
+<p>Whataka es gratis y sigue funcionando dones o no dones. La sala de donaciones
+existe para pagar dos cosas concretas y visibles:</p>
+<table>
+  <tr><th>Coste</th><th>Cuánto</th><th>Para qué</th></tr>
+  <tr><td>Servidor (Render)</td><td>7 $/mes</td><td>Que la app no se duerma y las llamadas no se corten</td></tr>
+  <tr><td>Dominio (Porkbun)</td><td>0,92 $/mes</td><td>whataka.vip, ~11 $/año</td></tr>
+</table>
+<p>Se puede donar de tres maneras, en la pantalla <strong>SALA</strong>:</p>
+<ul>
+  <li><strong>Un café (1 $)</strong> por PayPal, si prefieres no tocar cripto.</li>
+  <li><strong>Dólares</strong>: importes de 1, 3, 5 o 10 $.</li>
+  <li><strong>WTK</strong>: 100, 500, 1.000 o 5.000 WTK, de tu cartera a la del
+      creador, en una sola transacción.</li>
+</ul>
+
+<figure>
+  <svg viewBox="0 0 720 260" role="img" aria-label="La donación va de una cartera a otra sin pasar por la app">
+    <rect width="720" height="260" fill="#081521"/>
+    <rect x="60" y="60" width="118" height="140" rx="14" fill="#0f2437" stroke="#2b4a66"/>
+    <text x="119" y="88" text-anchor="middle" fill="#eaf2fb" font-size="10.5" font-family="system-ui" font-weight="700">TU CARTERA</text>
+    <rect x="103" y="106" width="32" height="24" rx="7" fill="#f6851b" opacity=".22"
+          stroke="#f6851b"/>
+     <text x="119" y="123" text-anchor="middle" fill="#f6851b" font-size="12"
+           font-family="system-ui" font-weight="700">M</text>
+    <text x="119" y="150" text-anchor="middle" fill="#b9cbdd" font-size="9.5" font-family="system-ui">tú firmas</text>
+    <text x="119" y="168" text-anchor="middle" fill="#8fe3b8" font-size="10" font-family="monospace">0xTú…</text>
+
+    <path d="M190 130 H330" stroke="#22b573" stroke-width="2.5"/>
+    <path d="M330 130 l-11 -6 l0 12 z" fill="#22b573"/>
+    <rect x="212" y="96" width="112" height="24" rx="8" fill="rgba(34,181,115,.14)" stroke="rgba(34,181,115,.45)"/>
+    <text x="268" y="112" text-anchor="middle" fill="#8fe3b8" font-size="10" font-family="system-ui">500 WTK, una sola vez</text>
+
+    <rect x="340" y="60" width="118" height="140" rx="14" fill="#0f2437" stroke="#8247e5"/>
+    <text x="399" y="88" text-anchor="middle" fill="#eaf2fb" font-size="10.5" font-family="system-ui" font-weight="700">CREADOR</text>
+    <circle cx="399" cy="116" r="13" fill="none" stroke="#c9a9ff" stroke-width="1.6"/>
+     <text x="399" y="121" text-anchor="middle" fill="#c9a9ff" font-size="12"
+           font-family="system-ui" font-weight="700">W</text>
+    <text x="399" y="150" text-anchor="middle" fill="#b9cbdd" font-size="9.5" font-family="system-ui">recibe directo</text>
+    <text x="399" y="168" text-anchor="middle" fill="#c9a9ff" font-size="10" font-family="monospace">0xCreador…</text>
+
+    <rect x="492" y="74" width="180" height="112" rx="12" fill="#0f2437" stroke="#ef5b5b" stroke-dasharray="5 5"/>
+    <text x="582" y="104" text-anchor="middle" fill="#ffb3b3" font-size="11" font-family="system-ui" font-weight="700">La app no toca el dinero</text>
+    <text x="582" y="126" text-anchor="middle" fill="#b9cbdd" font-size="10" font-family="system-ui">No hay custodia</text>
+    <text x="582" y="144" text-anchor="middle" fill="#b9cbdd" font-size="10" font-family="system-ui">No hay dirección intermedia</text>
+    <text x="582" y="162" text-anchor="middle" fill="#b9cbdd" font-size="10" font-family="system-ui">Si no donas, todo sigue igual</text>
+  </svg>
+  <figcaption>El token va de tu cartera a la del creador. Whataka solo prepara la transacción.</figcaption>
+</figure>
+
+<div class="aviso"><b>Donar es donar</b>
+No es una inversión, no da ventajas dentro de la app y no promete ganancias. Y si
+algún día recibes WTK, apunta la fecha y el valor en euros de ese día: puede
+contar como ingreso.
+</div>
+
+<h2 id="cambio"><span class="num">9</span> Cambiar WTK por dinero (o por otra moneda)</h2>
+<p>La app <strong>no cambia dinero</strong>. Lo que hace es abrirte la puerta: te
+lleva a un intercambiador descentralizado (DEX) donde el cambio lo haces tú, con
+tu cartera, y la app no toca tus fondos ni cobra comisión.</p>
+<ol class="pasos">
+  <li>En la sala, pulsa <strong>DEX</strong>: se abre <strong>QuickSwap</strong>.</li>
+  <li>Conecta la misma cartera que usas en Whataka.</li>
+  <li>Elige el par: <strong>WTK → USDT</strong> (o WTK → POL).</li>
+  <li>Escribe la cantidad y mira el <em>impacto en el precio</em>: si es alto, hay
+      poca liquidez y te van a pagar peor. Mejor cambiar poco a poco.</li>
+  <li>Confirma en la cartera y espera. El cambio queda en la cadena, visible en
+      el explorador.</li>
+</ol>
+
+<figure>
+  <svg viewBox="0 0 720 250" role="img" aria-label="Intercambio de WTK por USDT en un DEX, con la app fuera de la operación">
+    <rect width="720" height="250" fill="#081521"/>
+    <circle cx="200" cy="125" r="52" fill="#0f2437" stroke="#8247e5"/>
+    <text x="200" y="118" text-anchor="middle" fill="#c9a9ff" font-size="15" font-family="system-ui" font-weight="700">WTK</text>
+    <text x="200" y="140" text-anchor="middle" fill="#b9cbdd" font-size="10" font-family="system-ui">token de Whataka</text>
+
+    <path d="M270 100 C 320 80, 360 80, 404 100" stroke="#22b573" stroke-width="2.5" fill="none"/>
+    <path d="M404 100 l-11 -2 l4 9 z" fill="#22b573"/>
+    <path d="M404 150 C 360 170, 320 170, 270 150" stroke="#22b573" stroke-width="2.5" fill="none"/>
+    <path d="M270 150 l4 -9 l11 2 z" fill="#22b573"/>
+
+    <circle cx="462" cy="125" r="52" fill="#0f2437" stroke="#22b573"/>
+    <text x="462" y="118" text-anchor="middle" fill="#8fe3b8" font-size="15" font-family="system-ui" font-weight="700">USDT</text>
+    <text x="462" y="140" text-anchor="middle" fill="#b9cbdd" font-size="10" font-family="system-ui">o POL</text>
+
+    <rect x="540" y="70" width="156" height="110" rx="12" fill="#0f2437" stroke="#ffd54f"/>
+    <text x="618" y="96" text-anchor="middle" fill="#ffd54f" font-size="11" font-family="system-ui" font-weight="700">Tú, en QuickSwap</text>
+    <text x="618" y="118" text-anchor="middle" fill="#b9cbdd" font-size="10" font-family="system-ui">La app solo abre el enlace</text>
+    <text x="618" y="136" text-anchor="middle" fill="#b9cbdd" font-size="10" font-family="system-ui">No firma, no cobra,</text>
+    <text x="618" y="154" text-anchor="middle" fill="#b9cbdd" font-size="10" font-family="system-ui">no guarda tus fondos</text>
+    <text x="360" y="224" text-anchor="middle" fill="#7e93a8" font-size="10.5" font-family="system-ui">Ojo con el impacto en el precio: poca liquidez = peor cambio</text>
+  </svg>
+  <figcaption>El intercambio ocurre entre tu cartera y el DEX. Whataka queda fuera de la operación.</figcaption>
+</figure>
+
+<div class="aviso peligro"><b>Hoy el WTK está en red de pruebas</b>
+El contrato vive en Polygon Amoy (cadena 80002), que es una red de ensayo: su
+WTK no vale dinero y no se cambia por USDT real. El botón del DEX abre QuickSwap
+en Polygon real, así que hasta que el token se despliegue en la red principal, no
+hay nada que cambiar allí. Cuando se publique, se avisará en la app.
+</div>
+
+<h2 id="niveles"><span class="num">10</span> Niveles y referidos</h2>
+<p>Tu nivel sube con los puntos que dan el uso de la app y las aportaciones. No
+cambia lo que puedes hacer, es una forma de ver tu recorrido.</p>
+<table>
+  <tr><th>Nivel</th><th>Puntos</th></tr>
+  <tr><td>🌱 Recluta</td><td>0</td></tr>
+  <tr><td>🥉 Bronce</td><td>500</td></tr>
+  <tr><td>🥈 Plata</td><td>1.500</td></tr>
+  <tr><td>🥇 Oro</td><td>5.000</td></tr>
+  <tr><td>💠 Platino</td><td>15.000</td></tr>
+  <tr><td>💎 Diamante</td><td>—</td></tr>
+</table>
+<p>En <strong>Ajustes → HELP</strong> tienes tu enlace de invitación: lleva tu
+código dentro, así que quien entre por él queda apadrinado por ti
+automáticamente. No hay que escribir nada a mano.</p>
+
+<h2 id="seguridad"><span class="num">11</span> Seguridad y privacidad</h2>
+<h3>Qué guarda tu teléfono</h3>
+<p>Tu cuenta (código y claves), tus contactos, tus mensajes y tus ajustes. Todo
+dentro del almacén del navegador, en tu dispositivo. Los mensajes no se suben a
+ningún sitio: si cambias de teléfono sin copia, se van con el viejo.</p>
+<h3>Qué guarda el relé</h3>
+<p>Lo mínimo para que la app funcione: tu código, tu nombre público, tu clave
+pública, a quién llamas en ese momento y las unidades de minería que mide. Nada de
+mensajes. Y como vive en memoria, al reiniciar se olvida de casi todo.</p>
+<h3>Las cinco reglas que evitan sustos</h3>
+<ol class="pasos">
+  <li>Guarda la <strong>copia de cuenta</strong> y actualízala si cambias de
+      teléfono.</li>
+  <li>No desinstales la app para actualizarla: las versiones llegan solas.</li>
+  <li>Guarda las 12 palabras de tu cartera en papel, nunca en una foto ni en un
+      chat.</li>
+  <li>No firmes en la cartera nada que no entiendas, aunque la pantalla diga
+      Whataka.</li>
+  <li>Si te piden el código de tu cuenta para “verificar” algo, desconfía: ese
+      código es público, pero con él pueden suplantarte ante tus contactos.</li>
+</ol>
+
+<h2 id="problemas"><span class="num">12</span> Problemas frecuentes</h2>
+<table>
+  <tr><th>Qué te pasa</th><th>Qué hacer</th></tr>
+  <tr><td>Dice «Sin conexión con el relé»</td><td>Comprueba que tienes internet y
+      recarga. El servidor gratuito se duerme a veces; espera 30 segundos y
+      vuelve a abrir.</td></tr>
+  <tr><td>No me deja llamar: cámara o micrófono bloqueados</td><td>Candado junto a
+      la dirección → Permisos → Permitir. En iPhone, Ajustes → Safari → Cámara.
+      Si abriste el enlace desde WhatsApp, ábrelo en Chrome o Safari.</td></tr>
+  <tr><td>La llamada entra pero no suena nada</td><td>Silencio del móvil y
+      «No molestar» apagados. Sube el volumen durante la llamada.</td></tr>
+  <tr><td>No me avisa con la app cerrada</td><td>Vuelve a tocar Activar en la
+      franja de avisos. En iPhone, la app tiene que estar en la pantalla de
+      inicio.</td></tr>
+  <tr><td>Me ha salido otro código wt1</td><td>Restaura tu copia de cuenta. Si no
+      la tienes, y sigues en el mismo teléfono, prueba la página de rescate del
+      capítulo 2.</td></tr>
+  <tr><td>Un contacto no aparece o no le llegan mis mensajes</td><td>Los dos tenéis
+      que estar conectados al añadiros. Abrid la app a la vez y volved a añadir
+      el código.</td></tr>
+  <tr><td>Sigue saliendo una versión vieja</td><td>Cierra la app del todo y
+      ábrela. La versión se mira en Ajustes → ABOUT.</td></tr>
+  <tr><td>La minería dice «no configurada»</td><td>Es lo esperado en esta
+      versión: está en pruebas.</td></tr>
+</table>
+
+<h2 id="glosario"><span class="num">13</span> Glosario</h2>
+<table>
+  <tr><th>Palabra</th><th>Qué es</th></tr>
+  <tr><td><strong>Peer ID</strong></td><td>Tu código público, el que empieza por
+      <code>wt1</code>. Es como tu número de teléfono, pero sin números.</td></tr>
+  <tr><td><strong>Relé</strong></td><td>El servidor que pone en contacto a los
+      teléfonos y mide la minería. No puede leer tus mensajes.</td></tr>
+  <tr><td><strong>E2E</strong></td><td>Cifrado de extremo a extremo: solo los dos
+      teléfonos pueden leer los mensajes.</td></tr>
+  <tr><td><strong>WTK</strong></td><td>El token de Whataka. Hoy en red de pruebas.</td></tr>
+  <tr><td><strong>Vale</strong></td><td>El papel firmado por el relé que dice
+      cuánto WTK te toca. Caduca y no se puede reutilizar.</td></tr>
+  <tr><td><strong>Gas</strong></td><td>La comisión que se paga a la red Polygon
+      por cada operación.</td></tr>
+  <tr><td><strong>Cartera</strong></td><td>MetaMask u otra: guarda tus claves y
+      firma por ti. Whataka no la controla.</td></tr>
+  <tr><td><strong>DEX</strong></td><td>Casa de cambio sin dueño (QuickSwap) donde
+      tú cambias un token por otro.</td></tr>
+</table>
+
+<p style="text-align:center;margin-top:30px">
+  <a class="volver" href="./index.html">Volver a Whataka</a>
+</p>
+
+<div class="cierre">
+  Whataka · manual de uso · si algo de aquí no coincide con lo que ves en la app,
+  gana la app: escribe y lo arreglamos.
+</div>
+
+</div>
+</body>
+</html>
