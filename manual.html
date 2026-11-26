@@ -155,7 +155,8 @@
       <ol><li><a href="#practicar">Cómo practicar sin dinero</a></li></ol></li>
     <li><a href="#cartera">La cartera: conectar y cambiar</a></li>
     <li><a href="#donaciones">Donaciones</a></li>
-    <li><a href="#cambio">Cambiar WTK por dinero</a></li>
+    <li><a href="#cambio">Cambiar WTK por dinero</a>
+      <ol><li><a href="#comprar-cada-mes">Comprar cada mes</a></li></ol></li>
     <li><a href="#niveles">Niveles y referidos</a></li>
     <li><a href="#seguridad">Seguridad y privacidad</a></li>
     <li><a href="#problemas">Problemas frecuentes</a></li>
@@ -670,12 +671,80 @@ tu cartera, y la app no toca tus fondos ni cobra comisión.</p>
   <figcaption>El intercambio ocurre entre tu cartera y el DEX. Whataka queda fuera de la operación.</figcaption>
 </figure>
 
-<div class="aviso peligro"><b>Hoy el WTK está en red de pruebas</b>
-El contrato vive en Polygon Amoy (cadena 80002), que es una red de ensayo: su
-WTK no vale dinero y no se cambia por USDT real. El botón del DEX abre QuickSwap
-en Polygon real, así que hasta que el token se despliegue en la red principal, no
-hay nada que cambiar allí. Cuando se publique, se avisará en la app. Los pasos
-que faltan están en el capítulo 14.
+<div class="aviso peligro"><b>Hoy el wtk está en red de pruebas</b>
+El contrato vive en Polygon Amoy (cadena 80002), que es una red de ensayo: su wtk
+no vale dinero y no se cambia por USDT real. La minería ya paga ahí, así que se
+puede practicar el ciclo completo, pero no comprar. El botón del DEX abre
+QuickSwap en Polygon real, y allí todavía no hay par. Cuando el token se despliegue
+en la red principal, esta página y la app lo dirán. Los pasos que faltan están en
+el capítulo 14.
+</div>
+
+<h3 id="comprar-cada-mes">Comprar cada mes: cómo se hace y qué se lleva el camino</h3>
+<p>La respuesta corta a la pregunta más repetida: <strong>no hace falta otra
+billetera</strong>. La misma MetaMask que usas para minar sirve para comprar. Lo
+que cambia es de dónde sale el dinero y por dónde pasa antes de llegar al wtk.</p>
+
+<table>
+  <tr><th>Camino</th><th>Cómo va</th><th>Qué cuesta</th><th>Cuándo conviene</th></tr>
+  <tr>
+    <td>Comprar dentro de MetaMask</td>
+    <td>Pestaña <em>Comprar</em>: pagas con tarjeta y te llega POL o USDT a la
+        cartera</td>
+    <td>Entre un 2 % y un 5 % de comisión, más el tipo de cambio</td>
+    <td>La primera vez y para cantidades pequeñas: es lo más simple</td>
+  </tr>
+  <tr>
+    <td>Exchange y retirada</td>
+    <td>Compras USDT en un exchange y lo retiras a tu dirección eligiendo la red
+        <strong>Polygon</strong></td>
+    <td>Comisión de retirada, normalmente entre 0,1 y 1 $</td>
+    <td>Para cantidades mayores o si ya tienes cuenta</td>
+  </tr>
+  <tr>
+    <td>Cambio en QuickSwap</td>
+    <td>Con USDT o POL ya en la cartera, cambias a wtk en el DEX</td>
+    <td>0,3 % del DEX más céntimos de gas</td>
+    <td>Siempre: es el paso final, venga el dinero de donde venga</td>
+  </tr>
+</table>
+
+<h3>Los 20 $ del mes, con números</h3>
+<p>Comprar 20 $ cada mes es una buena costumbre, pero conviene saber qué parte se
+queda por el camino y, sobre todo, cuánto mueve el precio. Con un par pequeño, el
+problema no son las comisiones: es que tu propia compra sube el precio.</p>
+
+<table>
+  <tr><th>Concepto</th><th>Sobre 20 $</th></tr>
+  <tr><td>Gas en Polygon</td><td>Menos de 0,05 $ (céntimos)</td></tr>
+  <tr><td>Comisión del DEX</td><td>0,06 $ (el 0,3 %)</td></tr>
+  <tr><td>Comprar con tarjeta</td><td>Entre 0,40 y 1,00 $</td></tr>
+  <tr><td>Impacto en el precio con 100 $ de liquidez</td><td>Alrededor del 17 %: compras caro</td></tr>
+  <tr><td>Impacto en el precio con 500 $ de liquidez</td><td>Alrededor del 4 %</td></tr>
+</table>
+
+<p>De ahí sale un consejo práctico: si el par es pequeño, <strong>mejor comprar
+cada tres meses 60 $ que cada mes 20 $</strong>. Pagas menos veces las comisiones
+fijas y mueves menos el precio en cada operación. Si el par crece, comprar cada mes
+tiene todo el sentido.</p>
+
+<h3>Los cinco toques, en orden</h3>
+<ol class="pasos">
+  <li>Ten POL o USDT en tu cartera, en la red Polygon (cadena 137).</li>
+  <li>Importa el token wtk con su dirección, para verlo después en la cartera.</li>
+  <li>Abre QuickSwap desde el navegador de MetaMask, conecta la cartera y elige el
+      par USDT → wtk.</li>
+  <li>Mira el <strong>impacto en el precio</strong> antes de confirmar. Si es muy
+      alto, compra menos cantidad o espera.</li>
+  <li>Confirma, aprueba el gasto la primera vez y revisa el saldo. El wtk aparece
+      en tu cartera en segundos.</li>
+</ol>
+
+<div class="aviso"><b>Dos detalles que evitan sustos</b>
+Sube el deslizamiento (slippage) al 2-3 % cuando el par sea pequeño, o la
+operación se cancelará sola. Y si compras para guardar, usa una cartera distinta
+de la que lleva la clave del dueño del token: esa conviene tenerla apartada y con
+la frase secreta en papel.
 </div>
 
 <h2 id="niveles"><span class="num">10</span> Niveles y referidos</h2>
