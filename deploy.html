@@ -40,6 +40,17 @@
   <h1><span class="m">🥭</span> Desplegar token WTK</h1>
   <p class="sub">Crea tu token en Polygon Amoy desde el móvil, con un toque.</p>
 
+  <div class="card" id="card-abrir">
+    <h2>¿La página no encuentra tu wallet?</h2>
+    <p class="step" style="margin-bottom:10px">
+      MetaMask solo deja usar la wallet desde su propio navegador. Abre esta página dentro de la app:
+    </p>
+    <button class="ghost" id="btn-abrir-mm">Abrir dentro de MetaMask</button>
+    <p class="step" style="margin-top:8px">
+      A mano: MetaMask → pestaña <strong>Explorador</strong> → <code>whataka.vip/deploy.html</code>
+    </p>
+  </div>
+
   <div class="card">
     <h2>1 · Conecta tu wallet</h2>
     <div class="row"><span class="k">Wallet</span><span class="v" id="w-name">—</span></div>
@@ -76,6 +87,11 @@
     </p>
     <button id="btn-deploy">Desplegar token</button>
     <div id="st-deploy" class="status hide"></div>
+    <div id="err-box" class="hide" style="margin-top:10px">
+      <p class="step">Texto exacto del error (cópialo y mándamelo):</p>
+      <pre id="err-raw" style="white-space:pre-wrap;word-break:break-word;background:var(--bg);border:1px solid #3a1d1d;border-radius:10px;padding:10px;font-size:11.5px;color:#f5b7b1;margin-top:6px"></pre>
+      <button class="ghost" id="btn-copy-err">Copiar error</button>
+    </div>
   </div>
 
   <div class="card hide" id="card-result">
@@ -99,6 +115,10 @@
     <button class="ghost" id="btn-open-verify">Abrir verificación en el explorador</button>
     <div id="st-publish" class="status hide"></div>
   </div>
+
+  <p class="step" id="pie" style="text-align:center;margin-top:18px">
+    Página de despliegue · versión 2 · 26/11
+  </p>
 
   <div class="card" id="card-help">
     <h2>Si el saldo de gas es 0</h2>
@@ -183,6 +203,36 @@
         }
         return false;
       }
+    }
+
+    function traducirError(err) {
+      const codigo = err?.code ?? err?.info?.error?.code;
+      const texto = String(err?.shortMessage || err?.info?.error?.message || err?.message || err);
+      if (codigo === 4001 || codigo === 'ACTION_REJECTED' || /reject|denied|denegad|cancel/i.test(texto)) return 'Cancelaste la firma en MetaMask. Pulsa Desplegar otra vez y confirma.';
+      if (/insufficient funds|funds for gas/i.test(texto)) return 'No hay POL suficiente para el gas. Pide más en un grifo o espera a que baje el precio.';
+      if (/nonce/i.test(texto)) return 'La wallet se ha desincronizado. En MetaMask: Ajustes → Avanzado → Borrar datos de actividad, y reintenta.';
+      if (/chain|network/i.test(texto) && /wrong|mismatch|switch/i.test(texto)) return 'La wallet no está en Polygon Amoy. Cambia de red y reintenta.';
+      if (/out of gas|gas required exceeds|intrinsic gas/i.test(texto)) return 'Se quedó corto de gas. Reintenta: la página ya pide un 30% de margen.';
+      if (/no wallet|no encuentro/i.test(texto)) return 'No se ve ninguna wallet. Abre la página dentro de MetaMask (tarjeta de arriba).';
+      if (/failed to fetch|network error|timeout/i.test(texto)) return 'La conexión con la red falló. Revisa internet y reintenta.';
+      return texto;
+    }
+
+    function mostrarError(err) {
+      const corto = traducirError(err);
+      setStatus('#st-deploy', 'No se pudo desplegar: ' + corto, 'err');
+      const recortar = (t, n = 240) => (t && t.length > n ? t.slice(0, n) + '…' : t || '');
+      const lineas = [
+        'mensaje: ' + recortar(err?.message || String(err)),
+        err?.shortMessage ? 'resumen: ' + err.shortMessage : '',
+        err?.code !== undefined ? 'código: ' + err.code : '',
+        err?.info?.error?.message ? 'wallet: ' + err.info.error.message : '',
+        err?.info?.error?.code !== undefined ? 'código wallet: ' + err.info.error.code : '',
+        err?.info?.payload?.method ? 'método: ' + err.info.payload.method : '',
+      ].filter(Boolean);
+      $('#err-raw').textContent = lineas.join('\n');
+      $('#err-box').classList.remove('hide');
+      $('#btn-deploy').disabled = false;
     }
 
     async function estimarCoste() {
@@ -279,7 +329,19 @@
         setStatus('#st-deploy', 'Esperando tu confirmación en la wallet…', 'busy');
 
         const factory = new ethers.ContractFactory(art.abi, art.bytecode, signer);
-        const contract = await factory.deploy(signerAddr, supply, halving, factor, cap);
+        // Sin margen, el gas estimado justo hace que la transacción se quede corta.
+        let gasLimit = 3000000n;
+        try {
+          const estimado = await provider.send('eth_estimateGas', [{
+            from: account,
+            data: art.bytecode + factory.interface.encodeDeploy([signerAddr, supply, halving, factor, cap]).slice(2),
+          }]);
+          gasLimit = (BigInt(estimado) * 130n) / 100n;
+        } catch (e) {
+          console.warn('no se pudo estimar el gas, se usa 3.000.000', e);
+        }
+        $('#err-box').classList.add('hide');
+        const contract = await factory.deploy(signerAddr, supply, halving, factor, cap, { gasLimit });
         const tx = contract.deploymentTransaction();
 
         setStatus('#st-deploy', 'Transacción enviada: ' + short(tx.hash, 10, 8) + '\nEsperando confirmación (unos 5-15 segundos)…', 'busy');
@@ -301,9 +363,7 @@
         $('#card-result').scrollIntoView({ behavior: 'smooth' });
       } catch (err) {
         console.warn(err);
-        const msg = err.shortMessage || err.message || 'error';
-        setStatus('#st-deploy', 'No se pudo desplegar: ' + msg, 'err');
-        $('#btn-deploy').disabled = false;
+        mostrarError(err);
       }
     }
 
@@ -334,6 +394,22 @@
     }
 
     $('#btn-connect').addEventListener('click', connect);
+    $('#btn-abrir-mm').addEventListener('click', () => {
+      location.href = 'https://metamask.app.link/dapp/' + location.host + location.pathname;
+    });
+    $('#btn-copy-err').addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText($('#err-raw').textContent);
+        $('#btn-copy-err').textContent = 'Copiado ✓';
+      } catch {
+        const r = document.createRange();
+        r.selectNodeContents($('#err-raw'));
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(r);
+        $('#btn-copy-err').textContent = 'Seleccionado: copia a mano';
+      }
+    });
     $('#btn-deploy').addEventListener('click', deploy);
     $('#btn-verify').addEventListener('click', verify);
     $('#btn-copy-args').addEventListener('click', async () => {
