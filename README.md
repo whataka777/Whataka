@@ -225,6 +225,14 @@ el llamante lo despierta al conectar.
 
 - Los estados se guardan en el dispositivo y se comparten con la red; todavía no
   se difunden por GossipSub real.
+- En las videollamadas hay un lápiz para ponerse fondo y filtro. El vídeo se
+  redibuja en un lienzo y se envía ese lienzo, así que el efecto viaja dentro de
+  la misma llamada cifrada y el otro lado no necesita nada. Los fondos recortan
+  a la persona con MediaPipe Selfie Segmentation (Apache 2.0, servido desde
+  `vendor/mediapipe/`): son unos 6 MB que se descargan la primera vez que se
+  elige un fondo y luego quedan en la caché de la app. Los filtros de color no
+  dependen de eso y funcionan al instante. En un navegador sin WebAssembly SIMD
+  los fondos no se pueden aplicar y la app lo dice; la llamada sigue normal.
 - Las llamadas y videollamadas son P2P reales con WebRTC: el audio y el vídeo
   van cifrados (DTLS-SRTP) directos entre los dos, y el relé solo reenvía la
   negociación (offer/answer/ICE). Necesitan permiso de micrófono/cámara y, en

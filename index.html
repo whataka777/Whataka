@@ -1135,6 +1135,42 @@
       display: flex; gap: 40px; justify-content: center; z-index: 5;
     }
     .call-incoming[hidden] { display: none; }
+
+    /* Panel de fondos y filtros: se abre con el lápiz durante la videollamada. */
+    .call-efectos {
+      position: absolute; left: 0; right: 0; bottom: 0; z-index: 6;
+      max-height: 64%; overflow-y: auto;
+      padding: 12px 0 20px;
+      border-radius: 20px 20px 0 0;
+      background: rgba(9, 20, 32, .96);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 -8px 28px rgba(0,0,0,.45);
+    }
+    .call-efectos[hidden] { display: none; }
+    .call-efectos-barra { display: flex; align-items: center; justify-content: space-between; padding: 0 16px 6px; }
+    .call-efectos-barra strong { color: #fff; font-size: 15px; }
+    .call-efectos-barra button { border: 0; background: transparent; color: rgba(255,255,255,.72); font-size: 16px; padding: 4px; }
+    .call-efectos-titulo {
+      margin: 0; padding: 8px 16px 6px;
+      color: rgba(255,255,255,.55); font-size: 11px;
+      text-transform: uppercase; letter-spacing: .7px;
+    }
+    .call-efectos-fila { display: flex; gap: 12px; padding: 0 16px 4px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .call-efecto {
+      flex: none; width: 64px; border: 0; background: transparent; padding: 0;
+      display: flex; flex-direction: column; align-items: center; gap: 5px;
+      color: rgba(255,255,255,.78); font-size: 10.5px; line-height: 1.15;
+    }
+    .call-efecto-muestra {
+      width: 56px; height: 56px; border-radius: 50%;
+      border: 2px solid transparent; background: #1b3857;
+      object-fit: cover; display: block;
+    }
+    .call-efecto.activo .call-efecto-muestra { border-color: var(--accent-gold); }
+    .call-efecto.activo span { color: var(--accent-gold); font-weight: 600; }
+    .call-efecto:disabled { opacity: .45; }
+    .call-efecto.pensando .call-efecto-muestra { animation: latidoEfecto 1s ease-in-out infinite; }
+    @keyframes latidoEfecto { 50% { opacity: .45; } }
     .call-btn {
       width: 62px; height: 62px; border-radius: 50%; border: none; cursor: pointer;
       background: rgba(255,255,255,.16); color: #fff; font-size: 22px;
@@ -1803,7 +1839,18 @@
       <div class="call-actions" id="call-actions">
         <button id="call-toggle-mute" class="call-btn" title="Silenciar micrófono"><i class="fa-solid fa-microphone"></i></button>
         <button id="call-toggle-video" class="call-btn" title="Activar/desactivar cámara"><i class="fa-solid fa-video"></i></button>
+        <button id="call-efectos-btn" class="call-btn" title="Fondos y filtros" style="display:none"><i class="fa-solid fa-pencil"></i></button>
         <button id="call-hangup" class="call-btn call-btn-danger" title="Colgar"><i class="fa-solid fa-phone-slash"></i></button>
+      </div>
+      <div class="call-efectos" id="call-efectos" hidden>
+        <div class="call-efectos-barra">
+          <strong>Efectos</strong>
+          <button type="button" id="call-efectos-cerrar" aria-label="Cerrar"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <p class="call-efectos-titulo">Fondo</p>
+        <div class="call-efectos-fila" id="call-efectos-fondos"></div>
+        <p class="call-efectos-titulo">Filtro</p>
+        <div class="call-efectos-fila" id="call-efectos-filtros"></div>
       </div>
       <div class="call-incoming" id="call-incoming" hidden>
         <button id="call-accept" class="call-btn call-btn-accept" title="Aceptar"><i class="fa-solid fa-phone"></i></button>
@@ -1815,12 +1862,13 @@
   </div>
 
   <script src="./vendor/ethers.umd.min.js"></script>
-  <script src="./lib/niveles.js?v=58"></script>
-  <script src="./lib/referidos.js?v=58"></script>
-  <script src="./lib/donaciones.js?v=58"></script>
-  <script src="./lib/stickers.js?v=58"></script>
-  <script src="./lib/llamadas.js?v=58"></script>
-  <script src="./lib/relay-url.js?v=58"></script>
-  <script src="./app.js?v=58"></script>
+  <script src="./lib/niveles.js?v=59"></script>
+  <script src="./lib/referidos.js?v=59"></script>
+  <script src="./lib/donaciones.js?v=59"></script>
+  <script src="./lib/stickers.js?v=59"></script>
+  <script src="./lib/llamadas.js?v=59"></script>
+  <script src="./lib/efectos.js?v=59"></script>
+  <script src="./lib/relay-url.js?v=59"></script>
+  <script src="./app.js?v=59"></script>
 </body>
 </html>

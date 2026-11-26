@@ -3014,6 +3014,10 @@ function mostrarOverlayLlamada(mostrar) {
   const o = callEl('call-overlay');
   if (!o) return;
   o.classList.toggle('open', mostrar);
+  if (mostrar) {
+    reproduceVideo(callEl('call-local-video'));
+    reproduceVideo(callEl('call-remote-video'));
+  }
 }
 
 function pintaCabeceraLlamada(peerId) {
@@ -3055,13 +3059,213 @@ async function pedirMedios(video) {
   return navigator.mediaDevices.getUserMedia(constraints);
 }
 
+// Un <video> que recibió su stream estando oculto se queda en el primer fotograma
+// (pasa sobre todo en iPhone): hay que darle al play cuando ya se ve.
+function reproduceVideo(el) {
+  if (!el) return;
+  const intento = el.play();
+  if (intento && intento.catch) intento.catch(() => {});
+}
+
 function pintaVideoLocal() {
   const lv = callEl('call-local-video');
   const o = callEl('call-overlay');
-  if (lv && call.localStream) {
-    lv.srcObject = call.localStream;
+  const fuente = call.videoMostrado || call.localStream;
+  if (lv && fuente) {
+    if (lv.srcObject !== fuente) lv.srcObject = fuente;
     if (o) o.classList.toggle('local-on', call.video);
+    reproduceVideo(lv);
   }
+}
+
+// ── Efectos de vídeo (fondos y filtros) ─────────────────────────────────────
+// El efecto se dibuja en un lienzo y se envía el lienzo: el otro lado no nota
+// nada y la llamada sigue siendo P2P.
+
+function preparaEfectos() {
+  if (call.efectos) return true;
+  if (!window.WhatakaEfectos) { toast('Los efectos no se cargaron: recarga la app'); return false; }
+  if (!call.localStream) return false;
+  // El lienzo lee de un vídeo aparte: si leyera del que muestra el resultado,
+  // se dibujaría a sí mismo.
+  const fuente = document.createElement('video');
+  fuente.muted = true;
+  fuente.playsInline = true;
+  fuente.autoplay = true;
+  fuente.srcObject = call.localStream;
+  reproduceVideo(fuente);
+  const efectos = window.WhatakaEfectos.crear(fuente);
+  if (!efectos.stream) {
+    fuente.srcObject = null;
+    toast('Este navegador no permite efectos en la llamada');
+    return false;
+  }
+  efectos.ponFiltro(call.filtroElegido || 'normal');
+  call.efectosFuente = fuente;
+  call.efectos = efectos;
+  return true;
+}
+
+async function enviaEfectosAlOtroLado() {
+  if (!call.efectos || !call.pc) return;
+  const pista = call.efectos.stream.getVideoTracks()[0];
+  if (!pista) return;
+  for (const emisor of call.pc.getSenders()) {
+    if (emisor.track && emisor.track.kind === 'video') {
+      try { await emisor.replaceTrack(pista); } catch { /* la llamada sigue con la cámara */ }
+    }
+  }
+  call.videoMostrado = call.efectos.stream;
+  pintaVideoLocal();
+}
+
+async function vuelveALaCamara() {
+  const emisores = call.pc ? call.pc.getSenders() : [];
+  const pista = call.localStream ? call.localStream.getVideoTracks()[0] : null;
+  if (pista) {
+    for (const emisor of emisores) {
+      if (emisor.track && emisor.track.kind === 'video') {
+        try { await emisor.replaceTrack(pista); } catch { /* nada que restaurar */ }
+      }
+    }
+  }
+  if (call.efectos) { try { call.efectos.parar(); } catch { /* ya parado */ } }
+  if (call.efectosFuente) { call.efectosFuente.srcObject = null; }
+  call.efectos = null;
+  call.efectosFuente = null;
+  call.videoMostrado = null;
+  pintaVideoLocal();
+}
+
+function marcaEfectosActivos() {
+  const fondo = call.fondoElegido || 'ninguno';
+  const filtro = call.filtroElegido || 'normal';
+  document.querySelectorAll('#call-efectos-fondos [data-efecto]').forEach((b) => {
+    b.classList.toggle('activo', b.dataset.efecto === fondo);
+  });
+  document.querySelectorAll('#call-efectos-filtros [data-efecto]').forEach((b) => {
+    b.classList.toggle('activo', b.dataset.efecto === filtro);
+  });
+}
+
+function pintaBotonesEfectos() {
+  const filaFondos = document.getElementById('call-efectos-fondos');
+  const filaFiltros = document.getElementById('call-efectos-filtros');
+  if (!window.WhatakaEfectos) return;
+
+  if (filaFondos && !filaFondos.dataset.listo) {
+    window.WhatakaEfectos.FONDOS.forEach((fondo) => {
+      const boton = document.createElement('button');
+      boton.type = 'button';
+      boton.className = 'call-efecto';
+      boton.dataset.efecto = fondo.id;
+      const muestra = document.createElement('canvas');
+      muestra.className = 'call-efecto-muestra';
+      muestra.width = 112;
+      muestra.height = 112;
+      const ctx = muestra.getContext('2d');
+      if (fondo.id === 'ninguno') {
+        ctx.fillStyle = '#243a52';
+        ctx.fillRect(0, 0, 112, 112);
+        ctx.strokeStyle = 'rgba(255,255,255,.45)';
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.moveTo(30, 82);
+        ctx.lineTo(82, 30);
+        ctx.stroke();
+      } else {
+        window.WhatakaEfectos.pintaFondo(ctx, fondo.id, null, 112, 112);
+      }
+      const texto = document.createElement('span');
+      texto.textContent = fondo.nombre;
+      boton.append(muestra, texto);
+      boton.addEventListener('click', () => aplicaFondo(fondo.id));
+      filaFondos.appendChild(boton);
+    });
+    filaFondos.dataset.listo = '1';
+  }
+
+  if (filaFiltros && !filaFiltros.dataset.listo) {
+    window.WhatakaEfectos.FILTROS.forEach((filtro) => {
+      const boton = document.createElement('button');
+      boton.type = 'button';
+      boton.className = 'call-efecto';
+      boton.dataset.efecto = filtro.id;
+      const muestra = document.createElement('div');
+      muestra.className = 'call-efecto-muestra';
+      muestra.style.background = filtro.muestra;
+      if (filtro.css !== 'none') muestra.style.filter = filtro.css;
+      const texto = document.createElement('span');
+      texto.textContent = filtro.nombre;
+      boton.append(muestra, texto);
+      boton.addEventListener('click', () => aplicaFiltro(filtro.id));
+      filaFiltros.appendChild(boton);
+    });
+    filaFiltros.dataset.listo = '1';
+  }
+
+  marcaEfectosActivos();
+}
+
+async function aplicaFondo(id) {
+  const boton = document.querySelector(`#call-efectos-fondos [data-efecto="${id}"]`);
+  if (id === 'ninguno') {
+    call.fondoElegido = 'ninguno';
+    if (call.efectos) await aplicaEfectosActuales();
+    marcaEfectosActivos();
+    return;
+  }
+  if (!preparaEfectos()) return;
+  if (!window.SelfieSegmentation) {
+    // El modelo de segmentación son varios megas: solo se descarga la primera
+    // vez y conviene avisar de que tarda.
+    toast('Preparando el fondo: la primera vez tarda unos segundos', 5000);
+  }
+  if (boton) { boton.disabled = true; boton.classList.add('pensando'); }
+  try {
+    await call.efectos.ponFondo(id);
+    call.fondoElegido = id;
+    await enviaEfectosAlOtroLado();
+  } catch (err) {
+    console.warn('fondo', err);
+    toast('No se pudo poner el fondo. Necesita conexión la primera vez.');
+  } finally {
+    if (boton) { boton.disabled = false; boton.classList.remove('pensando'); }
+    marcaEfectosActivos();
+  }
+}
+
+async function aplicaFiltro(id) {
+  call.filtroElegido = id;
+  if (!call.efectos && id === 'normal' && (call.fondoElegido || 'ninguno') === 'ninguno') {
+    marcaEfectosActivos();
+    return;
+  }
+  if (!preparaEfectos()) return;
+  call.efectos.ponFiltro(id);
+  await aplicaEfectosActuales();
+  marcaEfectosActivos();
+}
+
+// Con todo en "normal" no hay nada que dibujar: se devuelve la cámara y se
+// apaga el lienzo, que gasta batería para nada.
+async function aplicaEfectosActuales() {
+  const sinNada = (call.fondoElegido || 'ninguno') === 'ninguno' && (call.filtroElegido || 'normal') === 'normal';
+  if (sinNada) { await vuelveALaCamara(); return; }
+  if (call.efectos) await enviaEfectosAlOtroLado();
+}
+
+function abrePanelEfectos() {
+  if (!call.video) { toast('Los efectos son para las videollamadas'); return; }
+  const panel = document.getElementById('call-efectos');
+  if (!panel) return;
+  pintaBotonesEfectos();
+  panel.hidden = false;
+}
+
+function cierraPanelEfectos() {
+  const panel = document.getElementById('call-efectos');
+  if (panel) panel.hidden = true;
 }
 
 function enviaSenal(kind, payload) {
@@ -3088,6 +3292,7 @@ function creaPeerConnection(peerId) {
     if (rv) {
       rv.srcObject = call.remoteStream;
       if (o) o.classList.toggle('has-remote', call.video);
+      reproduceVideo(rv);
     }
     call.mediosListos = true;
     quizasActivarLlamada();
@@ -3336,6 +3541,8 @@ function sincronizaBotonesLlamada() {
     if (i) i.className = call.camaraApagada ? 'fa-solid fa-video-slash' : 'fa-solid fa-video';
     vid.style.display = call.video ? '' : 'none';
   }
+  const lapiz = callEl('call-efectos-btn');
+  if (lapiz) lapiz.style.display = call.video ? '' : 'none';
   const acc = callEl('call-actions');
   if (acc && (!call.maquina || call.maquina.estado !== 'sonando')) acc.style.display = '';
 }
@@ -3364,6 +3571,17 @@ function terminaLlamada(motivo, aviso) {
   call.mediosListos = false;
   call.descripcionRemota = false;
   call.icePendientes = [];
+  // Los efectos se van con la llamada: si no, el lienzo seguiría dibujando y
+  // gastando batería con la cámara ya apagada.
+  if (call.efectos) { try { call.efectos.parar(); } catch {} }
+  if (call.efectosFuente) { call.efectosFuente.srcObject = null; }
+  call.efectos = null;
+  call.efectosFuente = null;
+  call.videoMostrado = null;
+  call.fondoElegido = 'ninguno';
+  call.filtroElegido = 'normal';
+  const panelEfectos = document.getElementById('call-efectos');
+  if (panelEfectos) panelEfectos.hidden = true;
   const rv = callEl('call-remote-video'); if (rv) rv.srcObject = null;
   const lv = callEl('call-local-video'); if (lv) lv.srcObject = null;
   const inc = callEl('call-incoming'); if (inc) inc.hidden = true;
@@ -3395,6 +3613,8 @@ function conectarBotonesLlamada() {
   if (q('call-reject')) q('call-reject').addEventListener('click', rechazarLlamada);
   if (q('call-toggle-mute')) q('call-toggle-mute').addEventListener('click', alternarMute);
   if (q('call-toggle-video')) q('call-toggle-video').addEventListener('click', alternarCamara);
+  if (q('call-efectos-btn')) q('call-efectos-btn').addEventListener('click', abrePanelEfectos);
+  if (q('call-efectos-cerrar')) q('call-efectos-cerrar').addEventListener('click', cierraPanelEfectos);
 }
 
 async function sendMiningReport() {
