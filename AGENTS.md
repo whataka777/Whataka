@@ -59,6 +59,21 @@ Después de desplegar, cada persona tiene que abrir la app y tocar **Activar**
 en la franja de avisos una vez; sin ese gesto el navegador no deja que el
 teléfono suene con la app cerrada.
 
+## Estado de la cadena (26/11)
+
+El WTK desplegado en Amoy (`0x4b0C9d8233DeFa8EcDF28D7a2bAa3EDaa4C8252B`)
+tiene el firmante de vales en `0xA5f1711DC508Fe8b256F1a8A834CFf2a47f41186` y el
+dueño en `0xAdd0f33B4680289892F001BAC049b9579548b5d9`. **Ninguna de las dos
+claves está disponible**, así que ese contrato no se puede reconfigurar y sus 90
+millones de WTK quedan congelados (son de prueba, sin valor).
+
+Plan acordado: desplegar un WTK nuevo en Amoy con `scripts/deploy.js`, donde el
+desplegador es a la vez firmante, y apuntar `MINING_CONTRACT` y
+`REPORT_SIGNER_KEY` a ese contrato. La clave del firmante nuevo vive en la
+variable `REPORT_SIGNER_KEY_PENDIENTE` de Render hasta que exista el contrato.
+Dirección: `0x2a7F39bDF3dAe21c240536C4d26c05De0087127a`. Solo falta gas de
+prueba; el despliegue simulado ya devuelve código.
+
 ## El manual
 
 `manual.html` es la guía del usuario: trece capítulos y siete ilustraciones
