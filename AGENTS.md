@@ -29,8 +29,19 @@ que es lo que se le pregunta al usuario para saber qué copia tiene.
 ## Despliegue
 
 Producción es `https://whataka.vip`, servida por Render desde `main` de
-`github.com/whataka777/Whataka` (servicio `whataka-relay`,
-`autoDeploy: true`). Un push a `main` publica.
+`github.com/whataka777/Whataka` (servicio `whataka-relay`). El servicio dice
+`autoDeploy: true`, pero en la práctica **el push no dispara el despliegue**:
+el repositorio no tiene webhook de Render. Después de empujar hay que lanzar el
+despliegue a mano, desde el panel o por la API:
+
+```bash
+curl -X POST -H "Authorization: Bearer $RENDER_API_KEY" \
+     -H "Content-Type: application/json" \
+     https://api.render.com/v1/services/srv-dbrneam7bikc73b2iu2g/deploys \
+     -d '{"clearCache":"do_not_clear"}'
+```
+
+Y comprobar que queda `live` antes de decir que está publicado.
 
 El token de la app de OpenHands (`ghu_…`) es de **solo lectura**: `git push` da
 403. Para publicar hace falta un PAT con *Contents: Read and write* sobre ese
