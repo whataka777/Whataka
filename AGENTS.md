@@ -59,6 +59,14 @@ Después de desplegar, cada persona tiene que abrir la app y tocar **Activar**
 en la franja de avisos una vez; sin ese gesto el navegador no deja que el
 teléfono suene con la app cerrada.
 
+## El manual
+
+`manual.html` es la guía del usuario: trece capítulos y siete ilustraciones
+vectoriales en SVG (nada de emojis dentro de las figuras, para que se vean en
+cualquier pantalla y al imprimir). Se abre desde el 📖 al final de la barra
+inferior, después de la tuerca. Cualquier función nueva tiene que aparecer ahí:
+`test/manual.test.js` comprueba las secciones, las ilustraciones y el botón.
+
 ## Cuentas de los teléfonos
 
 El Peer ID se genera en el móvil y vive en `localStorage` (`whataka.identity`),
