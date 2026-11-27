@@ -1244,7 +1244,9 @@
     /* ============ MODAL ============ */
     .modal-overlay {
       display: none; position: fixed; inset: 0;
-      background: rgba(0,0,0,.72); z-index: 100;
+      /* Por encima de la pantalla de llamada (120): los avisos que se abren
+         durante una llamada quedaban detrás y no se veían. */
+      background: rgba(0,0,0,.72); z-index: 200;
       align-items: flex-end; justify-content: center;
     }
     .modal-overlay.open { display: flex; }
@@ -1960,13 +1962,13 @@
   </div>
 
   <script src="./vendor/ethers.umd.min.js"></script>
-  <script src="./lib/niveles.js?v=83"></script>
-  <script src="./lib/referidos.js?v=83"></script>
-  <script src="./lib/donaciones.js?v=83"></script>
-  <script src="./lib/stickers.js?v=83"></script>
-  <script src="./lib/llamadas.js?v=83"></script>
-  <script src="./lib/efectos.js?v=83"></script>
-  <script src="./lib/relay-url.js?v=83"></script>
-  <script src="./app.js?v=83"></script>
+  <script src="./lib/niveles.js?v=84"></script>
+  <script src="./lib/referidos.js?v=84"></script>
+  <script src="./lib/donaciones.js?v=84"></script>
+  <script src="./lib/stickers.js?v=84"></script>
+  <script src="./lib/llamadas.js?v=84"></script>
+  <script src="./lib/efectos.js?v=84"></script>
+  <script src="./lib/relay-url.js?v=84"></script>
+  <script src="./app.js?v=84"></script>
 </body>
 </html>

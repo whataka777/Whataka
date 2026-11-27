@@ -69,3 +69,19 @@ conectaría.
   pantalla decía «En llamada» en silencio).
 - El diagnóstico se puede ver durante la llamada y se ofrece al fallar, con botón
   para copiarlo.
+
+## Versión 84: lo que se añadió tras el informe «le doy al botón verde y se cierra»
+
+- **Registro de la llamada**: cada paso (oferta recibida, toco contestar,
+  micrófono listo, respuesta enviada, estados de conexión, errores) se anota con
+  hora y aparece en el diagnóstico, junto a la versión de la app. Así se puede
+  saber qué falló sin adivinar.
+- **Si la negociación falla, la llamada ya no se cierra**: se abre una ventana
+  con el motivo, el registro y un botón **Reintentar** que vuelve a preparar la
+  respuesta con la misma oferta.
+- **Las ventanas emergentes se ven durante la llamada**: el modal estaba en
+  `z-index: 100` y la pantalla de llamada en `120`, así que cualquier aviso
+  abierto durante una llamada (por ejemplo el del micrófono) quedaba detrás y
+  parecía que no pasaba nada.
+- **La pestaña abierta se recarga sola** cuando el service worker se actualiza,
+  para no seguir usando una versión vieja tras un arreglo.

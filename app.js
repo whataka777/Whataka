@@ -2986,6 +2986,9 @@ const call = {
   icePendientes: [], // candidatos ICE que llegaron antes de tener la conexión
   hayTurn: false, // el relé publicó un servidor TURN
   vigia: null, // temporizador que evita quedarse en «Conectando…» para siempre
+  registro: [], // lo que va pasando, para poder diagnosticar sin adivinar
+  peerGuardado: null,
+  callIdGuardado: null,
   candidatosEnviados: 0,
   candidatosRecibidos: 0,
   reintentoIce: false,
@@ -3397,6 +3400,7 @@ function creaPeerConnection(peerId) {
   };
   pc.onconnectionstatechange = () => {
     const estado = pc.connectionState;
+    apunta(`conexión → ${estado}`);
     if (estado === 'connected') {
       if (call.vigia) { clearTimeout(call.vigia); call.vigia = null; }
       call.reintentoIce = false;
@@ -3461,6 +3465,14 @@ function vigilaConexion(segundos) {
   }, segundos * 1000);
 }
 
+// Anota un paso de la llamada con la hora. Se enseña en el diagnóstico.
+function apunta(texto) {
+  const t = new Date();
+  const hora = `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}:${String(t.getSeconds()).padStart(2, '0')}`;
+  call.registro.push(`${hora} ${texto}`);
+  if (call.registro.length > 40) call.registro.shift();
+}
+
 // Radiografía de la llamada: sirve para saber qué falló sin adivinar.
 function diagnosticoLlamada() {
   const pc = call.pc;
@@ -3476,7 +3488,10 @@ function diagnosticoLlamada() {
     `candidatos recibidos: ${call.candidatosRecibidos}`,
     `servidor TURN: ${call.hayTurn ? 'sí' : 'no'}`,
     `red: ${red}`,
+    `versión: ${typeof WHATAKA_BUILD !== 'undefined' ? WHATAKA_BUILD : '?'}`,
     `navegador: ${navigator.userAgent}`,
+    '--- registro ---',
+    ...(call.registro.length ? call.registro : ['(sin pasos anotados)']),
   ].join('\n');
 }
 
@@ -3555,6 +3570,8 @@ async function iniciarLlamada(video) {
 
   await cargarIceServers();
   call.maquina = LL.crear();
+  call.registro = [];
+  apunta(`llamando${video ? ' con vídeo' : ''}`);
   call.video = !!video;
   call.esLlamante = true;
   call.muteado = false;
@@ -3594,6 +3611,7 @@ function esperaRespuesta(segundos) {
 
 async function aceptarLlamada() {
   if (!call.maquina || call.maquina.estado !== 'sonando') return;
+  apunta('toco contestar');
   // Se calla al instante: pedir el micrófono tarda y el timbre seguiría sonando.
   stopRingtone();
   // El móvil solo deja sonar el audio si se pide dentro del toque del usuario.
@@ -3602,11 +3620,13 @@ async function aceptarLlamada() {
   try {
     call.localStream = await pedirMedios(call.video);
   } catch (err) {
+    apunta(`sin micrófono: ${(err && err.name) || 'error'}`);
     enviaSenal('reject', { motivo: 'sin_permiso' });
     terminaLlamada('terminada', 'No se pudo contestar: revisa el micrófono');
     avisaProblemaMedios(err);
     return;
   }
+  apunta('micrófono y cámara listos');
   call.maquina.aceptar();
   call.esLlamante = false;
   callEl('call-incoming').hidden = true;
@@ -3625,14 +3645,63 @@ async function aceptarLlamada() {
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
     enviaSenal('answer', { sdp: pc.localDescription });
+    apunta('respuesta enviada');
     vigilaConexion(CALL_CONNECT_SECONDS);
     quizasActivarLlamada();
   } catch (err) {
-    // Antes esto se quedaba colgado en «Conectando…» sin decir nada.
-    console.warn('no se pudo contestar', err);
-    enviaSenal('hangup', {});
-    terminaLlamada('sin_conexion', 'No se pudo contestar la llamada. Inténtalo otra vez.');
+    fallaAlContestar(err);
   }
+}
+
+// La negociación falló. Se deja la llamada viva y se explica: cerrar sin decir
+// nada era justo lo que parecía «le doy al botón verde y se cierra».
+function fallaAlContestar(err) {
+  apunta(`error al contestar: ${(err && err.name) || ''} ${(err && err.message) || ''}`.trim());
+  console.warn('no se pudo contestar', err);
+  try { if (call.pc) call.pc.close(); } catch {}
+  call.pc = null;
+  call.descripcionRemota = false;
+  call.mediosListos = false;
+  if (call.localStream) {
+    call.localStream.getTracks().forEach((t) => t.stop());
+    call.localStream = null;
+  }
+  setEstadoLlamada('No se pudo contestar');
+  const foto = diagnosticoLlamada();
+  openModal('📵 No se pudo contestar', `
+    <p>${escapeHtml((err && err.message) || 'La llamada falló al prepararse.')}</p>
+    <p class="hint-text">Puedes reintentar sin que te vuelvan a llamar. Si vuelve a fallar, copia el diagnóstico y mándalo: dice en qué paso se quedó.</p>
+    <pre id="fallo-texto" style="white-space:pre-wrap;word-break:break-word;background:#0f1722;border:1px solid #22364a;border-radius:10px;padding:10px;font-size:11px;color:#cfe0ef;max-height:38vh;overflow:auto">${escapeHtml(foto)}</pre>
+    <div class="modal-btn-row">
+      <button class="ghost-btn" id="fallo-copiar">Copiar</button>
+      <button class="ghost-btn" id="fallo-colgar">Colgar</button>
+      <button class="primary-btn" id="fallo-reintentar">Reintentar</button>
+    </div>`);
+  const copiar = document.getElementById('fallo-copiar');
+  if (copiar) copiar.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(foto); copiar.textContent = 'Copiado ✓'; }
+    catch { copiar.textContent = 'Copia a mano'; }
+  });
+  const colgar = document.getElementById('fallo-colgar');
+  if (colgar) colgar.addEventListener('click', () => { closeModal(); colgarLlamada(); });
+  const reintentar = document.getElementById('fallo-reintentar');
+  if (reintentar) reintentar.addEventListener('click', reintentaContestar);
+}
+
+// Vuelve a preparar la respuesta con la misma oferta, sin colgar la llamada.
+async function reintentaContestar() {
+  closeModal();
+  const peer = call.peerGuardado;
+  const callId = call.callIdGuardado;
+  const video = call.video;
+  if (!peer || !call._offerSdp) { colgarLlamada(); return; }
+  apunta('reintento de contestar');
+  call.maquina = LL.crear();
+  call.maquina.recibir({ callId, peer, video });
+  call.esLlamante = false;
+  call.descripcionRemota = false;
+  call.mediosListos = false;
+  await aceptarLlamada();
 }
 
 function rechazarLlamada() {
@@ -3664,7 +3733,11 @@ async function recibirSenal(msg) {
     call.mediosListos = false;
     call.descripcionRemota = false;
     call.icePendientes = [];
+    call.registro = [];
     call._offerSdp = msg.payload && msg.payload.sdp;
+    call.peerGuardado = msg.from;
+    call.callIdGuardado = msg.callId;
+    apunta(`oferta recibida (${call._offerSdp ? String(call._offerSdp).length + ' bytes' : 'sin sdp'})`);
     call.maquina.recibir({ callId: msg.callId, peer: msg.from, video: msg.video });
     pintaCabeceraLlamada(msg.from);
     mostrarOverlayLlamada(true);
@@ -3700,6 +3773,7 @@ async function recibirSenal(msg) {
     }
     call.descripcionRemota = true;
     aplicarIcePendientes();
+    apunta('respuesta recibida');
     call.maquina.conectar();
     setEstadoLlamada('Conectando…');
     vigilaConexion(CALL_CONNECT_SECONDS);
@@ -4121,7 +4195,7 @@ async function activarAvisosPush() {
 // Un solo número para todo: el de las URL de index.html, la caché del service
 // worker y esta pantalla. Sirve para saber de un vistazo qué copia se está
 // usando cuando algo no cuadra. Lo comprueba test/version.test.js.
-const WHATAKA_BUILD = '83';
+const WHATAKA_BUILD = '84';
 
 const AVISO_LLAMADAS_CLAVE = 'whataka-aviso-llamadas-oculto';
 const AVISO_LLAMADAS_DIAS = 3;
@@ -4585,7 +4659,20 @@ async function boot() {
   cargarIceServers();
 
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
-    navigator.serviceWorker.register('./sw.js').catch((err) => console.warn('SW', err));
+    // Al publicar una versión nueva el service worker se activa solo, pero la
+    // pestaña abierta sigue con el código viejo hasta que se recarga. En el
+    // móvil eso significa seguir viendo fallos ya arreglados.
+    const habiaControlador = !!navigator.serviceWorker.controller;
+    let recargado = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (recargado || !habiaControlador) return;
+      if (call.maquina && !call.maquina.terminada && call.maquina.estado !== 'inactiva') return;
+      recargado = true;
+      location.reload();
+    });
+    navigator.serviceWorker.register('./sw.js')
+      .then((reg) => reg.update().catch(() => {}))
+      .catch((err) => console.warn('SW', err));
   }
 
   hideSplash();
