@@ -3067,6 +3067,80 @@ function paraTimerLlamada() {
   if (t) t.textContent = '';
 }
 
+// Estado del permiso del micrófono, sin pedirlo. Sirve para avisar antes de
+// que la llamada entre, no después de fallar al contestar.
+async function estadoPermisoMicro() {
+  try {
+    if (!navigator.permissions || !navigator.permissions.query) return 'desconocido';
+    const r = await navigator.permissions.query({ name: 'microphone' });
+    return r.state; // granted | denied | prompt
+  } catch {
+    return 'desconocido';
+  }
+}
+
+// Traduce el error del navegador a algo que se pueda seguir.
+function explicaErrorMedios(err) {
+  const nombre = (err && err.name) || '';
+  if (nombre === 'NotAllowedError' || nombre === 'SecurityError') {
+    return {
+      titulo: '🎤 El micrófono está bloqueado',
+      texto: 'El navegador no deja usar el micrófono a Whataka, así que la llamada no se puede contestar. Se arregla en los ajustes del navegador, una sola vez.',
+      pasos: [
+        'Android con Chrome: toca el candado junto a la dirección → Permisos → Micrófono → Permitir, y recarga la página.',
+        'iPhone con Safari: Ajustes del iPhone → Safari → Micrófono → Permitir. También vale tocar «ᴀA» en la barra de direcciones → Ajustes del sitio web → Micrófono.',
+        'Si abriste el enlace desde WhatsApp o Instagram, ábrelo en Chrome o Safari: dentro de esas apps el micrófono está capado.',
+        'Vuelve a intentarlo: pide que te llamen otra vez.',
+      ],
+    };
+  }
+  if (nombre === 'NotFoundError' || nombre === 'DevicesNotFoundError') {
+    return {
+      titulo: '🎤 No encuentro el micrófono',
+      texto: 'El navegador no ve ningún micrófono conectado o disponible.',
+      pasos: [
+        'Comprueba que no haya otro dispositivo de audio raro conectado (auriculares, altavoz).',
+        'Recarga la app y vuelve a intentarlo.',
+      ],
+    };
+  }
+  if (nombre === 'NotReadableError' || nombre === 'TrackStartError') {
+    return {
+      titulo: '🎤 El micrófono está ocupado',
+      texto: 'Otra aplicación lo está usando en este momento.',
+      pasos: [
+        'Cierra la otra app o la otra llamada (WhatsApp, Telegram, una grabación).',
+        'Vuelve a intentarlo.',
+      ],
+    };
+  }
+  return {
+    titulo: '🎤 No se pudo usar el micrófono',
+    texto: (err && err.message) || 'El navegador no dio acceso al micrófono.',
+    pasos: ['Recarga la app y vuelve a intentarlo.'],
+  };
+}
+
+function avisaProblemaMedios(err) {
+  const info = explicaErrorMedios(err);
+  openModal(info.titulo, `
+    <p>${escapeHtml(info.texto)}</p>
+    <ol class="pasos">${info.pasos.map((p) => `<li>${escapeHtml(p)}</li>`).join('')}</ol>
+    <div class="modal-btn-row">
+      <button class="primary-btn" id="medios-ok">Entendido</button>
+    </div>`);
+  const ok = document.getElementById('medios-ok');
+  if (ok) ok.addEventListener('click', closeModal);
+}
+
+// Muestra u oculta el aviso rojo de la pantalla de llamada entrante.
+async function revisaPermisoMicro() {
+  const aviso = callEl('call-aviso-micro');
+  if (!aviso) return;
+  const estado = await estadoPermisoMicro();
+  aviso.hidden = estado !== 'denied';
+}
+
 async function pedirMedios(video) {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     throw new Error('Tu navegador no permite usar cámara ni micrófono aquí. Abre la app en una pestaña normal (no incrustada) y por HTTPS.');
@@ -3475,7 +3549,7 @@ async function iniciarLlamada(video) {
   try {
     call.localStream = await pedirMedios(video);
   } catch (err) {
-    toast(err.message || 'No se pudo acceder al micrófono/cámara');
+    avisaProblemaMedios(err);
     return;
   }
 
@@ -3529,7 +3603,8 @@ async function aceptarLlamada() {
     call.localStream = await pedirMedios(call.video);
   } catch (err) {
     enviaSenal('reject', { motivo: 'sin_permiso' });
-    terminaLlamada('terminada', err.message || 'No se pudo acceder al micrófono/cámara');
+    terminaLlamada('terminada', 'No se pudo contestar: revisa el micrófono');
+    avisaProblemaMedios(err);
     return;
   }
   call.maquina.aceptar();
@@ -3598,6 +3673,7 @@ async function recibirSenal(msg) {
     setEstadoLlamada(msg.video ? 'Videollamada entrante' : 'Llamada entrante');
     const inc = callEl('call-incoming');
     if (inc) inc.hidden = false;
+    revisaPermisoMicro();
     const acc = callEl('call-actions');
     if (acc) acc.style.display = 'none';
     // Sonido de timbre (si el navegador lo permite), vibración y aviso del
@@ -3640,7 +3716,13 @@ async function recibirSenal(msg) {
     try { await call.pc.addIceCandidate(new RTCIceCandidate(cand)); } catch {}
     return;
   }
-  if (kind === 'reject') { terminaLlamada('rechazada', 'El contacto rechazó la llamada'); return; }
+  if (kind === 'reject') {
+    const motivo = (msg.payload && msg.payload.motivo) || '';
+    terminaLlamada('rechazada', motivo === 'sin_permiso'
+      ? 'No pudo contestar: su teléfono tiene el micrófono bloqueado.'
+      : 'El contacto rechazó la llamada');
+    return;
+  }
   if (kind === 'busy') { terminaLlamada('rechazada', 'El contacto está en otra llamada'); return; }
   if (kind === 'hangup') { terminaLlamada('terminada', 'El contacto colgó'); return; }
   if (kind === 'offline') {
@@ -3748,6 +3830,7 @@ function terminaLlamada(motivo, aviso) {
   const rv = callEl('call-remote-video'); if (rv) rv.srcObject = null;
   const lv = callEl('call-local-video'); if (lv) lv.srcObject = null;
   const inc = callEl('call-incoming'); if (inc) inc.hidden = true;
+  const avisoMicro = callEl('call-aviso-micro'); if (avisoMicro) avisoMicro.hidden = true;
   const o = callEl('call-overlay'); if (o) o.classList.remove('has-remote', 'local-on');
   mostrarOverlayLlamada(false);
   if (typeof stopRingtone === 'function') stopRingtone();
@@ -3773,6 +3856,9 @@ function conectarBotonesLlamada() {
   const q = (id) => document.getElementById(id);
   if (q('call-hangup')) q('call-hangup').addEventListener('click', colgarLlamada);
   if (q('call-diag-btn')) q('call-diag-btn').addEventListener('click', mostrarDiagnosticoLlamada);
+  if (q('call-aviso-micro-btn')) {
+    q('call-aviso-micro-btn').addEventListener('click', () => avisaProblemaMedios({ name: 'NotAllowedError' }));
+  }
   if (q('call-diag-cerrar')) {
     q('call-diag-cerrar').addEventListener('click', () => { q('call-diag').hidden = true; });
   }
@@ -4035,7 +4121,7 @@ async function activarAvisosPush() {
 // Un solo número para todo: el de las URL de index.html, la caché del service
 // worker y esta pantalla. Sirve para saber de un vistazo qué copia se está
 // usando cuando algo no cuadra. Lo comprueba test/version.test.js.
-const WHATAKA_BUILD = '82';
+const WHATAKA_BUILD = '83';
 
 const AVISO_LLAMADAS_CLAVE = 'whataka-aviso-llamadas-oculto';
 const AVISO_LLAMADAS_DIAS = 3;
