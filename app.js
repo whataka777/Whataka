@@ -2136,6 +2136,9 @@ function connect() {
       signPub: state.identity.signPub,
       agreePub: state.identity.agreePub,
     });
+    // El relé guarda las suscripciones en memoria: cada reinicio las pierde.
+    // Al reconectar se vuelven a registrar solas, sin tocar nada.
+    registraAvisosSiToca();
     renderMining();
     renderStatus();
     renderChats();
@@ -4195,7 +4198,7 @@ async function activarAvisosPush() {
 // Un solo número para todo: el de las URL de index.html, la caché del service
 // worker y esta pantalla. Sirve para saber de un vistazo qué copia se está
 // usando cuando algo no cuadra. Lo comprueba test/version.test.js.
-const WHATAKA_BUILD = '85';
+const WHATAKA_BUILD = '86';
 
 const AVISO_LLAMADAS_CLAVE = 'whataka-aviso-llamadas-oculto';
 const AVISO_LLAMADAS_DIAS = 3;
@@ -4270,6 +4273,17 @@ function pintaEstadoAvisos() {
   }
   texto.textContent = 'Toca aquí para recibir llamadas con la app cerrada';
   fila.classList.add('pendiente');
+}
+
+// Vuelve a dar de alta el aviso push tras cada reconexión. Sin esto, un
+// reinicio del relé deja la cuenta sin avisos hasta que se reabre la app.
+let ultimoRegistroAvisos = 0;
+function registraAvisosSiToca() {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const ahora = Date.now();
+  if (ahora - ultimoRegistroAvisos < 60000) return;
+  ultimoRegistroAvisos = ahora;
+  activarAvisosPush().then((bien) => { if (bien) pintaEstadoAvisos(); }).catch(() => {});
 }
 
 // Cuántos teléfonos de esta cuenta recibirían una llamada con la app cerrada.

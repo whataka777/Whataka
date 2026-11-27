@@ -109,3 +109,7 @@ activos y tiene el botón «Probar aviso». Si `efimeras` sale `true`, las clave
 VAPID se generan al arrancar y cada reinicio invalida las suscripciones: hay que
 poner `VAPID_SEED` (o `VAPID_PUBLIC_KEY` y `VAPID_PRIVATE_KEY`) en el servicio.
 En producción sale `false`, así que las suscripciones sobreviven a los reinicios.
+
+Las suscripciones viven en memoria del relé, así que un reinicio (cada
+despliegue) las borra. La app las vuelve a registrar sola al reconectar
+(`registraAvisosSiToca()`), sin que el usuario tenga que hacer nada.
