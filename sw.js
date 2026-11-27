@@ -1,4 +1,4 @@
-const CACHE = 'whataka-v86';
+const CACHE = 'whataka-v87';
 const ASSETS = [
   './',
   './index.html',
@@ -9,6 +9,7 @@ const ASSETS = [
   './lib/donaciones.js',
   './lib/stickers.js',
   './lib/relay-url.js',
+  './lib/disfraces.js',
   './lib/efectos.js',
   './vendor/ethers.umd.min.js',
   './manifest.webmanifest',

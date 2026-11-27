@@ -79,3 +79,22 @@ test('los fondos con vídeo desenfocan el fotograma en vez de taparlo', () => {
   assert.ok(ctx.llamadas.some((c) => c[0] === 'save') && ctx.llamadas.some((c) => c[0] === 'restore'),
     'el desenfoque no se queda pegado al resto del dibujo');
 });
+
+test('los disfraces llegan al módulo de efectos', () => {
+  const ventana2 = {
+    document: { createElement: () => ({}) },
+    requestAnimationFrame: () => 0,
+    setInterval: () => 0,
+  };
+  ventana2.window = ventana2;
+  vm.createContext(ventana2);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'lib', 'disfraces.js'), 'utf8'), ventana2);
+  vm.runInContext(codigo, ventana2);
+
+  const disfraces = ventana2.WhatakaEfectos.DISFRAZES;
+  assert.ok(disfraces.length >= 12, `solo ${disfraces.length} disfraces`);
+  assert.ok(disfraces.some((d) => d.id === 'zombi'));
+  assert.ok(disfraces.some((d) => d.id === 'pajaro'));
+  assert.ok(disfraces.some((d) => d.id === 'sombrero'));
+  assert.ok(disfraces.some((d) => d.id === 'calavera'));
+});

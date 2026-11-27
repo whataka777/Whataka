@@ -3199,6 +3199,9 @@ function preparaEfectos() {
     return false;
   }
   efectos.ponFiltro(call.filtroElegido || 'normal');
+  if ((call.disfrazElegido || 'ninguno') !== 'ninguno') {
+    efectos.ponDisfraz(call.disfrazElegido).catch(() => {});
+  }
   call.efectosFuente = fuente;
   call.efectos = efectos;
   return true;
@@ -3244,10 +3247,14 @@ function marcaEfectosActivos() {
   document.querySelectorAll('#call-efectos-filtros [data-efecto]').forEach((b) => {
     b.classList.toggle('activo', b.dataset.efecto === filtro);
   });
+  const disfraz = call.disfrazElegido || 'ninguno';
+  document.querySelectorAll('#call-efectos-disfraces [data-efecto]').forEach((b) => {
+    b.classList.toggle('activo', b.dataset.efecto === disfraz);
+  });
   // El lápiz se enciende cuando hay algo puesto: si no, nadie recuerda que
   // lleva un fondo detrás.
   const lapiz = callEl('call-efectos-btn');
-  if (lapiz) lapiz.classList.toggle('activo', fondo !== 'ninguno' || filtro !== 'normal');
+  if (lapiz) lapiz.classList.toggle('activo', fondo !== 'ninguno' || filtro !== 'normal' || disfraz !== 'ninguno');
 }
 
 function pintaBotonesEfectos() {
@@ -3306,7 +3313,69 @@ function pintaBotonesEfectos() {
     filaFiltros.dataset.listo = '1';
   }
 
+  const filaDisfraces = document.getElementById('call-efectos-disfraces');
+  if (filaDisfraces && !filaDisfraces.dataset.listo) {
+    const catalogo = (window.WhaTakaDisfraces && window.WhaTakaDisfraces.CATALOGO) || [];
+    catalogo.forEach((disfraz) => {
+      const boton = document.createElement('button');
+      boton.type = 'button';
+      boton.className = 'call-efecto';
+      boton.dataset.efecto = disfraz.id;
+      const muestra = document.createElement('canvas');
+      muestra.className = 'call-efecto-muestra';
+      muestra.width = 112;
+      muestra.height = 112;
+      const ctx = muestra.getContext('2d');
+      if (disfraz.id === 'ninguno') {
+        ctx.fillStyle = '#243a52';
+        ctx.fillRect(0, 0, 112, 112);
+        ctx.strokeStyle = 'rgba(255,255,255,.45)';
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.moveTo(30, 82);
+        ctx.lineTo(82, 30);
+        ctx.stroke();
+      } else {
+        window.WhaTakaDisfraces.pintaMuestra(ctx, disfraz.id, 112);
+      }
+      const texto = document.createElement('span');
+      texto.textContent = disfraz.nombre;
+      boton.append(muestra, texto);
+      boton.addEventListener('click', () => aplicaDisfraz(disfraz.id));
+      filaDisfraces.appendChild(boton);
+    });
+    filaDisfraces.dataset.listo = '1';
+  }
+
   marcaEfectosActivos();
+}
+
+async function aplicaDisfraz(id) {
+  const boton = document.querySelector(`#call-efectos-disfraces [data-efecto="${id}"]`);
+  if (id === 'ninguno') {
+    call.disfrazElegido = 'ninguno';
+    if (call.efectos) await aplicaEfectosActuales();
+    marcaEfectosActivos();
+    return;
+  }
+  if (!preparaEfectos()) return;
+  if (!window.faceapi) {
+    // El detector de cara son casi dos megas: se descarga la primera vez.
+    toast('Preparando los disfraces: la primera vez tarda unos segundos', 5000);
+  }
+  if (boton) { boton.disabled = true; boton.classList.add('pensando'); }
+  try {
+    const puesto = await call.efectos.ponDisfraz(id);
+    if (!puesto) { toast('Ese disfraz no está disponible'); return; }
+    call.disfrazElegido = id;
+    await enviaEfectosAlOtroLado();
+  } catch (err) {
+    console.warn('disfraz', err);
+    toast('No se pudo poner el disfraz. Necesita conexión la primera vez.');
+  } finally {
+    if (boton) { boton.disabled = false; boton.classList.remove('pensando'); }
+    marcaEfectosActivos();
+  }
 }
 
 async function aplicaFondo(id) {
@@ -3352,7 +3421,9 @@ async function aplicaFiltro(id) {
 // Con todo en "normal" no hay nada que dibujar: se devuelve la cámara y se
 // apaga el lienzo, que gasta batería para nada.
 async function aplicaEfectosActuales() {
-  const sinNada = (call.fondoElegido || 'ninguno') === 'ninguno' && (call.filtroElegido || 'normal') === 'normal';
+  const sinNada = (call.fondoElegido || 'ninguno') === 'ninguno'
+    && (call.filtroElegido || 'normal') === 'normal'
+    && (call.disfrazElegido || 'ninguno') === 'ninguno';
   if (sinNada) { await vuelveALaCamara(); return; }
   if (call.efectos) await enviaEfectosAlOtroLado();
 }
@@ -3902,6 +3973,7 @@ function terminaLlamada(motivo, aviso) {
   call.videoMostrado = null;
   call.fondoElegido = 'ninguno';
   call.filtroElegido = 'normal';
+  call.disfrazElegido = 'ninguno';
   const panelEfectos = document.getElementById('call-efectos');
   if (panelEfectos) panelEfectos.hidden = true;
   const rv = callEl('call-remote-video'); if (rv) rv.srcObject = null;
@@ -4198,7 +4270,7 @@ async function activarAvisosPush() {
 // Un solo número para todo: el de las URL de index.html, la caché del service
 // worker y esta pantalla. Sirve para saber de un vistazo qué copia se está
 // usando cuando algo no cuadra. Lo comprueba test/version.test.js.
-const WHATAKA_BUILD = '86';
+const WHATAKA_BUILD = '87';
 
 const AVISO_LLAMADAS_CLAVE = 'whataka-aviso-llamadas-oculto';
 const AVISO_LLAMADAS_DIAS = 3;
