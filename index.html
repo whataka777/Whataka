@@ -1159,6 +1159,29 @@
       display: flex; gap: 40px; justify-content: center; z-index: 5;
     }
     .call-incoming[hidden] { display: none; }
+    .call-diag-btn {
+      margin-top: 6px; padding: 4px 10px; font-size: 11.5px;
+      background: none; border: 1px solid rgba(255,255,255,.25);
+      color: rgba(255,255,255,.6); border-radius: 12px; cursor: pointer;
+    }
+    .call-diag {
+      position: absolute; left: 12px; right: 12px; bottom: 110px; z-index: 7;
+      background: rgba(9,20,32,.97); border: 1px solid rgba(255,255,255,.12);
+      border-radius: 14px; padding: 12px;
+    }
+    .call-diag[hidden] { display: none; }
+    .call-diag-barra { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .call-diag-barra strong { font-size: 13px; color: #fff; }
+    .call-diag-barra button { background: none; border: none; color: #9fb3c6; font-size: 18px; cursor: pointer; }
+    .call-diag pre {
+      margin: 0; font-size: 11px; line-height: 1.5; color: #cfe0ef;
+      white-space: pre-wrap; word-break: break-word; max-height: 34vh; overflow-y: auto;
+    }
+    .call-diag-copiar {
+      margin-top: 10px; width: 100%; padding: 9px; border-radius: 10px;
+      border: 1px solid rgba(255,255,255,.2); background: rgba(255,255,255,.08);
+      color: #fff; font-size: 13px; cursor: pointer;
+    }
 
     /* Panel de fondos y filtros: se abre con el lápiz durante la videollamada. */
     .call-efectos {
@@ -1885,6 +1908,7 @@
         <h3 id="call-name" class="call-name">Contacto</h3>
         <p id="call-status" class="call-status">Llamando…</p>
         <p id="call-timer" class="call-timer"></p>
+        <button id="call-diag-btn" class="call-diag-btn" type="button">Diagnóstico</button>
       </div>
       <video id="call-local-video" class="call-local-video" playsinline autoplay muted></video>
       <div class="call-actions" id="call-actions">
@@ -1892,6 +1916,14 @@
         <button id="call-toggle-video" class="call-btn" title="Activar/desactivar cámara"><i class="fa-solid fa-video"></i></button>
         <button id="call-efectos-btn" class="call-btn" title="Fondos y filtros" style="display:none"><i class="fa-solid fa-pencil"></i></button>
         <button id="call-hangup" class="call-btn call-btn-danger" title="Colgar"><i class="fa-solid fa-phone-slash"></i></button>
+      </div>
+      <div class="call-diag" id="call-diag" hidden>
+        <div class="call-diag-barra">
+          <strong>Diagnóstico de la llamada</strong>
+          <button type="button" id="call-diag-cerrar" aria-label="Cerrar">×</button>
+        </div>
+        <pre id="call-diag-texto"></pre>
+        <button class="call-diag-copiar" id="call-diag-copiar" type="button">Copiar diagnóstico</button>
       </div>
       <div class="call-efectos" id="call-efectos" hidden>
         <div class="call-efectos-barra">
@@ -1913,13 +1945,13 @@
   </div>
 
   <script src="./vendor/ethers.umd.min.js"></script>
-  <script src="./lib/niveles.js?v=81"></script>
-  <script src="./lib/referidos.js?v=81"></script>
-  <script src="./lib/donaciones.js?v=81"></script>
-  <script src="./lib/stickers.js?v=81"></script>
-  <script src="./lib/llamadas.js?v=81"></script>
-  <script src="./lib/efectos.js?v=81"></script>
-  <script src="./lib/relay-url.js?v=81"></script>
-  <script src="./app.js?v=81"></script>
+  <script src="./lib/niveles.js?v=82"></script>
+  <script src="./lib/referidos.js?v=82"></script>
+  <script src="./lib/donaciones.js?v=82"></script>
+  <script src="./lib/stickers.js?v=82"></script>
+  <script src="./lib/llamadas.js?v=82"></script>
+  <script src="./lib/efectos.js?v=82"></script>
+  <script src="./lib/relay-url.js?v=82"></script>
+  <script src="./app.js?v=82"></script>
 </body>
 </html>

@@ -2985,11 +2985,21 @@ const call = {
   descripcionRemota: false, // ya aplicamos offer/answer
   icePendientes: [], // candidatos ICE que llegaron antes de tener la conexión
   hayTurn: false, // el relé publicó un servidor TURN
+  vigia: null, // temporizador que evita quedarse en «Conectando…» para siempre
+  candidatosEnviados: 0,
+  candidatosRecibidos: 0,
+  reintentoIce: false,
 };
 // Aviso tocado en la notificación del sistema antes de que llegue la oferta.
 let avisoPendiente = null;
 
 const CALL_RING_SECONDS = 45;
+// Margen para que el audio empiece a fluir tras contestar. Si no ocurre, se
+// avisa y se cuelga: mejor un mensaje claro que una pantalla congelada.
+const CALL_CONNECT_SECONDS = 30;
+// Un corte de red de unos segundos es normal en el móvil; no es una llamada
+// terminada. Se le da este margen antes de tocar nada.
+const CALL_DISCONNECT_GRACE_MS = 8000;
 const RTC_CONFIG = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
@@ -3295,7 +3305,9 @@ function enviaSenal(kind, payload) {
 function creaPeerConnection(peerId) {
   const pc = new RTCPeerConnection(RTC_CONFIG);
   pc.onicecandidate = (e) => {
-    if (e.candidate) enviaSenal('ice', { candidate: e.candidate.toJSON ? e.candidate.toJSON() : e.candidate });
+    if (!e.candidate) return;
+    call.candidatosEnviados += 1;
+    enviaSenal('ice', { candidate: e.candidate.toJSON ? e.candidate.toJSON() : e.candidate });
   };
   pc.ontrack = (e) => {
     call.remoteStream = e.streams[0];
@@ -3310,16 +3322,45 @@ function creaPeerConnection(peerId) {
     quizasActivarLlamada();
   };
   pc.onconnectionstatechange = () => {
-    if (pc.connectionState === 'failed') {
-      // Sin TURN, dos redes móviles o NAT estricto no pueden abrir el canal
-      // directo: el usuario merece saber por qué y qué hace falta.
+    const estado = pc.connectionState;
+    if (estado === 'connected') {
+      if (call.vigia) { clearTimeout(call.vigia); call.vigia = null; }
+      call.reintentoIce = false;
+      quizasActivarLlamada();
+      return;
+    }
+    if (estado === 'failed') {
+      // Un primer fallo puede ser un cambio de red: se reintenta el ICE antes
+      // de rendirse. Sin TURN, dos redes móviles con NAT estricto no tienen
+      // camino directo, y eso hay que decirlo con claridad.
+      if (!call.reintentoIce) {
+        call.reintentoIce = true;
+        try { pc.restartIce(); } catch {}
+        vigilaConexion(15);
+        return;
+      }
       const pista = call.hayTurn
         ? 'No se pudo conectar la llamada. Prueba con otra red (Wi-Fi).'
-        : 'No se pudo conectar la llamada: tu red no permite el enlace directo y el relé no tiene TURN configurado.';
+        : 'No se pudo conectar la llamada: las dos redes no dejan el enlace directo y el relé no tiene servidor TURN. Prueba con Wi-Fi.';
+      const foto = diagnosticoLlamada();
       terminaLlamada('sin_conexion', pista);
+      avisaFalloLlamada(pista, foto);
+      return;
     }
-    if (pc.connectionState === 'disconnected' || pc.connectionState === 'closed') {
-      if (call.maquina && call.maquina.estado === 'activa') terminaLlamada('terminada', 'Llamada finalizada');
+    if (estado === 'disconnected') {
+      // En el móvil esto pasa al cambiar de antena o al bloquear la pantalla:
+      // se espera un poco y, si no vuelve, se reintenta el ICE.
+      if (call.corteRed) clearTimeout(call.corteRed);
+      call.corteRed = setTimeout(() => {
+        call.corteRed = null;
+        if (!call.pc || call.pc.connectionState === 'connected') return;
+        try { call.pc.restartIce(); } catch {}
+        vigilaConexion(CALL_CONNECT_SECONDS);
+      }, CALL_DISCONNECT_GRACE_MS);
+      return;
+    }
+    if (estado === 'closed' && call.maquina && call.maquina.estado === 'activa') {
+      terminaLlamada('terminada', 'Llamada finalizada');
     }
   };
   if (call.localStream) {
@@ -3327,6 +3368,82 @@ function creaPeerConnection(peerId) {
   }
   call.pc = pc;
   return pc;
+}
+
+// Si en este tiempo la llamada no llega a «connected», se cierra con un aviso
+// claro en vez de dejar la pantalla en «Conectando…» para siempre.
+function vigilaConexion(segundos) {
+  if (call.vigia) clearTimeout(call.vigia);
+  call.vigia = setTimeout(() => {
+    call.vigia = null;
+    if (!call.pc || call.pc.connectionState === 'connected') return;
+    if (!call.maquina || call.maquina.estado !== 'conectando') return;
+    const pista = call.hayTurn
+      ? 'No se pudo conectar la llamada. Prueba con otra red (Wi-Fi o datos).'
+      : 'No se pudo conectar la llamada: las dos redes no dejan el enlace directo y falta un servidor TURN. Prueba con Wi-Fi.';
+    const foto = diagnosticoLlamada();
+    terminaLlamada('sin_conexion', pista);
+    avisaFalloLlamada(pista, foto);
+  }, segundos * 1000);
+}
+
+// Radiografía de la llamada: sirve para saber qué falló sin adivinar.
+function diagnosticoLlamada() {
+  const pc = call.pc;
+  const red = (navigator.connection && navigator.connection.effectiveType) || 'desconocida';
+  return [
+    `hora: ${new Date().toISOString()}`,
+    `estado: ${call.maquina ? call.maquina.estado : 'sin llamada'}`,
+    `conexión: ${pc ? pc.connectionState : '—'}`,
+    `hielo: ${pc ? pc.iceConnectionState : '—'}`,
+    `recolección: ${pc ? pc.iceGatheringState : '—'}`,
+    `señalización: ${pc ? pc.signalingState : '—'}`,
+    `candidatos enviados: ${call.candidatosEnviados}`,
+    `candidatos recibidos: ${call.candidatosRecibidos}`,
+    `servidor TURN: ${call.hayTurn ? 'sí' : 'no'}`,
+    `red: ${red}`,
+    `navegador: ${navigator.userAgent}`,
+  ].join('\n');
+}
+
+function mostrarDiagnosticoLlamada() {
+  const caja = callEl('call-diag');
+  const texto = callEl('call-diag-texto');
+  if (!caja || !texto) return;
+  texto.textContent = diagnosticoLlamada();
+  caja.hidden = false;
+}
+
+// Cuando la llamada se cae sola, la pantalla de llamada desaparece; el
+// diagnóstico se enseña en una ventana para que se pueda copiar y enviar.
+function avisaFalloLlamada(motivo, texto) {
+  if (!texto) texto = diagnosticoLlamada();
+  openModal('📵 La llamada no conectó', `
+    <p>${escapeHtml(motivo)}</p>
+    <p class="hint-text">Si vuelve a pasar, copia este diagnóstico y mándalo: dice exactamente en qué paso se quedó.</p>
+    <pre id="diag-modal-texto" style="white-space:pre-wrap;word-break:break-word;background:#0f1722;border:1px solid #22364a;border-radius:10px;padding:10px;font-size:11px;color:#cfe0ef;max-height:38vh;overflow:auto">${escapeHtml(texto)}</pre>
+    <div class="modal-btn-row">
+      <button class="ghost-btn" id="diag-modal-cerrar">Cerrar</button>
+      <button class="primary-btn" id="diag-modal-copiar">Copiar diagnóstico</button>
+    </div>`);
+  const cerrar = document.getElementById('diag-modal-cerrar');
+  if (cerrar) cerrar.addEventListener('click', closeModal);
+  const copiar = document.getElementById('diag-modal-copiar');
+  if (copiar) {
+    copiar.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(texto);
+        copiar.textContent = 'Copiado ✓';
+      } catch {
+        const r = document.createRange();
+        r.selectNodeContents(document.getElementById('diag-modal-texto'));
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(r);
+        copiar.textContent = 'Seleccionado: copia a mano';
+      }
+    });
+  }
 }
 
 // Aplica los candidatos ICE que llegaron antes de estar lista la conexión.
@@ -3405,6 +3522,9 @@ async function aceptarLlamada() {
   if (!call.maquina || call.maquina.estado !== 'sonando') return;
   // Se calla al instante: pedir el micrófono tarda y el timbre seguiría sonando.
   stopRingtone();
+  // El móvil solo deja sonar el audio si se pide dentro del toque del usuario.
+  // Se hace aquí, antes de cualquier espera, o la llamada se queda muda.
+  reproduceVideo(callEl('call-remote-video'));
   try {
     call.localStream = await pedirMedios(call.video);
   } catch (err) {
@@ -3419,18 +3539,25 @@ async function aceptarLlamada() {
   pintaVideoLocal();
   sincronizaBotonesLlamada();
 
-  await cargarIceServers();
-  const pc = creaPeerConnection(call.maquina.peer);
-  // La oferta ya la guardamos al recibirla.
-  if (call._offerSdp) {
+  try {
+    await cargarIceServers();
+    const pc = creaPeerConnection(call.maquina.peer);
+    // La oferta ya la guardamos al recibirla.
+    if (!call._offerSdp) throw new Error('la oferta de la llamada ya no está disponible');
     await pc.setRemoteDescription(new RTCSessionDescription(call._offerSdp));
     call.descripcionRemota = true;
     aplicarIcePendientes();
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    enviaSenal('answer', { sdp: pc.localDescription });
+    vigilaConexion(CALL_CONNECT_SECONDS);
+    quizasActivarLlamada();
+  } catch (err) {
+    // Antes esto se quedaba colgado en «Conectando…» sin decir nada.
+    console.warn('no se pudo contestar', err);
+    enviaSenal('hangup', {});
+    terminaLlamada('sin_conexion', 'No se pudo contestar la llamada. Inténtalo otra vez.');
   }
-  const answer = await pc.createAnswer();
-  await pc.setLocalDescription(answer);
-  enviaSenal('answer', { sdp: pc.localDescription });
-  quizasActivarLlamada();
 }
 
 function rechazarLlamada() {
@@ -3488,11 +3615,18 @@ async function recibirSenal(msg) {
   }
   if (kind === 'answer') {
     if (!call.pc || !call.maquina) return;
-    await call.pc.setRemoteDescription(new RTCSessionDescription(msg.payload.sdp));
+    try {
+      await call.pc.setRemoteDescription(new RTCSessionDescription(msg.payload.sdp));
+    } catch (err) {
+      console.warn('respuesta no aplicable', err);
+      terminaLlamada('sin_conexion', 'La llamada se cortó antes de conectar. Inténtalo otra vez.');
+      return;
+    }
     call.descripcionRemota = true;
     aplicarIcePendientes();
     call.maquina.conectar();
     setEstadoLlamada('Conectando…');
+    vigilaConexion(CALL_CONNECT_SECONDS);
     quizasActivarLlamada();
     return;
   }
@@ -3501,6 +3635,7 @@ async function recibirSenal(msg) {
     const cand = msg.payload.candidate;
     // Sin conexión, o con la descripción remota aún sin aplicar, no se puede
     // añadir el candidato todavía: se guarda para aplicarlo en cuanto se pueda.
+    call.candidatosRecibidos += 1;
     if (!call.pc || !call.descripcionRemota) { call.icePendientes.push(cand); return; }
     try { await call.pc.addIceCandidate(new RTCIceCandidate(cand)); } catch {}
     return;
@@ -3531,12 +3666,21 @@ function activarLlamada() {
   sincronizaBotonesLlamada();
 }
 
-// La llamada se da por "activa" solo cuando ya se aplicó la descripción remota
-// y llegó audio/vídeo. Así da igual el orden en que pasen ambas cosas.
+// La llamada se da por "activa" solo cuando hay descripción remota, llegó
+// audio/vídeo Y la conexión está establecida. Antes bastaba con la descripción:
+// con la red bloqueada la pantalla decía «En llamada» en silencio y parecía
+// colgada.
+function conexionEstablecida() {
+  const pc = call.pc;
+  if (!pc) return false;
+  const hielo = pc.iceConnectionState;
+  return pc.connectionState === 'connected' || hielo === 'connected' || hielo === 'completed';
+}
+
 function quizasActivarLlamada() {
   if (!call.maquina || call.maquina.estado === 'activa') return;
   if (call.maquina.estado !== 'conectando') return;
-  if (call.descripcionRemota && call.mediosListos) activarLlamada();
+  if (call.descripcionRemota && call.mediosListos && conexionEstablecida()) activarLlamada();
 }
 
 function sincronizaBotonesLlamada() {
@@ -3561,6 +3705,13 @@ function sincronizaBotonesLlamada() {
 
 function terminaLlamada(motivo, aviso) {
   if (call.esperandoRespuesta) { clearTimeout(call.esperandoRespuesta); call.esperandoRespuesta = null; }
+  if (call.vigia) { clearTimeout(call.vigia); call.vigia = null; }
+  if (call.corteRed) { clearTimeout(call.corteRed); call.corteRed = null; }
+  call.candidatosEnviados = 0;
+  call.candidatosRecibidos = 0;
+  call.reintentoIce = false;
+  const cajaDiag = callEl('call-diag');
+  if (cajaDiag) cajaDiag.hidden = true;
   paraTimerLlamada();
   try {
     if (call.maquina && !call.maquina.terminada) {
@@ -3621,6 +3772,21 @@ function alternarCamara() {
 function conectarBotonesLlamada() {
   const q = (id) => document.getElementById(id);
   if (q('call-hangup')) q('call-hangup').addEventListener('click', colgarLlamada);
+  if (q('call-diag-btn')) q('call-diag-btn').addEventListener('click', mostrarDiagnosticoLlamada);
+  if (q('call-diag-cerrar')) {
+    q('call-diag-cerrar').addEventListener('click', () => { q('call-diag').hidden = true; });
+  }
+  if (q('call-diag-copiar')) {
+    q('call-diag-copiar').addEventListener('click', async () => {
+      const texto = (q('call-diag-texto') || {}).textContent || '';
+      try {
+        await navigator.clipboard.writeText(texto);
+        toast('Diagnóstico copiado');
+      } catch {
+        toast('No se pudo copiar: selecciona el texto a mano');
+      }
+    });
+  }
   if (q('call-accept')) q('call-accept').addEventListener('click', aceptarLlamada);
   if (q('call-reject')) q('call-reject').addEventListener('click', rechazarLlamada);
   if (q('call-toggle-mute')) q('call-toggle-mute').addEventListener('click', alternarMute);
@@ -3869,7 +4035,7 @@ async function activarAvisosPush() {
 // Un solo número para todo: el de las URL de index.html, la caché del service
 // worker y esta pantalla. Sirve para saber de un vistazo qué copia se está
 // usando cuando algo no cuadra. Lo comprueba test/version.test.js.
-const WHATAKA_BUILD = '81';
+const WHATAKA_BUILD = '82';
 
 const AVISO_LLAMADAS_CLAVE = 'whataka-aviso-llamadas-oculto';
 const AVISO_LLAMADAS_DIAS = 3;
