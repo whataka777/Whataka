@@ -638,6 +638,27 @@ app.post('/api/push/subscribe', (req, res) => {
   res.json({ ok: true, avisos: push.cuantas(String(peerId)) });
 });
 
+// Cuántos teléfonos de esta cuenta recibirían el aviso ahora mismo.
+app.get('/api/push/estado/:peerId', (req, res) => {
+  const peerId = String(req.params.peerId || '');
+  if (!validatePeerId(peerId)) return res.status(400).json({ error: 'peerId inválido' });
+  res.json({ dispositivos: push.cuantas(peerId), efimeras: push.efimeras });
+});
+
+// Aviso de prueba: sirve para comprobar, con la app cerrada, que el camino
+// hasta el teléfono funciona de verdad.
+app.post('/api/push/prueba', async (req, res) => {
+  const peerId = String((req.body && req.body.peerId) || '');
+  if (!validatePeerId(peerId)) return res.status(400).json({ error: 'peerId inválido' });
+  const dispositivos = push.cuantas(peerId);
+  const enviados = await push.enviar(peerId, {
+    tipo: 'prueba',
+    titulo: 'Aviso de prueba de Whataka',
+    cuerpo: 'Si ves esto con la app cerrada, las llamadas te llegarán.',
+  }, { ttl: 120 });
+  res.json({ dispositivos, enviados });
+});
+
 app.post('/api/push/unsubscribe', (req, res) => {
   const { peerId, endpoint } = req.body || {};
   push.desuscribir(String(peerId || ''), endpoint ? String(endpoint) : null);

@@ -85,3 +85,27 @@ conectaría.
   parecía que no pasaba nada.
 - **La pestaña abierta se recarga sola** cuando el service worker se actualiza,
   para no seguir usando una versión vieja tras un arreglo.
+
+## Con la app cerrada: avisos push
+
+Un navegador no puede mantener la conexión con la app cerrada: el sistema
+suspende la pestaña y el WebSocket se cae. Lo único que despierta el teléfono es
+un aviso push, que ya está montado:
+
+- el relé guarda la oferta de llamada y repite el aviso cada pocos segundos
+  mientras suena (`lib/push.js`);
+- el service worker lo muestra como notificación con «Contestar» y «Rechazar»;
+- al tocar «Contestar» se abre la app con `?contestar=1` y la oferta guardada se
+  entrega al conectar.
+
+Para saber si el camino funciona hay dos rutas nuevas en el relé:
+
+- `GET /api/push/estado/:peerId` → `{ dispositivos, efimeras }`
+- `POST /api/push/prueba` con `{ peerId }` → manda un aviso de prueba y devuelve
+  `{ dispositivos, enviados }`
+
+La app las usa en Ajustes → NOTIFICATIONS: muestra en cuántos teléfonos están
+activos y tiene el botón «Probar aviso». Si `efimeras` sale `true`, las claves
+VAPID se generan al arrancar y cada reinicio invalida las suscripciones: hay que
+poner `VAPID_SEED` (o `VAPID_PUBLIC_KEY` y `VAPID_PRIVATE_KEY`) en el servicio.
+En producción sale `false`, así que las suscripciones sobreviven a los reinicios.

@@ -4195,7 +4195,7 @@ async function activarAvisosPush() {
 // Un solo número para todo: el de las URL de index.html, la caché del service
 // worker y esta pantalla. Sirve para saber de un vistazo qué copia se está
 // usando cuando algo no cuadra. Lo comprueba test/version.test.js.
-const WHATAKA_BUILD = '84';
+const WHATAKA_BUILD = '85';
 
 const AVISO_LLAMADAS_CLAVE = 'whataka-aviso-llamadas-oculto';
 const AVISO_LLAMADAS_DIAS = 3;
@@ -4253,11 +4253,14 @@ function estaInstalada() {
 function pintaEstadoAvisos() {
   const fila = document.getElementById('btn-permissions');
   const texto = document.getElementById('avisos-estado');
+  const probar = document.getElementById('avisos-probar');
   if (!fila || !texto) return;
   const permiso = 'Notification' in window ? Notification.permission : 'no-soportado';
+  if (probar) probar.hidden = permiso !== 'granted';
   if (permiso === 'granted') {
     texto.textContent = 'Avisos de llamada activados: te llaman con la app cerrada';
     fila.classList.remove('pendiente');
+    pintaDispositivosAviso();
     return;
   }
   if (esIPhone() && !estaInstalada()) {
@@ -4267,6 +4270,46 @@ function pintaEstadoAvisos() {
   }
   texto.textContent = 'Toca aquí para recibir llamadas con la app cerrada';
   fila.classList.add('pendiente');
+}
+
+// Cuántos teléfonos de esta cuenta recibirían una llamada con la app cerrada.
+async function pintaDispositivosAviso() {
+  const texto = document.getElementById('avisos-estado');
+  if (!texto || !state.identity) return;
+  try {
+    const r = await fetch(`${RELAY_HTTP}/api/push/estado/${state.identity.peerId}`);
+    const d = await r.json();
+    if (!d || typeof d.dispositivos !== 'number') return;
+    texto.textContent = d.dispositivos > 0
+      ? `Avisos activados en ${d.dispositivos} teléfono${d.dispositivos === 1 ? '' : 's'}: te llaman con la app cerrada`
+      : 'Permiso dado, pero este teléfono aún no está suscrito: recarga la app';
+  } catch { /* sin relé: se queda el texto anterior */ }
+}
+
+// Aviso de prueba: comprueba el camino completo hasta el teléfono.
+async function probarAviso() {
+  const boton = document.getElementById('avisos-probar');
+  if (!state.identity) return;
+  if (!('Notification' in window) || Notification.permission !== 'granted') {
+    toast('Primero activa los avisos: toca la fila de NOTIFICATIONS');
+    return;
+  }
+  if (boton) { boton.disabled = true; boton.textContent = 'Enviando…'; }
+  try {
+    const r = await fetch(`${RELAY_HTTP}/api/push/prueba`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ peerId: state.identity.peerId }),
+    });
+    const d = await r.json();
+    if (d.enviados > 0) toast(`Aviso enviado a ${d.enviados} teléfono. Cierra la app y mira la pantalla.`);
+    else if (d.dispositivos === 0) toast('Este teléfono no está suscrito: activa los avisos primero');
+    else toast('El teléfono no aceptó el aviso: revisa las notificaciones en los ajustes del sistema');
+  } catch {
+    toast('No se pudo pedir el aviso de prueba: revisa la conexión');
+  } finally {
+    if (boton) { boton.disabled = false; boton.textContent = 'Probar aviso'; }
+  }
 }
 
 // Dentro de WhatsApp, Instagram o Facebook la cámara y el micrófono no existen:
@@ -4633,6 +4676,8 @@ async function boot() {
   if (etiquetaVersion) etiquetaVersion.textContent = WHATAKA_BUILD;
   const botonAviso = document.getElementById('aviso-llamadas-activar');
   if (botonAviso) botonAviso.addEventListener('click', activarAvisosDesdeLaLista);
+  const botonProbar = document.getElementById('avisos-probar');
+  if (botonProbar) botonProbar.addEventListener('click', probarAviso);
   const cerrarAviso = document.getElementById('aviso-llamadas-cerrar');
   if (cerrarAviso) cerrarAviso.addEventListener('click', () => ocultarAvisoLlamadas(true));
 

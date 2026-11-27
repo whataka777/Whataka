@@ -1,4 +1,4 @@
-const CACHE = 'whataka-v84';
+const CACHE = 'whataka-v85';
 const ASSETS = [
   './',
   './index.html',
@@ -63,6 +63,21 @@ self.addEventListener('push', (event) => {
         icon: './icons/icon-192.png',
         badge: './icons/icon-192.png',
         vibrate: [200, 100, 200],
+        data: datos,
+      }),
+    );
+    return;
+  }
+  // Aviso de prueba: se muestra tal cual, para comprobar que el camino llega.
+  if (datos.tipo === 'prueba') {
+    event.waitUntil(
+      self.registration.showNotification(datos.titulo || 'Aviso de prueba', {
+        body: datos.cuerpo || 'Los avisos de Whataka funcionan.',
+        tag: 'prueba-whataka',
+        renotify: true,
+        vibrate: [300, 150, 300],
+        icon: './icons/icon-192.png',
+        badge: './icons/icon-192.png',
         data: datos,
       }),
     );
